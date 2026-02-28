@@ -5,7 +5,10 @@ import { Server } from "socket.io";
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  
+  // ВАЖНО: Берем порт от Render (process.env.PORT) или используем 3000 локально
+  const PORT = process.env.PORT || 3000;
+  
   const httpServer = createServer(app);
   
   const io = new Server(httpServer, {
@@ -21,7 +24,7 @@ async function startServer() {
   });
 
   // Socket.IO Logic
-  const rooms = new Map<string, { id: string, name: string, players: any[], gameType: string, status: string }>();
+ const rooms = new Map<string, { id: string, name: string, maxPlayers: number, players: any[], gameType: string, status: string }>();
 
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
@@ -165,8 +168,9 @@ async function startServer() {
     app.use(express.static("dist"));
   }
 
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  // Запускаем сервер с использованием переменной PORT
+  httpServer.listen(PORT as number, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
   });
 }
 

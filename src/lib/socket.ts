@@ -1,6 +1,8 @@
 import { io } from "socket.io-client";
 
-// The APP_URL is provided by the environment, but in dev we can use window.location.origin
+// window.location.origin автоматически подставит правильный URL.
+// Локально это будет "http://localhost:3000", 
+// а на Render это будет "https://nekoplay-server.onrender.com"
 const URL = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
 
 export const socket = io(URL, {
