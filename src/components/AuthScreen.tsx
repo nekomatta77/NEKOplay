@@ -5,7 +5,6 @@ import { Cat, UserCircle, Sparkles } from 'lucide-react';
 import { ref, set, serverTimestamp } from 'firebase/database';
 import { db } from '../lib/firebase';
 
-// Генерируем массив из 20 аватарок: от ava1.png до ava20.png
 const AVATARS = Array.from({ length: 20 }, (_, i) => `/assets/avatars/ava${i + 1}.png`);
 
 interface AuthScreenProps {
@@ -22,7 +21,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     if (!name.trim()) return;
 
     setIsLoading(true);
-
     const userId = Math.random().toString(36).substring(2, 9);
     
     const newUser = {
@@ -39,6 +37,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         lastSeen: serverTimestamp()
       });
 
+      // Сохраняем в память браузера
+      localStorage.setItem('nekoplay_user', JSON.stringify(newUser));
+
       onLogin(newUser);
     } catch (error) {
       console.error("Ошибка при сохранении пользователя в Firebase:", error);
@@ -50,7 +51,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-[100dvh] bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden pb-safe">
-      {/* Background Glows */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-600/20 rounded-full blur-[120px] pointer-events-none" />
 
@@ -80,7 +80,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
               <Sparkles className="w-4 h-4 text-indigo-400" />
               Выберите аватар
             </label>
-            {/* Сделали сетку более плотной (5 колонок) и добавили скролл, если экран маленький */}
             <div className="grid grid-cols-5 gap-2 sm:gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
               {AVATARS.map((avatar, idx) => (
                 <button

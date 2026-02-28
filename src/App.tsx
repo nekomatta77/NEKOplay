@@ -4,9 +4,9 @@ import { Dashboard } from './components/Dashboard';
 import { Lobby } from './components/Lobby';
 import LoadingScreen from './components/LoadingScreen';
 import { User, Room } from './types';
-import { socket } from './lib/socket';
+import { ref, onValue } from 'firebase/database';
+import { db } from './lib/firebase';
 
-// Lazy load the GameView with an artificial delay to show the beautiful loading screen
 const GameView = React.lazy(() => {
   return Promise.all([
     import('./components/GameView'),
@@ -15,42 +15,34 @@ const GameView = React.lazy(() => {
 });
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  // Инициализируем пользователя из памяти браузера
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('nekoplay_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+  
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
 
   useEffect(() => {
-    if (user) {
-      socket.connect();
+    if (!currentRoomId) {
+      setCurrentRoom(null);
+      return;
     }
 
-    return () => {
-      socket.disconnect();
-    };
-  }, [user]);
+    const roomRef = ref(db, `rooms/${currentRoomId}`);
+    const unsubscribe = onValue(roomRef, (snapshot) => {
+      const roomData = snapshot.val();
+      if (roomData) {
+        setCurrentRoom(roomData);
+      } else {
+        setCurrentRoomId(null);
+        setCurrentRoom(null);
+      }
+    });
 
-  useEffect(() => {
-    const handleRoomUpdated = (room: Room) => {
-      setCurrentRoom(room);
-    };
-
-    const handleGameStarted = (room: Room) => {
-      setCurrentRoom(room);
-    };
-
-    const handleError = (error: { message: string }) => {
-      alert(error.message);
-    };
-
-    socket.on('room_updated', handleRoomUpdated);
-    socket.on('game_started', handleGameStarted);
-    socket.on('error', handleError);
-
-    return () => {
-      socket.off('room_updated', handleRoomUpdated);
-      socket.off('game_started', handleGameStarted);
-      socket.off('error', handleError);
-    };
-  }, []);
+    return () => unsubscribe();
+  }, [currentRoomId]);
 
   if (!user) {
     return <AuthScreen onLogin={setUser} />;
@@ -60,24 +52,12 @@ export default function App() {
     if (currentRoom.status === 'playing') {
       return (
         <Suspense fallback={<LoadingScreen />}>
-          <GameView
-            room={currentRoom}
-            user={user}
-            onLeave={() => setCurrentRoom(null)}
-          />
+          <GameView room={currentRoom} user={user} onLeave={() => setCurrentRoomId(null)} />
         </Suspense>
       );
     }
-    
-    return (
-      <Lobby
-        room={currentRoom}
-        user={user}
-        onLeave={() => setCurrentRoom(null)}
-      />
-    );
+    return <Lobby room={currentRoom} user={user} onLeave={() => setCurrentRoomId(null)} />;
   }
 
-  return <Dashboard user={user} onJoinRoom={setCurrentRoom} />;
+  return <Dashboard user={user} onJoinRoom={(room) => setCurrentRoomId(room.id)} />;
 }
-
