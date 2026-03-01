@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Room } from '../types';
 import { ref, onValue, push, set, serverTimestamp } from 'firebase/database';
 import { db } from '../lib/firebase';
+import { GAMES } from '../lib/games'; // ДОБАВЛЕНО: Импортируем список игр
 import { motion } from 'motion/react';
 import { LogOut, Plus, Users, Gamepad2, X } from 'lucide-react';
 
@@ -14,7 +15,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [roomName, setRoomName] = useState('Комната ' + user.name);
-  const [maxPlayers, setMaxPlayers] = useState(2);
+  // ДОБАВЛЕНО: Состояние для выбранной игры (по умолчанию первая из списка)
+  const [selectedGameId, setSelectedGameId] = useState(GAMES[0].id); 
+  const [maxPlayers, setMaxPlayers] = useState(GAMES[0].maxPlayers);
+
+  // ДОБАВЛЕНО: При смене игры обновляем лимиты игроков
+  const handleGameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newGameId = e.target.value;
+    setSelectedGameId(newGameId);
+    
+    const game = GAMES.find(g => g.id === newGameId);
+    if (game) {
+      if (maxPlayers > game.maxPlayers) setMaxPlayers(game.maxPlayers);
+      if (maxPlayers < game.minPlayers) setMaxPlayers(game.minPlayers);
+    }
+  };
 
   useEffect(() => {
     const roomsRef = ref(db, 'rooms');
@@ -41,7 +56,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
     const newRoom: Room = {
       id: roomId,
       name: roomName,
-      gameType: 'tictactoe', // Теперь всегда только одна игра
+      gameType: selectedGameId, // ИСПРАВЛЕНО: Теперь берем игру из состояния
       maxPlayers: maxPlayers,
       players: [{
         ...user,
@@ -82,6 +97,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
 
     onJoinRoom(room);
   };
+
+  // ДОБАВЛЕНО: Вспомогательная функция для получения названия игры по её ID
+  const getGameName = (gameId: string) => {
+    const game = GAMES.find(g => g.id === gameId);
+    return game ? game.name : 'Неизвестная игра';
+  };
+
+  // Получаем текущую выбранную игру для настройки ползунка игроков
+  const selectedGameObj = GAMES.find(g => g.id === selectedGameId) || GAMES[0];
 
   return (
     <div className="min-h-[100dvh] bg-zinc-950 p-4 sm:p-8">
@@ -147,8 +171,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                   </span>
                 </div>
                 
+                {/* ИСПРАВЛЕНО: Теперь выводим реальное название игры */}
                 <p className="text-sm text-indigo-400 font-medium mb-6 uppercase tracking-wider">
-                  Neon Tic-Tac-Toe
+                  {getGameName(room.gameType)}
                 </p>
 
                 <button 
@@ -190,20 +215,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                 />
               </div>
 
+              {/* ИСПРАВЛЕНО: Заменили заблокированный блок на выпадающий список (select) */}
               <div>
                 <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Режим игры</label>
-                <div className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-indigo-400 font-bold opacity-80 cursor-not-allowed">
-                  Neon Tic-Tac-Toe
-                </div>
+                <select 
+                  value={selectedGameId}
+                  onChange={handleGameChange}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors appearance-none cursor-pointer"
+                >
+                  {GAMES.map((game) => (
+                    <option key={game.id} value={game.id}>
+                      {game.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
+              {/* ИСПРАВЛЕНО: Ползунок игроков теперь зависит от выбранной игры */}
               <div>
                 <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">
                   Игроков: <span className="text-white">{maxPlayers}</span>
                 </label>
                 <input 
                   type="range" 
-                  min="2" max="8" 
+                  min={selectedGameObj.minPlayers} 
+                  max={selectedGameObj.maxPlayers} 
                   value={maxPlayers}
                   onChange={(e) => setMaxPlayers(parseInt(e.target.value))}
                   className="w-full accent-indigo-500"

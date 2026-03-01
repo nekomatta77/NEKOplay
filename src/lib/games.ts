@@ -10,19 +10,11 @@ export const GAMES: Game[] = [
     maxPlayers: 8,
   },
   {
-    id: 'connect4',
-    name: 'Четыре в ряд',
-    description: 'Бросай фишки и собери 4 в ряд быстрее соперника.',
-    image: 'https://picsum.photos/seed/connect4/400/300?blur=2',
-    minPlayers: 2,
-    maxPlayers: 8,
-  },
-  {
-    id: 'neko_cards',
-    name: 'NEKO Карты (Скоро)',
-    description: 'Карточная игра для большой компании. Избавься от карт первым!',
-    image: 'https://picsum.photos/seed/cards/400/300?blur=2',
-    minPlayers: 2,
-    maxPlayers: 8,
+    id: 'drawphone',
+    name: 'Испорченный телефон',
+    description: 'Рисуй и угадывай! Безумная цепочка слов и рисунков.',
+    image: 'https://picsum.photos/seed/drawphone/400/300?blur=2',
+    minPlayers: 3,
+    maxPlayers: 12,
   }
 ];

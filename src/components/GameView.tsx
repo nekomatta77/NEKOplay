@@ -12,7 +12,6 @@ interface GameViewProps {
 export default function GameView({ room, user, onLeave }: GameViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Обработка выхода из игры
   const handleLeaveGame = async () => {
     const updatedPlayers = room.players?.filter(p => p.id !== user.id) || [];
     const isHost = room.players?.find(p => p.id === user.id)?.isHost;
@@ -30,7 +29,25 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
-      // 1. Игровые действия (крестики, прыжки и т.д.)
+      // 1. НАДЕЖНЫЙ СТАРТ: Передаем аватарки и настройки режима
+      if (event.data?.type === 'start_game') {
+        const gamePlayers = room.players || [];
+        const playerNames = gamePlayers.reduce((acc, p) => ({...acc, [p.id]: p.name}), {});
+        const playerAvatars = gamePlayers.reduce((acc, p) => ({...acc, [p.id]: p.avatar}), {});
+
+        await update(ref(db, `rooms/${room.id}/gameState`), {
+          status: 'playing',
+          round: 1,
+          totalRounds: gamePlayers.length > 0 ? gamePlayers.length : 2,
+          players: gamePlayers.map(p => p.id),
+          playerNames: playerNames,
+          playerAvatars: playerAvatars, // ДОБАВЛЕНО: Аватарки для финала
+          settings: event.data.settings || { mode: 'classic', time: 90 }, // ДОБАВЛЕНО: Режимы
+          submissions: null // Очищаем историю при новом старте
+        });
+      }
+
+      // 2. Игровые действия Tictactoe
       if (event.data?.type === 'game_action') {
         await set(ref(db, `rooms/${room.id}/lastAction`), {
           senderId: user.id,
@@ -39,7 +56,11 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
         });
       }
       
-      // 2. НОВОЕ: Если сама игра просит нас закрыть её
+      // 3. Обновления Drawphone
+      if (event.data?.type === 'update_state' && event.data.updates) {
+        await update(ref(db, `rooms/${room.id}/gameState`), event.data.updates);
+      }
+      
       if (event.data?.type === 'leave_game') {
         handleLeaveGame();
       }
@@ -47,8 +68,24 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [room.id, user.id]);
+  }, [room.id, user.id, room.players]);
 
+  // Синхронизация gameState
+  useEffect(() => {
+    const stateRef = ref(db, `rooms/${room.id}/gameState`);
+    const unsubscribe = onValue(stateRef, (snapshot) => {
+      const state = snapshot.val() || {};
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'sync_state',
+          state: state
+        }, '*');
+      }
+    });
+    return () => unsubscribe();
+  }, [room.id]);
+
+  // Синхронизация lastAction (Крестики-нолики)
   useEffect(() => {
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
@@ -67,10 +104,13 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   const getGameUrl = () => {
     const playersCount = room.players?.length || 2;
-    return `/games/tictactoe/tictac.html?players=${playersCount}&name=${encodeURIComponent(user.name)}`;
+    const isHost = room.players?.find(p => p.id === user.id)?.isHost || false;
+    const gameId = room.gameType || 'tictactoe'; 
+    const fileName = gameId === 'tictactoe' ? 'tictac.html' : 'index.html';
+    
+    return `/games/${gameId}/${fileName}?players=${playersCount}&name=${encodeURIComponent(user.name)}&userId=${user.id}&isHost=${isHost}`;
   };
 
-  // ТЕПЕРЬ ТУТ ТОЛЬКО IFRAME НА ВЕСЬ ЭКРАН! Никаких шапок!
   return (
     <div className="fixed inset-0 bg-black z-50">
       <iframe
