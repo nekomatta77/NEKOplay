@@ -2,150 +2,27 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Neon Tic-Tac-Toe</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-
-    :root {
-      --bg: #09090b; /* zinc-950 */
-      --grid-line: rgba(63, 63, 70, 0.4);
-      --panel: rgba(24, 24, 27, 0.8);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background-color: var(--bg);
-      color: white;
-      font-family: 'Inter', sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      overflow: hidden;
-      user-select: none;
-    }
-
-    /* Фоновые неоновые пятна */
-    .glow-bg {
-      position: absolute;
-      width: 40vw; height: 40vw;
-      background: radial-gradient(circle, var(--my-color) 0%, transparent 60%);
-      opacity: 0.05;
-      z-index: 0;
-      pointer-events: none;
-      transition: background 0.5s;
-    }
-
-    .header {
-      position: absolute;
-      top: 20px;
-      text-align: center;
-      z-index: 10;
-      background: var(--panel);
-      padding: 10px 20px;
-      border-radius: 20px;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.1);
-    }
-
-    h1 { font-weight: 900; font-size: 24px; text-transform: uppercase; letter-spacing: 2px; }
-    .status { font-size: 14px; color: #a1a1aa; margin-top: 5px; font-weight: 700;}
-
-    /* Игровое поле */
-    .board-container {
-      position: relative;
-      z-index: 10;
-      padding: 10px;
-      background: var(--panel);
-      border-radius: 16px;
-      box-shadow: 0 0 40px rgba(0,0,0,0.5);
-      border: 1px solid rgba(255,255,255,0.05);
-    }
-
-    .board {
-      display: grid;
-      grid-template-columns: repeat(15, 30px);
-      grid-template-rows: repeat(15, 30px);
-      gap: 2px;
-      background-color: var(--grid-line);
-      border: 2px solid var(--grid-line);
-      border-radius: 8px;
-    }
-
-    .cell {
-      width: 30px; height: 30px;
-      background-color: var(--bg);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-    }
-
-    .cell:hover { background-color: rgba(255,255,255,0.05); }
-
-    /* Неоновые токены */
-    .token {
-      width: 80%;
-      height: 80%;
-      border-radius: 50%;
-      box-shadow: 0 0 10px currentColor, inset 0 0 10px currentColor;
-      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-
-    @keyframes popIn {
-      0% { transform: scale(0); opacity: 0; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-
-    /* Кулдаун бар */
-    .cooldown-bar {
-      position: absolute;
-      bottom: 20px;
-      width: 200px;
-      height: 6px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 10px;
-      overflow: hidden;
-      z-index: 10;
-    }
-    
-    .cooldown-fill {
-      height: 100%;
-      width: 100%;
-      background: var(--my-color);
-      transform-origin: left;
-      transition: transform 0.1s linear;
-    }
-
-    .winner-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(10px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.5s;
-    }
-    .winner-overlay.active { opacity: 1; pointer-events: auto; }
-    .winner-text { font-size: 48px; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 20px currentColor;}
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
   <div class="glow-bg" id="glow"></div>
+
+  <button class="leave-btn" onclick="leaveGame()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+      <polyline points="16 17 21 12 16 7"></polyline>
+      <line x1="21" y1="12" x2="9" y2="12"></line>
+    </svg>
+    Выйти
+  </button>
+
+  <button class="help-btn" onclick="toggleHelp()">?</button>
 
   <div class="header">
     <h1>NEKO<span style="color: var(--my-color)">TicTac</span></h1>
-    <div class="status" id="status">Твой цвет назначен! Кликай на поле.</div>
+    <div class="status" id="status">Жми на поле!</div>
   </div>
 
   <div class="board-container">
@@ -156,145 +33,28 @@
     <div class="cooldown-fill" id="cooldown"></div>
   </div>
 
-  <div class="winner-overlay" id="winnerOverlay">
-    <div class="winner-text" id="winnerText">ИГРА ОКОНЧЕНА</div>
+  <div class="overlay active" id="countdownOverlay" style="z-index: 200;">
+    <div class="countdown-text" id="countdownText">ОЖИДАНИЕ...</div>
   </div>
 
-  <script>
-    const BOARD_SIZE = 15;
-    const WIN_STREAK = 5; // По умолчанию 5 в ряд. Можно менять логику
-    let boardState = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
-    let isOnCooldown = false;
-    let isGameOver = false;
+  <div class="overlay" id="helpOverlay">
+    <div class="modal">
+      <h2>Как играть?</h2>
+      <p id="rulesDescription"></p>
+      <h3 style="color: white; margin-top: 15px; margin-bottom: 5px; font-size: 1rem;">Правила комнаты:</h3>
+      <ul id="dynamicRules"></ul>
+      <button class="close-btn" onclick="toggleHelp()">Понятно, в бой!</button>
+    </div>
+  </div>
 
-    // Генерация красивого неонового цвета для текущего игрока
-    const NEON_COLORS = ['#f43f5e', '#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#06b6d4', '#ec4899', '#8b5cf6'];
-    const myColor = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
-    
-    // Устанавливаем цвет в CSS
-    document.documentElement.style.setProperty('--my-color', myColor);
+  <div class="overlay" id="winnerOverlay">
+    <div class="modal" style="text-align: center; border-color: var(--my-color); box-shadow: 0 0 40px rgba(0,0,0,0.8);">
+      <div class="winner-text" id="winnerText" style="font-size: 2rem; margin-bottom: 20px;">ИГРА ОКОНЧЕНА</div>
+      <button class="restart-btn" onclick="requestRestart()">Играть еще раз</button>
+    </div>
+  </div>
 
-    const boardEl = document.getElementById('board');
-    const cooldownEl = document.getElementById('cooldown');
-
-    // Отрисовка пустого поля
-    function initBoard() {
-      for (let y = 0; y < BOARD_SIZE; y++) {
-        for (let x = 0; x < BOARD_SIZE; x++) {
-          const cell = document.createElement('div');
-          cell.className = 'cell';
-          cell.dataset.x = x;
-          cell.dataset.y = y;
-          cell.addEventListener('click', () => handleCellClick(x, y));
-          boardEl.appendChild(cell);
-        }
-      }
-    }
-
-    // Обработка клика
-    function handleCellClick(x, y) {
-      if (isGameOver || isOnCooldown || boardState[y][x]) return;
-
-      // 1. Ставим визуальный кулдаун (штраф за клик, чтобы не спамили)
-      startCooldown();
-
-      // 2. Отправляем ход в главную платформу (React -> Firebase)
-      window.parent.postMessage({
-        type: 'game_action',
-        action: { type: 'move', x, y, color: myColor }
-      }, '*');
-
-      // 3. Рисуем у себя
-      placeToken(x, y, myColor);
-      checkWin(x, y, myColor);
-    }
-
-    function startCooldown() {
-      isOnCooldown = true;
-      cooldownEl.style.transform = 'scaleX(0)';
-      
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 0.1; // 1 секунда кулдауна
-        cooldownEl.style.transform = `scaleX(${progress})`;
-        if (progress >= 1) {
-          clearInterval(interval);
-          isOnCooldown = false;
-        }
-      }, 100);
-    }
-
-    // Отрисовка фигуры
-    function placeToken(x, y, color) {
-      if (boardState[y][x]) return; // Уже занято
-      boardState[y][x] = color;
-      
-      const index = y * BOARD_SIZE + x;
-      const cell = boardEl.children[index];
-      
-      const token = document.createElement('div');
-      token.className = 'token';
-      token.style.color = color;
-      token.style.backgroundColor = color + '40'; // Прозрачный фон
-      cell.appendChild(token);
-    }
-
-    // Получение ходов от других игроков (через React)
-    window.addEventListener('message', (event) => {
-      if (event.data?.type === 'game_action') {
-        const action = event.data.action;
-        if (action.type === 'move') {
-          placeToken(action.x, action.y, action.color);
-          checkWin(action.x, action.y, action.color);
-        }
-      }
-    });
-
-    // Проверка победы (Гомоку алгоритм)
-    function checkWin(x, y, color) {
-      const directions = [
-        [1, 0], [0, 1], [1, 1], [1, -1] // Горизонталь, вертикаль, две диагонали
-      ];
-
-      for (let [dx, dy] of directions) {
-        let count = 1;
-        
-        // Вперед
-        let currX = x + dx, currY = y + dy;
-        while (currX >= 0 && currX < BOARD_SIZE && currY >= 0 && currY < BOARD_SIZE && boardState[currY][currX] === color) {
-          count++; currX += dx; currY += dy;
-        }
-        
-        // Назад
-        currX = x - dx; currY = y - dy;
-        while (currX >= 0 && currX < BOARD_SIZE && currY >= 0 && currY < BOARD_SIZE && boardState[currY][currX] === color) {
-          count++; currX -= dx; currY -= dy;
-        }
-
-        // Если собрали нужное количество в ряд
-        if (count >= WIN_STREAK) {
-          showWinner(color);
-          return;
-        }
-      }
-    }
-
-    function showWinner(color) {
-      isGameOver = true;
-      const overlay = document.getElementById('winnerOverlay');
-      const text = document.getElementById('winnerText');
-      
-      overlay.classList.add('active');
-      text.style.color = color;
-      
-      if (color === myColor) {
-        text.innerText = "ТЫ ПОБЕДИЛ!";
-      } else {
-        text.innerText = "ИГРА ОКОНЧЕНА";
-      }
-    }
-
-    initBoard();
-  </script>
+  <script src="rules.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>

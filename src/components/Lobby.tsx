@@ -20,7 +20,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, user, onLeave }) => {
   const handleLeave = async () => {
     const updatedPlayers = room.players?.filter(p => p.id !== user.id) || [];
     
-    // Удаляем комнату, если вышел хост или мы были последними
     if (isHost || updatedPlayers.length === 0) {
       await remove(ref(db, `rooms/${room.id}`));
     } else {
@@ -62,8 +61,7 @@ export const Lobby: React.FC<LobbyProps> = ({ room, user, onLeave }) => {
             <h2 className="text-2xl font-black text-white mb-1">{room.name}</h2>
             <div className="flex items-center gap-3 text-sm font-medium">
               <span className="text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 uppercase tracking-wider text-xs">
-                {room.gameType === 'tictactoe' ? 'Tic-Tac-Toe' : 
-                 room.gameType === 'brawl' ? 'BrawlKitty' : 'KittyHunt'}
+                Neon Tic-Tac-Toe
               </span>
               <span className="text-zinc-400 flex items-center gap-1.5 bg-zinc-800/50 px-3 py-1 rounded-full">
                 <Users className="w-4 h-4" />

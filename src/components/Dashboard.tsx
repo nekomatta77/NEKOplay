@@ -14,7 +14,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [roomName, setRoomName] = useState('Комната ' + user.name);
-  const [gameType, setGameType] = useState('tictactoe');
   const [maxPlayers, setMaxPlayers] = useState(2);
 
   useEffect(() => {
@@ -42,7 +41,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
     const newRoom: Room = {
       id: roomId,
       name: roomName,
-      gameType: gameType,
+      gameType: 'tictactoe', // Теперь всегда только одна игра
       maxPlayers: maxPlayers,
       players: [{
         ...user,
@@ -149,8 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                 </div>
                 
                 <p className="text-sm text-indigo-400 font-medium mb-6 uppercase tracking-wider">
-                  {room.gameType === 'tictactoe' ? 'Tic-Tac-Toe' : 
-                   room.gameType === 'brawl' ? 'BrawlKitty' : 'KittyHunt'}
+                  Neon Tic-Tac-Toe
                 </p>
 
                 <button 
@@ -194,15 +192,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
 
               <div>
                 <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Режим игры</label>
-                <select 
-                  value={gameType}
-                  onChange={(e) => setGameType(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors appearance-none"
-                >
-                  <option value="tictactoe">Tic-Tac-Toe</option>
-                  <option value="brawl">BrawlKitty</option>
-                  <option value="godot_run">KittyHunt</option>
-                </select>
+                <div className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-indigo-400 font-bold opacity-80 cursor-not-allowed">
+                  Neon Tic-Tac-Toe
+                </div>
               </div>
 
               <div>
@@ -211,7 +203,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                 </label>
                 <input 
                   type="range" 
-                  min="2" max="6" 
+                  min="2" max="8" 
                   value={maxPlayers}
                   onChange={(e) => setMaxPlayers(parseInt(e.target.value))}
                   className="w-full accent-indigo-500"
