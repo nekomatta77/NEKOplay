@@ -1,3 +1,18 @@
+// ==========================================
+// ФИКС РАЗМЕРА ЭКРАНА ДЛЯ МОБИЛОК (PWA)
+// ==========================================
+function setViewportHeight() {
+  // Вычисляем 1% от реальной высоты видимого окна (без учета браузерных панелей)
+  let vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+window.addEventListener('resize', setViewportHeight);
+window.addEventListener('orientationchange', () => setTimeout(setViewportHeight, 100));
+setViewportHeight();
+
+// ==========================================
+// ИНИЦИАЛИЗАЦИЯ И ПАРАМЕТРЫ
+// ==========================================
 const urlParams = new URLSearchParams(window.location.search);
 const playersCountParam = parseInt(urlParams.get('players')) || 3;
 const myName = urlParams.get('name') || 'Аноним';
@@ -16,11 +31,13 @@ else document.getElementById('guest-waiting').style.display = 'flex';
 
 function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 
-// Полный экран при клике
 function requestFullscreen() {
     window.parent.postMessage({ type: 'request_fullscreen' }, '*');
 }
 
+// ==========================================
+// ЛОББИ И УПРАВЛЕНИЕ ИГРОЙ
+// ==========================================
 function selectMode(mode) {
   if (!isHost) return;
   selectedMode = mode;
@@ -30,7 +47,7 @@ function selectMode(mode) {
 
 function startGame() {
   if (!isHost) return;
-  requestFullscreen(); // Разворачиваем сайт
+  requestFullscreen();
   const time = document.getElementById('setting-time').value;
   window.parent.postMessage({ type: 'start_game', settings: { mode: selectedMode, time: parseInt(time) } }, '*');
 }
@@ -48,7 +65,6 @@ window.addEventListener('message', (event) => {
 });
 
 function handleStateChange() {
-  // Если статус waiting - мы в лобби
   if (!globalState.status || globalState.status === 'waiting') {
     currentLocalRound = 0;
     document.getElementById('play-again-btn').style.display = 'none';
@@ -66,6 +82,7 @@ function handleStateChange() {
   if (players.length === 0) return;
   const totalRounds = globalState.totalRounds || players.length;
 
+  // Настройки режима "Секрет"
   if (globalState.settings?.mode === 'nocolor') {
       document.getElementById('color-palette').style.visibility = 'hidden';
       currentColor = '#000000';
@@ -75,6 +92,7 @@ function handleStateChange() {
 
   if (globalState.round > currentLocalRound) startRound(globalState.round, players, totalRounds);
 
+  // Хост проверяет, все ли сдали
   if (isHost) {
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
     if (Object.keys(currentSubs).length >= players.length) {
@@ -113,7 +131,7 @@ function startRound(round, players, totalRounds) {
     if (isDrawingPhase) {
       document.getElementById('word-to-draw').innerText = previousData || "...";
       showPhase('draw-phase');
-      clearCanvas(); // Подготавливаем чистый мольберт
+      clearCanvas(); 
     } else {
       document.getElementById('text-instruction').innerText = 'Что здесь нарисовано?';
       const imgEl = document.getElementById('image-to-guess');
@@ -145,7 +163,7 @@ function submitDrawing() {
 }
 
 // ==========================================
-// ХОЛСТ 800x600 НА МОЛЬБЕРТЕ
+// ИДЕАЛЬНЫЙ CANVAS 800x600 НА МОЛЬБЕРТЕ
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const ctx = canvas.getContext('2d');
@@ -185,7 +203,6 @@ function getCoordinates(e) {
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
   
-  // Умный пересчет координат для зафиксированного 800x600 холста
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
   return { 
@@ -232,7 +249,7 @@ canvas.addEventListener('touchstart', startPosition, {passive: false});
 canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ
+// ЧАТ-ПРЕЗЕНТАЦИЯ И ОЗВУЧКА
 // ==========================================
 let presNotebooks = [];
 let presCurrentBookIndex = 0;
@@ -240,6 +257,7 @@ let presCurrentRound = 1;
 
 let voices = [];
 window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
+
 function speakText(text) {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
@@ -300,8 +318,8 @@ function showCurrentSlide() {
     const btn = document.getElementById('next-slide-btn');
     if (presCurrentRound === globalState.totalRounds) {
         if (presCurrentBookIndex === presNotebooks.length - 1) {
-            btn.style.display = 'none'; // Прячем кнопку "Дальше"
-            if (isHost) document.getElementById('play-again-btn').style.display = 'block'; // Показываем хосту "Сыграть еще"
+            btn.style.display = 'none'; 
+            if (isHost) document.getElementById('play-again-btn').style.display = 'block'; 
         } else {
             btn.innerText = "Следующая история";
         }

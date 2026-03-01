@@ -213,45 +213,47 @@ input[type="range"] { flex-grow: 1; accent-color: var(--primary); height: 4px; b
   .tool-btn { width: 28px; height: 28px; }
   .brush-slider { display: none; } /* Прячем ползунок, если нет места */
 }
-/* ДИЗАЙН МОЛЬБЕРТА */
+/* ДИЗАЙН МОЛЬБЕРТА (Идеальная мобильная адаптация) */
+.draw-layout { padding: 0; justify-content: center; align-items: center; position: relative; }
+
 .easel-container {
   position: relative;
-  width: 100%;
-  max-width: 800px;
+  /* Высота экрана минус отступы для панели инструментов (90px) */
+  height: calc(var(--vh, 1vh) * 100 - 90px);
+  max-height: 600px;
+  /* Ширина подстраивается автоматически под высоту (пропорция 4:3) */
+  aspect-ratio: 4 / 3;
   margin: 0 auto;
-  margin-top: 60px; /* Отступ от заголовка */
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
 
-/* Деревянный зажим сверху */
 .easel-clip {
-  width: 120px;
-  height: 25px;
+  width: 25%;
+  height: 20px;
   background: linear-gradient(to bottom, #8b5a2b, #6b4226);
-  border-radius: 10px 10px 0 0;
+  border-radius: 8px 8px 0 0;
   box-shadow: 0 5px 10px rgba(0,0,0,0.5);
   position: relative;
   z-index: 5;
-  margin-bottom: -10px;
+  margin-bottom: -8px;
   border: 2px solid #52311c;
   border-bottom: none;
 }
 
-/* Сама деревянная доска */
 .easel-board {
-  background: #a06e3d; /* Цвет светлого дерева */
+  background: #a06e3d;
   background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.05) 10px, rgba(0,0,0,0.05) 20px);
-  padding: 15px;
+  padding: 3%; /* Относительные отступы вместо пикселей */
   border-radius: 8px;
   box-shadow: 0 15px 35px rgba(0,0,0,0.6), inset 0 0 20px rgba(0,0,0,0.4);
   width: 100%;
-  aspect-ratio: 4 / 3; /* Жестко держим пропорции холста (800x600) */
+  height: 100%;
   position: relative;
 }
 
-/* Лист бумаги (Canvas) */
 .canvas-wrapper {
   width: 100%;
   height: 100%;
@@ -262,7 +264,6 @@ input[type="range"] { flex-grow: 1; accent-color: var(--primary); height: 4px; b
   overflow: hidden;
 }
 
-/* Сам холст растягивается, но внутреннее разрешение всегда 800x600 */
 #drawing-board {
   width: 100%;
   height: 100%;
@@ -271,9 +272,11 @@ input[type="range"] { flex-grow: 1; accent-color: var(--primary); height: 4px; b
   touch-action: none;
 }
 
-/* Фикс чата для картинок мольберта */
-.msg-img {
-  background: white;
-  aspect-ratio: 4 / 3;
-  object-fit: contain;
+/* Скрываем текстовый заголовок на очень узких горизонтальных экранах (чтобы не мешал холсту) */
+@media screen and (max-height: 450px) {
+  .draw-header { display: none; }
+  .easel-container { height: calc(var(--vh, 1vh) * 100 - 75px); }
+  .floating-dock { bottom: 5px; padding: 8px 15px; }
+  .swatch { width: 24px; height: 24px; }
+  .tool-btn { width: 28px; height: 28px; }
 }

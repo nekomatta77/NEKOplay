@@ -1,0 +1,23 @@
+{
+  "name": "NEKOplay",
+  "short_name": "NEKOplay",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/assets/avatars/ava1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/avatars/ava1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
