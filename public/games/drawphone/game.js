@@ -16,6 +16,11 @@ else document.getElementById('guest-waiting').style.display = 'flex';
 
 function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 
+// Полный экран при клике
+function requestFullscreen() {
+    window.parent.postMessage({ type: 'request_fullscreen' }, '*');
+}
+
 function selectMode(mode) {
   if (!isHost) return;
   selectedMode = mode;
@@ -25,8 +30,14 @@ function selectMode(mode) {
 
 function startGame() {
   if (!isHost) return;
+  requestFullscreen(); // Разворачиваем сайт
   const time = document.getElementById('setting-time').value;
   window.parent.postMessage({ type: 'start_game', settings: { mode: selectedMode, time: parseInt(time) } }, '*');
+}
+
+function playAgain() {
+  if (!isHost) return;
+  window.parent.postMessage({ type: 'play_again' }, '*');
 }
 
 window.addEventListener('message', (event) => {
@@ -37,11 +48,17 @@ window.addEventListener('message', (event) => {
 });
 
 function handleStateChange() {
-  if (!globalState.status || globalState.status !== 'playing') {
-    if (globalState.status === 'finished' && currentLocalRound !== -1) {
-      currentLocalRound = -1; 
-      showPhase('ready-to-present-phase');
-    }
+  // Если статус waiting - мы в лобби
+  if (!globalState.status || globalState.status === 'waiting') {
+    currentLocalRound = 0;
+    document.getElementById('play-again-btn').style.display = 'none';
+    showPhase('lobby-screen');
+    return;
+  }
+
+  if (globalState.status === 'finished' && currentLocalRound !== -1) {
+    currentLocalRound = -1; 
+    showPhase('ready-to-present-phase');
     return;
   }
 
@@ -50,10 +67,10 @@ function handleStateChange() {
   const totalRounds = globalState.totalRounds || players.length;
 
   if (globalState.settings?.mode === 'nocolor') {
-      document.getElementById('color-palette').style.display = 'none';
-      ctx.strokeStyle = '#000000'; // По умолчанию черный на белом фоне
+      document.getElementById('color-palette').style.visibility = 'hidden';
+      currentColor = '#000000';
   } else {
-      document.getElementById('color-palette').style.display = 'flex';
+      document.getElementById('color-palette').style.visibility = 'visible';
   }
 
   if (globalState.round > currentLocalRound) startRound(globalState.round, players, totalRounds);
@@ -85,7 +102,7 @@ function startRound(round, players, totalRounds) {
   const isDrawingPhase = (round % 2 === 0);
   
   if (round === 1) {
-    document.getElementById('text-instruction').innerText = 'Напишите любую безумную фразу!';
+    document.getElementById('text-instruction').innerText = 'Придумайте фразу';
     document.getElementById('image-to-guess').style.display = 'none';
     document.getElementById('word-input').value = '';
     showPhase('text-phase');
@@ -96,12 +113,12 @@ function startRound(round, players, totalRounds) {
     if (isDrawingPhase) {
       document.getElementById('word-to-draw').innerText = previousData || "...";
       showPhase('draw-phase');
-      setTimeout(resizeCanvas, 50); 
+      clearCanvas(); // Подготавливаем чистый мольберт
     } else {
       document.getElementById('text-instruction').innerText = 'Что здесь нарисовано?';
       const imgEl = document.getElementById('image-to-guess');
       imgEl.src = previousData || "";
-      imgEl.style.display = 'block';
+      imgEl.style.display = 'inline-block';
       document.getElementById('word-input').value = '';
       showPhase('text-phase');
     }
@@ -109,8 +126,9 @@ function startRound(round, players, totalRounds) {
 }
 
 function submitWord() {
+  requestFullscreen();
   const word = document.getElementById('word-input').value.trim();
-  if (!word) return alert("Напишите хоть что-нибудь!");
+  if (!word) return alert("Не оставляйте поле пустым!");
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = word;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -118,6 +136,7 @@ function submitWord() {
 }
 
 function submitDrawing() {
+  requestFullscreen();
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = canvas.toDataURL('image/png');
   window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -126,162 +145,53 @@ function submitDrawing() {
 }
 
 // ==========================================
-// ИНСТРУМЕНТЫ 
-// ==========================================
-let currentColor = '#000000'; // По умолчанию черный (так как фон белый)
-let isErasing = false;
-
-function setColor(color, element) {
-    isErasing = false;
-    currentColor = color;
-    ctx.globalCompositeOperation = 'source-over';
-    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active-swatch'));
-    if(element) element.classList.add('active-swatch');
-}
-
-function setEraser(element) {
-    isErasing = true;
-    ctx.globalCompositeOperation = 'destination-out';
-    document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active-swatch'));
-    element.classList.add('active-swatch');
-}
-
-// ==========================================
-// ОЗВУЧКА
-// ==========================================
-let voices = [];
-window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
-
-function speakText(text) {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ru-RU';
-    if (voices.length === 0) voices = window.speechSynthesis.getVoices();
-    const bestVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('Google') || v.name.includes('Microsoft'))) || voices.find(v => v.lang.includes('ru'));
-    if (bestVoice) utterance.voice = bestVoice;
-    utterance.pitch = 0.9 + Math.random() * 0.4;
-    window.speechSynthesis.speak(utterance);
-}
-
-// ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ
-// ==========================================
-let presNotebooks = [];
-let presCurrentBookIndex = 0;
-let presCurrentRound = 1;
-
-function startPresentation() {
-    showPhase('presentation-phase');
-    presNotebooks = globalState.players || [];
-    presCurrentBookIndex = 0;
-    presCurrentRound = 1;
-    document.getElementById('chat-messages').innerHTML = ''; // Очищаем чат
-    updateChatHeader();
-    showCurrentSlide();
-}
-
-function updateChatHeader() {
-    const bookOwnerId = presNotebooks[presCurrentBookIndex];
-    const ownerName = globalState.playerNames?.[bookOwnerId] || "Аноним";
-    document.getElementById('chat-book-title').innerText = `История: ${ownerName}`;
-}
-
-function showCurrentSlide() {
-    const bookId = presNotebooks[presCurrentBookIndex];
-    const data = globalState.submissions?.[`round_${presCurrentRound}`]?.[bookId];
-    const authorId = presNotebooks[(presNotebooks.indexOf(bookId) + presCurrentRound - 1) % presNotebooks.length];
-    
-    const authorName = globalState.playerNames?.[authorId] || "Аноним";
-    const authorAvatar = globalState.playerAvatars?.[authorId] || "https://picsum.photos/100";
-    const isText = (presCurrentRound % 2 !== 0);
-    
-    // Чередуем сторону (левая/правая)
-    const side = (presCurrentRound % 2 !== 0) ? 'left' : 'right';
-
-    // Создаем HTML пузыря
-    const msgHTML = `
-        <div class="msg-row ${side}">
-            <img src="${authorAvatar}" class="msg-avatar">
-            <div class="msg-bubble">
-                <div class="msg-author">${authorName}</div>
-                ${isText ? `<div class="msg-text">${data}</div>` : `<img src="${data}" class="msg-img">`}
-            </div>
-        </div>
-    `;
-
-    const chatContainer = document.getElementById('chat-messages');
-    chatContainer.insertAdjacentHTML('beforeend', msgHTML);
-    
-    // Плавный скролл вниз
-    chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
-
-    if (isText) speakText(data);
-
-    // Меняем кнопку
-    const btn = document.getElementById('next-slide-btn');
-    if (presCurrentRound === globalState.totalRounds) {
-        btn.innerText = (presCurrentBookIndex === presNotebooks.length - 1) ? "Вернуться в меню" : "Следующий игрок";
-    } else {
-        btn.innerText = "Показать дальше";
-    }
-}
-
-function nextSlide() {
-    presCurrentRound++;
-    if (presCurrentRound > globalState.totalRounds) {
-        presCurrentBookIndex++; 
-        presCurrentRound = 1;
-        
-        if (presCurrentBookIndex >= presNotebooks.length) return leaveGame();
-        
-        // Переход к следующему блокноту (очищаем чат)
-        document.getElementById('chat-messages').innerHTML = '';
-        updateChatHeader();
-    }
-    showCurrentSlide();
-}
-
-// ==========================================
-// ИДЕАЛЬНЫЙ МОБИЛЬНЫЙ CANVAS
+// ХОЛСТ 800x600 НА МОЛЬБЕРТЕ
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const ctx = canvas.getContext('2d');
 let isDrawing = false;
 let zoomScale = 1;
 let initialDistance = 0;
+let currentColor = '#000000'; 
+let isErasing = false;
 
-function resizeCanvas() {
-  const wrapper = document.getElementById('canvas-wrapper');
-  if (!wrapper || wrapper.clientWidth === 0) return;
-  
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = canvas.width || wrapper.clientWidth; 
-  tempCanvas.height = canvas.height || wrapper.clientHeight;
-  if(canvas.width) tempCanvas.getContext('2d').drawImage(canvas, 0, 0);
-  
-  canvas.width = wrapper.clientWidth;
-  canvas.height = wrapper.clientHeight;
-  clearCanvas();
-  if(tempCanvas.width) ctx.drawImage(tempCanvas, 0, 0);
+// Заливаем фон белым при старте
+ctx.fillStyle = '#ffffff';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+function setColor(color, element) {
+    isErasing = false; currentColor = color;
+    ctx.globalCompositeOperation = 'source-over';
+    document.querySelectorAll('.swatch, .tool-btn').forEach(s => s.classList.remove('active-swatch'));
+    if(element) element.classList.add('active-swatch');
+}
+
+function setEraser(element) {
+    isErasing = true;
+    ctx.globalCompositeOperation = 'destination-out';
+    document.querySelectorAll('.swatch, .tool-btn').forEach(s => s.classList.remove('active-swatch'));
+    element.classList.add('active-swatch');
 }
 
 function clearCanvas() {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#ffffff'; // Белый фон как в настоящем Gartic Phone
+  ctx.fillStyle = '#ffffff'; 
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if(isErasing) ctx.globalCompositeOperation = 'destination-out';
 }
-
-window.addEventListener('resize', resizeCanvas);
 
 function getCoordinates(e) {
   const rect = canvas.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  
+  // Умный пересчет координат для зафиксированного 800x600 холста
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
-  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+  return { 
+      x: (clientX - rect.left) * scaleX, 
+      y: (clientY - rect.top) * scaleY 
+  };
 }
 
 function startPosition(e) { 
@@ -291,18 +201,13 @@ function startPosition(e) {
 function endPosition() { isDrawing = false; ctx.beginPath(); }
 
 function draw(e) {
-  if (e.touches && e.touches.length === 2) {
-      e.preventDefault();
-      return handlePinchZoom(e);
-  }
+  if (e.touches && e.touches.length === 2) { e.preventDefault(); return handlePinchZoom(e); }
   if (!isDrawing) return;
-  e.preventDefault(); // Запрет скролла экрана при рисовании
-  
+  e.preventDefault(); 
   const pos = getCoordinates(e);
   ctx.lineWidth = document.getElementById('brush-size').value;
   ctx.lineCap = 'round';
   ctx.strokeStyle = currentColor;
-  
   ctx.lineTo(pos.x, pos.y);
   ctx.stroke();
   ctx.beginPath();
@@ -325,3 +230,93 @@ canvas.addEventListener('mousemove', draw);
 canvas.addEventListener('mouseleave', endPosition);
 canvas.addEventListener('touchstart', startPosition, {passive: false});
 canvas.addEventListener('touchmove', draw, {passive: false});
+
+// ==========================================
+// ЧАТ-ПРЕЗЕНТАЦИЯ
+// ==========================================
+let presNotebooks = [];
+let presCurrentBookIndex = 0;
+let presCurrentRound = 1;
+
+let voices = [];
+window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
+function speakText(text) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ru-RU';
+    if (voices.length === 0) voices = window.speechSynthesis.getVoices();
+    const bestVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('Google') || v.name.includes('Microsoft'))) || voices.find(v => v.lang.includes('ru'));
+    if (bestVoice) utterance.voice = bestVoice;
+    utterance.pitch = 0.9 + Math.random() * 0.4;
+    window.speechSynthesis.speak(utterance);
+}
+
+function startPresentation() {
+    requestFullscreen();
+    showPhase('presentation-phase');
+    presNotebooks = globalState.players || [];
+    presCurrentBookIndex = 0;
+    presCurrentRound = 1;
+    document.getElementById('chat-messages').innerHTML = ''; 
+    document.getElementById('play-again-btn').style.display = 'none';
+    document.getElementById('next-slide-btn').style.display = 'block';
+    updateChatHeader();
+    showCurrentSlide();
+}
+
+function updateChatHeader() {
+    const bookOwnerId = presNotebooks[presCurrentBookIndex];
+    const ownerName = globalState.playerNames?.[bookOwnerId] || "Аноним";
+    document.getElementById('chat-book-title').innerText = `История: ${ownerName}`;
+}
+
+function showCurrentSlide() {
+    const bookId = presNotebooks[presCurrentBookIndex];
+    const data = globalState.submissions?.[`round_${presCurrentRound}`]?.[bookId];
+    const authorId = presNotebooks[(presNotebooks.indexOf(bookId) + presCurrentRound - 1) % presNotebooks.length];
+    
+    const authorName = globalState.playerNames?.[authorId] || "Аноним";
+    const authorAvatar = globalState.playerAvatars?.[authorId] || "https://picsum.photos/100";
+    const isText = (presCurrentRound % 2 !== 0);
+    const side = (presCurrentRound % 2 !== 0) ? 'left' : 'right';
+
+    const msgHTML = `
+        <div class="msg-row ${side}">
+            <img src="${authorAvatar}" class="msg-avatar">
+            <div class="msg-bubble">
+                <div class="msg-author">${authorName}</div>
+                ${isText ? `<div class="msg-text">${data}</div>` : `<img src="${data}" class="msg-img">`}
+            </div>
+        </div>
+    `;
+
+    const chatContainer = document.getElementById('chat-messages');
+    chatContainer.insertAdjacentHTML('beforeend', msgHTML);
+    setTimeout(() => { chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' }); }, 50);
+
+    if (isText) speakText(data);
+
+    const btn = document.getElementById('next-slide-btn');
+    if (presCurrentRound === globalState.totalRounds) {
+        if (presCurrentBookIndex === presNotebooks.length - 1) {
+            btn.style.display = 'none'; // Прячем кнопку "Дальше"
+            if (isHost) document.getElementById('play-again-btn').style.display = 'block'; // Показываем хосту "Сыграть еще"
+        } else {
+            btn.innerText = "Следующая история";
+        }
+    } else {
+        btn.innerText = "Показать дальше";
+    }
+}
+
+function nextSlide() {
+    presCurrentRound++;
+    if (presCurrentRound > globalState.totalRounds) {
+        presCurrentBookIndex++; 
+        presCurrentRound = 1;
+        document.getElementById('chat-messages').innerHTML = '';
+        updateChatHeader();
+    }
+    showCurrentSlide();
+}

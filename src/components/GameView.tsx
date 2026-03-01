@@ -13,6 +13,9 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const handleLeaveGame = async () => {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(console.error);
+    }
     const updatedPlayers = room.players?.filter(p => p.id !== user.id) || [];
     const isHost = room.players?.find(p => p.id === user.id)?.isHost;
     
@@ -29,7 +32,14 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
-      // 1. НАДЕЖНЫЙ СТАРТ: Передаем аватарки и настройки режима
+      // Запрос на полный экран (срабатывает при кликах в игре)
+      if (event.data?.type === 'request_fullscreen') {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => console.log("Fullscreen error:", err));
+        }
+      }
+
+      // Старт игры
       if (event.data?.type === 'start_game') {
         const gamePlayers = room.players || [];
         const playerNames = gamePlayers.reduce((acc, p) => ({...acc, [p.id]: p.name}), {});
@@ -41,13 +51,21 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
           totalRounds: gamePlayers.length > 0 ? gamePlayers.length : 2,
           players: gamePlayers.map(p => p.id),
           playerNames: playerNames,
-          playerAvatars: playerAvatars, // ДОБАВЛЕНО: Аватарки для финала
-          settings: event.data.settings || { mode: 'classic', time: 90 }, // ДОБАВЛЕНО: Режимы
-          submissions: null // Очищаем историю при новом старте
+          playerAvatars: playerAvatars,
+          settings: event.data.settings || { mode: 'classic', time: 90 },
+          submissions: null 
         });
       }
 
-      // 2. Игровые действия Tictactoe
+      // Возврат в лобби (Сыграть еще раз)
+      if (event.data?.type === 'play_again') {
+        await update(ref(db, `rooms/${room.id}/gameState`), {
+          status: 'waiting',
+          round: 0,
+          submissions: null
+        });
+      }
+
       if (event.data?.type === 'game_action') {
         await set(ref(db, `rooms/${room.id}/lastAction`), {
           senderId: user.id,
@@ -56,7 +74,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
         });
       }
       
-      // 3. Обновления Drawphone
       if (event.data?.type === 'update_state' && event.data.updates) {
         await update(ref(db, `rooms/${room.id}/gameState`), event.data.updates);
       }
@@ -70,37 +87,16 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return () => window.removeEventListener('message', handleMessage);
   }, [room.id, user.id, room.players]);
 
-  // Синхронизация gameState
   useEffect(() => {
     const stateRef = ref(db, `rooms/${room.id}/gameState`);
     const unsubscribe = onValue(stateRef, (snapshot) => {
       const state = snapshot.val() || {};
       if (iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage({
-          type: 'sync_state',
-          state: state
-        }, '*');
+        iframeRef.current.contentWindow.postMessage({ type: 'sync_state', state: state }, '*');
       }
     });
     return () => unsubscribe();
   }, [room.id]);
-
-  // Синхронизация lastAction (Крестики-нолики)
-  useEffect(() => {
-    const actionRef = ref(db, `rooms/${room.id}/lastAction`);
-    const unsubscribe = onValue(actionRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data && data.senderId !== user.id) {
-        if (iframeRef.current?.contentWindow) {
-          iframeRef.current.contentWindow.postMessage({
-            type: 'game_action',
-            action: data.action
-          }, '*');
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, [room.id, user.id]);
 
   const getGameUrl = () => {
     const playersCount = room.players?.length || 2;

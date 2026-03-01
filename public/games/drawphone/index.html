@@ -7,125 +7,132 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="glow-bg" id="glow"></div>
+  <div class="ambient-bg"></div>
 
-  <button class="leave-btn" onclick="leaveGame()">
+  <div id="rotate-prompt">
+    <div class="rotate-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+    </div>
+    <h2>Поверните телефон</h2>
+    <p>Для рисования нужен горизонтальный экран</p>
+  </div>
+
+  <button class="leave-btn" onclick="leaveGame()" title="Выйти">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
   </button>
 
   <div id="lobby-screen" class="screen active">
-    <div class="glass-panel">
-      <h1 class="title">NEKO<span class="highlight">Phone</span></h1>
-      
-      <div class="info-badges">
-        <div class="badge">👥 Игроков: <span id="players-count-display">0</span></div>
-        <div class="badge">👤 Вы: <span id="player-name-display">Аноним</span></div>
+    <div class="glass-card main-lobby">
+      <h1 class="logo">NEKO<span>Phone</span></h1>
+      <div class="stats-row">
+        <div class="stat-pill">👥 <span id="players-count-display">0</span> игроков</div>
+        <div class="stat-pill">👤 <span id="player-name-display">Аноним</span></div>
       </div>
-
       <div id="host-controls" style="display: none; width: 100%;">
+        <h3 class="section-title">Выберите режим</h3>
         <div class="modes-grid">
           <div class="mode-card active" data-mode="classic" onclick="selectMode('classic')">
-            <h4>🎨 Классика</h4><p>Обычный режим</p>
+            <div class="mode-icon">🎨</div><h4>Классика</h4>
           </div>
           <div class="mode-card" data-mode="speedrun" onclick="selectMode('speedrun')">
-            <h4>⚡ Спидран</h4><p>Мало времени</p>
+            <div class="mode-icon">⚡</div><h4>Спидран</h4>
           </div>
           <div class="mode-card" data-mode="nocolor" onclick="selectMode('nocolor')">
-            <h4>👻 Секрет</h4><p>Без цветов</p>
+            <div class="mode-icon">👻</div><h4>Секрет</h4>
           </div>
         </div>
-
-        <div class="input-group">
-          <label>Время на раунд:</label>
-          <select id="setting-time">
-            <option value="60">Короткое (60 сек)</option>
-            <option value="90" selected>Нормальное (90 сек)</option>
-            <option value="120">Долгое (120 сек)</option>
+        <div class="settings-row">
+          <label>Время раунда:</label>
+          <select id="setting-time" class="glass-select">
+            <option value="60">60 сек</option>
+            <option value="90" selected>90 сек</option>
+            <option value="120">120 сек</option>
           </select>
         </div>
-        <button class="main-btn" onclick="startGame()">НАЧАТЬ ИГРУ</button>
+        <button class="btn-primary" onclick="startGame()">ЗАПУСТИТЬ ИГРУ</button>
       </div>
-
-      <div id="guest-waiting" class="waiting-box" style="display: none;">
-        <div class="loader"></div>
-        <p>Ждем запуск от хоста...</p>
+      <div id="guest-waiting" class="waiting-state" style="display: none;">
+        <div class="spinner"></div><p>Ожидание хоста...</p>
       </div>
     </div>
   </div>
 
   <div id="game-screen" class="screen">
-    
     <div id="text-phase" class="phase-container">
-      <div class="glass-panel text-center">
-        <h2 id="text-instruction" class="phase-title">Напишите безумную фразу!</h2>
-        <div class="image-preview-container">
+      <div class="glass-card text-center">
+        <h2 id="text-instruction" class="task-title">Придумайте фразу</h2>
+        <div class="image-showcase">
           <img id="image-to-guess" src="" style="display:none;">
         </div>
-        <input type="text" id="word-input" class="modern-input" placeholder="Например: Кот-самурай ест суши..." autocomplete="off">
-        <button class="main-btn mt-4" onclick="submitWord()">Готово</button>
+        <input type="text" id="word-input" class="glass-input" placeholder="Введите смешную идею..." autocomplete="off">
+        <button class="btn-primary mt-4" onclick="submitWord()">Готово</button>
       </div>
     </div>
 
     <div id="draw-phase" class="phase-container draw-layout">
       <div class="draw-header">
-        <p>Нарисуйте:</p>
+        <span>Ваша цель:</span>
         <h2 id="word-to-draw" class="target-word">Слово</h2>
       </div>
       
-      <div class="canvas-wrapper" id="canvas-wrapper">
-        <canvas id="drawing-board"></canvas>
+      <div class="easel-container">
+        <div class="easel-clip"></div>
+        <div class="easel-board">
+          <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="drawing-board" width="800" height="600"></canvas>
+          </div>
+        </div>
       </div>
       
-      <div class="tools-dock">
+      <div class="floating-dock">
         <div class="palette" id="color-palette">
-          <div class="swatch active-swatch" style="background:#ffffff" onclick="setColor('#ffffff', this)"></div>
+          <div class="swatch active-swatch" style="background:#000000" onclick="setColor('#000000', this)"></div>
           <div class="swatch" style="background:#ef4444" onclick="setColor('#ef4444', this)"></div>
           <div class="swatch" style="background:#f97316" onclick="setColor('#f97316', this)"></div>
           <div class="swatch" style="background:#eab308" onclick="setColor('#eab308', this)"></div>
           <div class="swatch" style="background:#22c55e" onclick="setColor('#22c55e', this)"></div>
           <div class="swatch" style="background:#3b82f6" onclick="setColor('#3b82f6', this)"></div>
           <div class="swatch" style="background:#a855f7" onclick="setColor('#a855f7', this)"></div>
-          <div class="swatch" style="background:#000000" onclick="setColor('#000000', this)"></div>
-          
-          <div class="swatch eraser" onclick="setEraser(this)">
+          <div class="swatch" style="background:#ffffff; border: 1px solid #ccc;" onclick="setColor('#ffffff', this)"></div>
+          <div class="divider"></div>
+          <div class="tool-btn eraser" onclick="setEraser(this)" title="Ластик">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20"></path></svg>
           </div>
-          <button class="icon-btn" onclick="clearCanvas()">🗑️</button>
+          <div class="tool-btn clear" onclick="clearCanvas()" title="Очистить">🗑️</div>
         </div>
-        <div class="brush-controls">
+        <div class="brush-slider">
+          <div class="dot small-dot"></div>
           <input type="range" id="brush-size" min="1" max="40" value="5">
-          <button class="main-btn small" onclick="submitDrawing()">Отправить</button>
+          <div class="dot large-dot"></div>
         </div>
+        <button class="btn-primary small" onclick="submitDrawing()">Отправить</button>
       </div>
     </div>
 
     <div id="waiting-phase" class="phase-container">
-      <div class="glass-panel text-center">
-        <div class="loader mb-4"></div>
-        <h2>Отлично!</h2>
-        <p>Ждем остальных игроков...</p>
+      <div class="glass-card text-center">
+        <div class="spinner mx-auto mb-4"></div>
+        <h2 class="task-title">Отлично!</h2>
+        <p class="text-muted">Ждем остальных гениев...</p>
       </div>
     </div>
   </div>
 
   <div id="ready-to-present-phase" class="screen">
-    <div class="glass-panel text-center">
-      <h1 class="title">ГОТОВО!</h1>
-      <p class="mb-4">Посмотрим, что вы натворили?</p>
-      <button class="main-btn" onclick="startPresentation()">Открыть историю</button>
+    <div class="glass-card text-center">
+      <h1 class="logo" style="font-size: 3rem;">ИГРА <span>ОКОНЧЕНА</span></h1>
+      <button class="btn-primary pulse-btn" onclick="startPresentation()">Смотреть результаты</button>
     </div>
   </div>
 
   <div id="presentation-phase" class="screen chat-layout">
     <div class="chat-header">
-      <h2 id="chat-book-title">Блокнот игрока</h2>
+      <h2 id="chat-book-title">История</h2>
     </div>
-    
-    <div class="chat-container" id="chat-messages">
-      </div>
-
-    <div class="chat-footer">
-      <button class="main-btn" id="next-slide-btn" onclick="nextSlide()">Показать дальше</button>
+    <div class="chat-scroll-area" id="chat-messages"></div>
+    <div class="chat-footer" style="gap: 10px; flex-direction: column; align-items: center;">
+      <button class="btn-primary full-width" id="next-slide-btn" onclick="nextSlide()">Показать дальше</button>
+      <button class="btn-primary full-width" id="play-again-btn" onclick="playAgain()" style="display: none; background: #22c55e;">Сыграть еще раз (В лобби)</button>
     </div>
   </div>
 
