@@ -59,15 +59,17 @@ function showModeInfo(e, mode) {
 
 function closeInfoModal() { setDisplay('info-modal', 'none'); }
 
-// Защищенное закрытие плагиата для мобилок
-function hidePlagiarism(e) { if(e) e.preventDefault(); setDisplay('plagiarism-overlay', 'none'); }
+// Безопасное закрытие полноэкранного плагиата (ошибка консоли устранена)
+function hidePlagiarism(e) { 
+    setDisplay('plagiarism-overlay', 'none'); 
+}
 
 // Закрываем выезжающее меню инструментов на мобилках при клике мимо
 function toggleMobileTools(e) {
     if (e) e.stopPropagation();
     document.getElementById('tools-popup').classList.toggle('show');
 }
-document.addEventListener('touchstart', (e) => {
+document.addEventListener('pointerdown', (e) => {
     const popup = document.getElementById('tools-popup');
     const trigger = document.querySelector('.mobile-tool-trigger');
     if (popup && popup.classList.contains('show') && !popup.contains(e.target) && trigger && !trigger.contains(e.target)) {
@@ -138,6 +140,7 @@ function startPhaseTimer(isDrawing) {
     let timeLimit = globalState.settings?.time || 90;
     
     if (globalState.settings?.mode === 'tagteam') timeLimit = 5;
+    // Время действительно уменьшается с каждым этапом плагиата
     if (globalState.settings?.mode === 'plagiarism' && currentLocalRound > 1) timeLimit = Math.max(15, timeLimit - (currentLocalRound - 1) * 15);
     if (globalState.settings?.mode === 'finishit' && currentLocalRound === 1) timeLimit = 10;
 
@@ -229,11 +232,8 @@ function handleStateChange() {
     renderedPresentationState = ''; showPhase('lobby-screen'); return;
   }
 
-  // ОГРАНИЧИВАЕМ ЭТАПЫ ДЛЯ ОСОБЫХ РЕЖИМОВ (чтобы рисунок не превращался в кашу)
+  // Ограничение снято - игра идет по всем игрокам, чтобы в результатах показать все этапы!
   calculatedTotalRounds = players.length * (globalState.settings?.roundsMultiplier || 1);
-  if (globalState.settings?.mode === 'finishit' || globalState.settings?.mode === 'plagiarism') {
-      calculatedTotalRounds = 2; 
-  }
 
   if (globalState.status === 'finished') {
     currentLocalRound = -1; clearInterval(phaseTimerInterval);
@@ -382,7 +382,6 @@ function startRound(round, players) {
           } else if (mode === 'finishit' || mode === 'tagteam') {
               setText('word-to-draw', mode === 'finishit' ? "Дорисуй-ка!" : "Продолжи рисунок!");
               finishitBaseImg.src = prevImg;
-              // Защита для мобилок: используем реальный тег img под прозрачным холстом
               if (bgRef) { bgRef.src = prevImg; bgRef.style.display = 'block'; bgRef.style.opacity = '1'; }
           } else if (mode === 'copycat' && prevImg && prevImg.length > 50) {
               setHTML('word-to-draw', `<img src="${prevImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`);
@@ -583,9 +582,10 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
     }
 }
 
+// 90 FPS + Ускорение холста
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
-const ctx = canvas.getContext('2d');
+const ctx = canvas.getContext('2d', { desynchronized: true, willReadFrequently: false });
 let isDrawing = false; let currentColor = '#000000'; let isErasing = false; let isFilling = false; let isEyedropper = false; let isBlur = false; let isRect = false; let isCircle = false; let isLine = false; let isArrow = false; let isSymmetry = false; let isNeon = false;
 let canvasTransform = { x: 0, y: 0, scale: 1 }; let initialDistance = 0; let lastZoomCenter = { x: 0, y: 0 }; let preZoomState = null; 
 let shapeStartX = 0, shapeStartY = 0; let shapeImgData = null; let isDrawingShape = false; let lastX = 0, lastY = 0;
@@ -651,12 +651,14 @@ function clearCanvas() {
 
 function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; updateTransform(); }
 function updateTransform() { if (!zoomContainer) return; if (canvasTransform.scale <= 1) { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; } zoomContainer.style.transformOrigin = `0 0`; zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
-function getCoordinates(e) { const rect = canvas.getBoundingClientRect(); const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY; return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height }; }
+function getCoordinates(e) { const rect = canvas.getBoundingClientRect(); return { x: ((e.clientX - rect.left) / rect.width) * canvas.width, y: ((e.clientY - rect.top) / rect.height) * canvas.height }; }
 
 function startPosition(e) { 
-    if (e.touches && e.touches.length >= 2) return; 
+    if (e.pointerType === 'touch' && !e.isPrimary) return; // Игнорируем мультитач
     let pos = getCoordinates(e); const mode = globalState.settings?.mode;
     
+    canvas.setPointerCapture(e.pointerId);
+
     if (mode === 'lasso' && currentLocalRound > 2) {
         if (!activeLassoStampRef) return alert("Выберите фрагмент сверху!");
         let size = document.getElementById('brush-size').value * 10;
@@ -697,8 +699,8 @@ function startPosition(e) {
 }
 
 function draw(e) {
-  if (e.touches && e.touches.length >= 2) { e.preventDefault(); return handlePinchZoom(e); }
-  if (!isDrawing && !isDrawingShape) return; e.preventDefault(); 
+  if (!isDrawing && !isDrawingShape) return; 
+  if (e.pointerType === 'touch') e.preventDefault(); // Предотвращаем скролл во время рисования
   let pos = getCoordinates(e); const mode = globalState.settings?.mode;
   if (mode === 'coop') { const players = globalState.players || []; const isLeft = players.indexOf(myUserId) % 2 === 0; if (isLeft && pos.x > 400) pos.x = 400; if (!isLeft && pos.x < 400) pos.x = 400; }
   if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
@@ -730,7 +732,8 @@ function draw(e) {
   lastX = pos.x; lastY = pos.y;
 }
 
-function endPosition() { 
+function endPosition(e) { 
+    if(e) canvas.releasePointerCapture(e.pointerId);
     ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0;
     let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
     let opacity = 1; const bo = document.getElementById('brush-opacity'); if (bo) opacity = parseFloat(bo.value);
@@ -746,26 +749,16 @@ function endPosition() {
     saveState(); 
 }
 
-function handlePinchZoom(e) {
-    if (isDrawing || isDrawingShape) {
-        isDrawing = false; isDrawingShape = false; ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0; currentStroke = null;
-        if (preZoomState) { let img = new Image(); img.src = preZoomState; img.onload = () => { ctx.globalAlpha=1; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0); } }
-    }
-    const t1 = e.touches[0]; const t2 = e.touches[1]; const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); const cx = (t1.clientX + t2.clientX) / 2; const cy = (t1.clientY + t2.clientY) / 2;
-    if (initialDistance === 0) { initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; }
-    let newScale = canvasTransform.scale * (currentDist / initialDistance); if (newScale < 1) newScale = 1; if (newScale > 5) newScale = 5;
-    const wrapperRect = zoomContainer.parentElement.getBoundingClientRect();
-    canvasTransform.x -= (cx - wrapperRect.left - canvasTransform.x) * (newScale / canvasTransform.scale - 1); canvasTransform.y -= (cy - wrapperRect.top - canvasTransform.y) * (newScale / canvasTransform.scale - 1);
-    canvasTransform.x += (cx - lastZoomCenter.x); canvasTransform.y += (cy - lastZoomCenter.y);
-    canvasTransform.scale = newScale; initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; updateTransform();
-}
-canvas.addEventListener('touchend', (e) => { if (e.touches.length < 2) { initialDistance = 0; if (canvasTransform.scale <= 1) resetCanvasTransform(); } endPosition(); });
-canvas.addEventListener('mousedown', startPosition); canvas.addEventListener('mouseup', endPosition);
-canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave', endPosition);
-canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
+// Заменили mouse/touch на PointerEvents для 90+ FPS без лагов
+canvas.addEventListener('pointerdown', startPosition); 
+canvas.addEventListener('pointerup', endPosition);
+canvas.addEventListener('pointermove', draw, {passive: false}); 
+canvas.addEventListener('pointercancel', endPosition);
+canvas.addEventListener('pointerout', endPosition);
+
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ (Умная логика данных и Аватарки)
+// ЧАТ-ПРЕЗЕНТАЦИЯ (Аватарки и Хронология)
 // ==========================================
 let voices = []; window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
 function speakText(text) {

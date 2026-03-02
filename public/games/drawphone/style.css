@@ -81,6 +81,10 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 .waiting-player-item.not-ready { border: 1px solid #ef4444; background: rgba(239, 68, 68, 0.1); }
 .waiting-player-item span { font-weight: bold; color: white; font-size: 1rem; display: flex; align-items: center; }
 
+/* ОВЕРЛЕЙ ПЛАГИАТА НА ВЕСЬ ЭКРАН */
+.fullscreen-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 999999; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); cursor: pointer; padding: 20px; }
+.fullscreen-overlay img { width: 100%; max-width: 800px; max-height: 70vh; border-radius: 12px; border: 4px solid var(--primary); object-fit: contain; background: white; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+
 /* РИСОВАНИЕ - ДЕСКТОП И ГОРИЗОНТАЛЬНЫЙ */
 .draw-layout { flex-direction: row; align-items: stretch; justify-content: flex-start; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); gap: 15px; width: 100vw; height: 100dvh; background: var(--bg-color); }
 
@@ -113,6 +117,8 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 
 .btn-submit-draw { width: 100%; height: 45px; border-radius: 14px; border: none; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; margin-top: auto; }
 .btn-submit-draw svg { width: 24px; height: 24px; }
+
+/* Правильный Flex для холста на ПК */
 .canvas-area { flex-grow: 1; display: flex; flex-direction: column; position: relative; height: 100%; gap: 10px; min-width: 0; align-items: center; justify-content: flex-start; }
 .top-tool-bar { width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; background: var(--glass-bg); backdrop-filter: blur(15px); padding: 10px 20px; border-radius: 16px; border: 1px solid var(--glass-border); box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 5; flex-shrink: 0;}
 .draw-header { display: flex; align-items: center; gap: 10px; white-space: nowrap; width: 100%; }
@@ -122,14 +128,11 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 .brush-slider-horizontal { display: flex; align-items: center; gap: 8px; flex: 1; }
 input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; border-radius: 3px; cursor: pointer; }
 
-.canvas-wrapper-outer { width: 100%; max-width: 1000px; max-height: calc(100dvh - 120px); aspect-ratio: 4 / 3; padding: 12px; background-color: #8b5a2b; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px), repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(0,0,0,0.1) 15px, rgba(0,0,0,0.1) 30px), linear-gradient(to right, #6b4226, #8b5a2b, #5c3a21); background-size: 20px 20px, 20px 20px, auto, auto; border-radius: 6px; position: relative; overflow: hidden; border: 4px solid #4a2a12; border-bottom-width: 8px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 15px 35px rgba(0,0,0,0.6); margin: 0 auto; transition: 0.3s; }
+/* Холст - автоматически занимает оставшееся место */
+.canvas-wrapper-outer { width: 100%; max-width: 1000px; flex: 1 1 auto; min-height: 0; aspect-ratio: 4 / 3; padding: 12px; background-color: #8b5a2b; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px), repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(0,0,0,0.1) 15px, rgba(0,0,0,0.1) 30px), linear-gradient(to right, #6b4226, #8b5a2b, #5c3a21); background-size: 20px 20px, 20px 20px, auto, auto; border-radius: 6px; position: relative; overflow: hidden; border: 4px solid #4a2a12; border-bottom-width: 8px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 15px 35px rgba(0,0,0,0.6); margin: 0 auto; transition: 0.3s; }
 .canvas-wrapper { width: 100%; height: 100%; position: relative; background: transparent; transition: 0.3s; }
 #drawing-board { width: 100%; height: 100%; position: absolute; top: 0; left: 0; touch-action: none; cursor: crosshair; display: block; background: transparent; border-radius: 2px; box-shadow: 0 0 15px rgba(0,0,0,0.6); }
 
-/* Окно плагиата */
-.plagiarism-overlay { display: none; position: absolute; inset: 0; background: rgba(15,23,42,0.95); z-index: 50; flex-direction: column; align-items: center; justify-content: center; border-radius: 2px; padding: 20px; backdrop-filter: blur(10px); cursor: pointer; }
-.plagiarism-overlay h3 { color: white; margin-bottom: 20px; font-size: 1.2rem; text-align: center; }
-.plagiarism-overlay img { width: 100%; max-width: 600px; max-height: 70vh; border-radius: 12px; border: 4px solid var(--primary); object-fit: contain; background: white; margin-bottom: 20px; }
 
 /* ЧАТ ПРЕЗЕНТАЦИИ И ХРОНОЛОГИЯ */
 .chat-layout { padding: 0; background: #0f172a; height: 100dvh; }
@@ -158,7 +161,6 @@ input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; bo
 .msg-row.right .msg-author { color: rgba(255,255,255,0.9); }
 .msg-text { font-size: 1.1rem; line-height: 1.4; color: white; word-wrap: break-word; font-weight: 500; }
 
-/* Уменьшенный размер холстов в результатах для мобилок */
 .msg-canvas, .msg-img { 
     width: 100%; max-height: 35vh; height: auto; aspect-ratio: 4 / 3; 
     object-fit: contain; border-radius: 12px; background: white; 
@@ -185,25 +187,27 @@ input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; bo
     
     .canvas-area { 
         flex-grow: 1; padding: max(10px, env(safe-area-inset-top)) 10px 0 10px; 
-        display: flex; flex-direction: column; overflow: hidden;
+        display: flex; flex-direction: column; overflow: hidden; min-height: 50vh;
     }
     
     .top-tool-bar { padding: 8px 12px; margin-bottom: 10px; border-radius: 0 0 16px 16px; border-top: none; }
     
+    /* Заметный скроллбар под холстом */
     .canvas-wrapper-outer { 
-        width: 100%; height: 100%; margin: 0; border-radius: 12px;
-        overflow-x: auto; overflow-y: hidden; /* ГОРИЗОНТАЛЬНЫЙ СКРОЛЛ */
-        display: flex; align-items: center; justify-content: flex-start;
-        scrollbar-width: none; 
+        width: 100%; height: auto; flex: 1 1 auto; margin: 0; border-radius: 12px;
+        overflow-x: auto; overflow-y: hidden;
+        display: block; scrollbar-width: thin; scrollbar-color: var(--primary) rgba(255,255,255,0.1);
     }
-    .canvas-wrapper-outer::-webkit-scrollbar { display: none; }
+    .canvas-wrapper-outer::-webkit-scrollbar { height: 8px; display: block; }
+    .canvas-wrapper-outer::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); border-radius: 4px; }
+    .canvas-wrapper-outer::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
     
     /* Холст растягивается по высоте экрана и вылазит по ширине */
-    .canvas-wrapper { height: 95%; max-height: 100%; width: auto; aspect-ratio: 4 / 3; flex-shrink: 0; margin: auto 0; }
+    .canvas-wrapper { height: 100%; width: auto; aspect-ratio: 4 / 3; flex-shrink: 0; margin: 0 auto; }
     
     /* Нижнее меню инструментов */
     .sidebar-tools { 
-        width: 100%; max-width: 100%; height: auto; min-height: 70px; 
+        width: 100%; max-width: 100%; height: auto; min-height: 70px; flex-shrink: 0;
         border-radius: 24px 24px 0 0; padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); 
         background: rgba(15,23,42,0.95); position: relative; border: none; border-top: 1px solid rgba(255,255,255,0.1);
         box-shadow: 0 -10px 30px rgba(0,0,0,0.6); overflow: visible;
@@ -218,6 +222,10 @@ input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; bo
         box-shadow: 0 -10px 30px rgba(0,0,0,0.5); z-index: 1000; scrollbar-width: none;
     }
     .tools-popup.show { display: flex; animation: slideUp 0.2s ease; }
+    
+    /* ИНСТРУМЕНТЫ НЕ УВЕЛИЧИВАЮТСЯ В ВЕРТИКАЛЬНОМ РЕЖИМЕ */
+    .tool-btn.active-swatch { transform: none !important; background: var(--primary) !important; border-color: var(--primary) !important; }
+    .swatch.active-swatch { transform: scale(1.2) !important; } /* Цвета по-прежнему увеличиваются */
     
     /* Строка управления внизу */
     .bottom-row-ui { flex-direction: row; align-items: center; justify-content: space-between; height: 50px; margin-top: 0; }
