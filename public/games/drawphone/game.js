@@ -364,12 +364,9 @@ function handleStateChange() {
   }
 }
 
+// ИСПРАВЛЕНИЕ: Убран баг Кооп режима. Теперь все игроки отправляют слова от своего имени в свои блокноты.
 function getCurrentNotebookId(round, players) {
     const myIndex = players.indexOf(myUserId);
-    if (globalState.settings?.mode === 'coop') {
-        const primaryIndex = myIndex % 2 === 0 ? myIndex : myIndex - 1;
-        return players[primaryIndex];
-    }
     if (myIndex === -1) return myUserId; 
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
 }
@@ -526,27 +523,33 @@ function startRound(round, players) {
   }
 }
 
-// НАСТОЯЩИЙ СЛОМАННЫЙ ПЕРЕВОДЧИК ЧЕРЕЗ GOOGLE TRANSLATE API
+// ИСПРАВЛЕНИЕ: Безумная цепочка перевода для интересного эффекта
 async function getRealBabelTranslation(text) {
-    const langs = ['ja', 'zh-CN', 'ar', 'hi', 'ko', 'de', 'es', 'fr', 'zu', 'vi', 'th'];
-    const l1 = langs[Math.floor(Math.random() * langs.length)];
-    let l2 = langs[Math.floor(Math.random() * langs.length)];
-    while(l1 === l2) l2 = langs[Math.floor(Math.random() * langs.length)];
+    // Цепочка: Русский -> Японский -> Арабский -> Зулусский -> Французский -> Русский
+    const chain = [
+        { id: 'ja', name: 'Яп' },
+        { id: 'ar', name: 'Ар' },
+        { id: 'zu', name: 'Зулу' },
+        { id: 'fr', name: 'Фр' },
+        { id: 'ru', name: 'Рус' }
+    ];
+    
+    let currentText = text;
     
     try {
-        const res1 = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=${l1}&dt=t&q=${encodeURIComponent(text)}`);
-        const data1 = await res1.json();
-        const t1 = data1[0].map(x => x[0]).join('');
+        for (let i = 0; i < chain.length; i++) {
+            const sl = i === 0 ? 'ru' : chain[i-1].id;
+            const tl = chain[i].id;
+            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(currentText)}`);
+            const data = await res.json();
+            currentText = data[0].map(x => x[0]).join('');
+        }
         
-        const res2 = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${l1}&tl=${l2}&dt=t&q=${encodeURIComponent(t1)}`);
-        const data2 = await res2.json();
-        const t2 = data2[0].map(x => x[0]).join('');
-
-        const res3 = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${l2}&tl=ru&dt=t&q=${encodeURIComponent(t2)}`);
-        const data3 = await res3.json();
-        const finalT = data3[0].map(x => x[0]).join('');
+        // Добавляем рандомный смешной эмодзи для эффекта
+        const emojis = ['🤔', '🤯', '💀', '🤡', '👽', '🍝', '✨', '🥴'];
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
         
-        return `[Через ${l1.toUpperCase()} и ${l2.toUpperCase()}] -> ${finalT}`;
+        return `[Яп ➔ Ар ➔ Зулу ➔ Фр] ${randomEmoji}\n${currentText}`;
     } catch(e) {
         console.error("Translate API error:", e);
         return `[Сбой авто-перевода] ${text}`;
@@ -1074,10 +1077,9 @@ function syncPresentationView(players) {
                <img src="${p2Data.imgUrl}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain;">
                <div style="position:absolute; left:50%; top:0; bottom:0; width:4px; background:#d946ef; opacity:0.8; box-shadow: 0 0 10px #d946ef;"></div>
             </div>`;
-        } else if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism' || mode === 'impostor') {
-            visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img"></div>`;
         } else {
-            visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas></div>`;
+            // ИСПРАВЛЕНИЕ: Теперь для всех рисунков (включая Babel) грузится надежный тег img, а не пустой canvas
+            visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img" style="width:100%; height:auto; border-radius:12px; border:2px solid rgba(255,255,255,0.1);"></div>`;
         }
     }
 

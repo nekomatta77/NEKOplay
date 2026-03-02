@@ -32,7 +32,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
-      // Запрос на полный экран (срабатывает при кликах в игре)
+      // Запрос на полный экран
       if (event.data?.type === 'request_fullscreen') {
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen().catch(err => console.log("Fullscreen error:", err));
@@ -42,8 +42,8 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
       // Старт игры
       if (event.data?.type === 'start_game') {
         const gamePlayers = room.players || [];
-        const playerNames = gamePlayers.reduce((acc, p) => ({...acc, [p.id]: p.name}), {});
-        const playerAvatars = gamePlayers.reduce((acc, p) => ({...acc, [p.id]: p.avatar}), {});
+        const playerNames = gamePlayers.reduce((acc: any, p) => ({...acc, [p.id]: p.name}), {});
+        const playerAvatars = gamePlayers.reduce((acc: any, p) => ({...acc, [p.id]: p.avatar}), {});
 
         await update(ref(db, `rooms/${room.id}/gameState`), {
           status: 'playing',
@@ -57,7 +57,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
         });
       }
 
-      // Возврат в лобби (Сыграть еще раз)
+      // Возврат в лобби
       if (event.data?.type === 'play_again') {
         await update(ref(db, `rooms/${room.id}/gameState`), {
           status: 'waiting',
@@ -66,6 +66,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
         });
       }
 
+      // Отправка хода (сохраняем в Firebase)
       if (event.data?.type === 'game_action') {
         await set(ref(db, `rooms/${room.id}/lastAction`), {
           senderId: user.id,
@@ -87,6 +88,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return () => window.removeEventListener('message', handleMessage);
   }, [room.id, user.id, room.players]);
 
+  // Слушаем глобальное состояние
   useEffect(() => {
     const stateRef = ref(db, `rooms/${room.id}/gameState`);
     const unsubscribe = onValue(stateRef, (snapshot) => {
@@ -97,6 +99,19 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     });
     return () => unsubscribe();
   }, [room.id]);
+
+  // НОВОЕ: Слушаем действия (game_action) из Firebase и передаем их в iframe для других игроков (решает рассинхрон!)
+  useEffect(() => {
+    const actionRef = ref(db, `rooms/${room.id}/lastAction`);
+    const unsubscribe = onValue(actionRef, (snapshot) => {
+      const actionData = snapshot.val();
+      // Отправляем в iframe только если ход сделали НЕ мы
+      if (actionData && actionData.senderId !== user.id && iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({ type: 'game_action', action: actionData.action }, '*');
+      }
+    });
+    return () => unsubscribe();
+  }, [room.id, user.id]);
 
   const getGameUrl = () => {
     const playersCount = room.players?.length || 2;
