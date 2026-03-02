@@ -58,7 +58,6 @@ function showModeInfo(e, mode) {
     const el = document.querySelector(`.mode-card[data-mode="${mode}"] h4`);
     if(el) setText('info-modal-title', el.innerText);
     
-    // Безопасное получение описания из modes.js (если подключен) или из локального словаря
     let desc = "Описание режима отсутствует.";
     if (typeof modeDescriptions !== 'undefined' && modeDescriptions[mode]) desc = modeDescriptions[mode];
     setText('info-modal-desc', desc);
@@ -214,7 +213,6 @@ function handleStateChange() {
   const players = globalState.players || [];
   if (players.length > 0) renderPlayersList(players);
 
-  // ЖЕСТКАЯ ОЧИСТКА ПРИ НОВОЙ ИГРЕ
   if (!globalState.status || globalState.status === 'waiting') {
     currentLocalRound = 0; clearInterval(phaseTimerInterval);
     if (animationFrameId) cancelAnimationFrame(animationFrameId); 
@@ -258,7 +256,7 @@ function handleStateChange() {
   }
 
   if (mode === 'hardcore') { setDisplay('action-tools', 'none'); setDisplay('tool-divider-1', 'none'); } 
-  else { setDisplay('action-tools', 'grid'); setDisplay('tool-divider-1', 'block'); }
+  else { setDisplay('action-tools', 'flex'); setDisplay('tool-divider-1', 'block'); }
 
   if (mode === 'lasso' && globalState.round > 2) preloadLassoStamps();
 
@@ -338,10 +336,10 @@ function startRound(round, players) {
 
       resetCanvasTransform(); clearCanvas(); initHistory(); setBrush(document.querySelector('.brush-tool'));
       
-      if (mode === 'connectdots') {
+      if (mode === 'connectdots' || mode === 'constellation') {
           dotsArray = [];
           for(let i=0; i<30; i++) dotsArray.push({x: Math.random()*700+50, y: Math.random()*500+50});
-          ctx.fillStyle = '#000';
+          ctx.fillStyle = (globalState.settings?.mode === 'darkmode' || mode === 'constellation') ? '#fff' : '#000';
           dotsArray.forEach(d => { ctx.beginPath(); ctx.arc(d.x, d.y, 5, 0, Math.PI*2); ctx.fill(); });
       }
 
@@ -501,6 +499,34 @@ function drawArrow(actx, fromx, fromy, tox, toy) {
     actx.moveTo(tox, toy); actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6)); actx.stroke();
 }
 
+// Заливка
+function floodFillCore(startX, startY, fillColorHex) {
+    startX = Math.round(startX); 
+    startY = Math.round(startY);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = new Uint32Array(imgData.data.buffer); 
+    const startPos = startY * canvas.width + startX;
+    const startColor = data[startPos];
+    const r = parseInt(fillColorHex.slice(1,3), 16);
+    const g = parseInt(fillColorHex.slice(3,5), 16);
+    const b = parseInt(fillColorHex.slice(5,7), 16);
+    const fillColor = (255 << 24) | (b << 16) | (g << 8) | r;
+    if (startColor === fillColor) return;
+    const queue = [startPos];
+    while (queue.length > 0) {
+        let pos = queue.pop();
+        if (data[pos] === startColor) {
+            data[pos] = fillColor;
+            let x = pos % canvas.width; let y = Math.floor(pos / canvas.width);
+            if (x > 0) queue.push(pos - 1);
+            if (x < canvas.width - 1) queue.push(pos + 1);
+            if (y > 0) queue.push(pos - canvas.width);
+            if (y < canvas.height - 1) queue.push(pos + canvas.width);
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+}
+
 function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
     targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over';
     targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
@@ -510,6 +536,7 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
         
         if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { targetCtx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); continue; }
         if (stroke.type === 'clear') { targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
+        else if (stroke.type === 'fill') { /* Воспроизведение заливки при анимации опускаем для производительности */ }
         else if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
         else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
@@ -531,7 +558,14 @@ function saveState() { if (globalState.settings?.mode === 'hardcore' || globalSt
 function restoreState(index) { let img = new Image(); img.src = drawHistory[index]; img.onload = () => { ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowBlur=0; ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); }; recordedStrokes = JSON.parse(JSON.stringify(strokesHistory[index])); }
 function undo() { if (historyIndex > 0) { historyIndex--; restoreState(historyIndex); } }
 function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; restoreState(historyIndex); } }
-function clearTools() { isErasing = false; isFilling = false; isEyedropper = false; isBlur = false; isRect = false; isCircle = false; isLine = false; isArrow = false; isNeon = false; document.querySelectorAll('.tool-btn').forEach(s => { if (!s.classList.contains('sym-tool')) s.classList.remove('active-swatch'); }); }
+
+function clearTools() { 
+    isErasing = false; isFilling = false; isEyedropper = false; isRect = false; isCircle = false; isLine = false; isArrow = false; 
+    document.querySelectorAll('.tool-btn').forEach(s => { 
+        if (!s.classList.contains('sym-tool')) s.classList.remove('active-swatch'); 
+    }); 
+}
+
 function setColor(color, element) { currentColor = color; ctx.globalCompositeOperation = 'source-over'; document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active-swatch')); if(element) element.classList.add('active-swatch'); if (isErasing) setBrush(document.querySelector('.brush-tool')); }
 function setBrush(element) { clearTools(); ctx.globalCompositeOperation = 'source-over'; if(element) element.classList.add('active-swatch'); }
 function setEraser(element) { clearTools(); isErasing = true; ctx.globalCompositeOperation = 'destination-out'; element.classList.add('active-swatch'); }
@@ -542,6 +576,9 @@ function setCircle(element) { clearTools(); isCircle = true; ctx.globalComposite
 function setLine(element) { clearTools(); isLine = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setArrow(element) { clearTools(); isArrow = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function toggleSymmetry(element) { isSymmetry = !isSymmetry; element.classList.toggle('active-swatch', isSymmetry); }
+function toggleNeon(element) { isNeon = !isNeon; element.classList.toggle('active-swatch', isNeon); }
+function toggleBlur(element) { isBlur = !isBlur; element.classList.toggle('active-swatch', isBlur); }
+
 function clearCanvas() { ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; const isDark = globalState.settings?.mode === 'darkmode'; ctx.fillStyle = isDark ? '#000000' : '#ffffff'; const cw = document.getElementById('canvas-wrapper'); if(cw) cw.style.backgroundColor = isDark ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); if(isErasing) ctx.globalCompositeOperation = 'destination-out'; recordedStrokes.push({ type: 'clear' }); saveState(); }
 function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; updateTransform(); }
 function updateTransform() { if (!zoomContainer) return; if (canvasTransform.scale <= 1) { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; } zoomContainer.style.transformOrigin = `0 0`; zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
@@ -570,11 +607,11 @@ function startPosition(e) {
     if (mode === 'oneline' && hasDrawnStrokeOneline) return;
     
     if (isEyedropper) { const p = ctx.getImageData(pos.x, pos.y, 1, 1).data; const hex = "#" + ("000000" + ((p[0] << 16) | (p[1] << 8) | p[2]).toString(16)).slice(-6); setColor(hex); setBrush(document.querySelector('.brush-tool')); return; }
-    if (isFilling) { floodFillCore(Math.round(pos.x), Math.round(pos.y), currentColor); recordedStrokes.push({ type: 'fill', c: currentColor, p: [Math.round(pos.x), Math.round(pos.y)] }); saveState(); return; }
+    if (isFilling) { floodFillCore(pos.x, pos.y, currentColor); recordedStrokes.push({ type: 'fill', c: currentColor, p: [Math.round(pos.x), Math.round(pos.y)] }); saveState(); return; }
     if (mode === 'chaos') { currentColor = getRandomHex(); const bs = document.getElementById('brush-size'); if(bs) bs.value = Math.floor(Math.random() * 35) + 5; }
     if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
     if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
-    if (mode === 'connectdots') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return;  }
+    if (mode === 'connectdots' || mode === 'constellation') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return;  }
     
     let opacity = 1;
     const bo = document.getElementById('brush-opacity');
@@ -597,7 +634,7 @@ function draw(e) {
   if (mode === 'coop') { const players = globalState.players || []; const isLeft = players.indexOf(myUserId) % 2 === 0; if (isLeft && pos.x > 400) pos.x = 400; if (!isLeft && pos.x < 400) pos.x = 400; }
   if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
   if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
-  if (mode === 'connectdots') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return; }
+  if (mode === 'connectdots' || mode === 'constellation') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return; }
   
   let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
   if (mode === 'inkmeter') { let dist = Math.hypot(pos.x - lastX, pos.y - lastY); currentInk -= dist * (bsVal / 5); if (currentInk < 0) currentInk = 0; const im = document.getElementById('ink-meter-bar'); if(im) im.style.width = `${(currentInk/maxInk)*100}%`; if (currentInk === 0) return; }
@@ -690,7 +727,7 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             
             if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { actx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'clear') { actx.globalAlpha = 1; actx.globalCompositeOperation = 'source-over'; actx.fillStyle = isDarkMode ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
-            if (stroke.type === 'fill') { strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
+            if (stroke.type === 'fill') { /* Опускаем для производительности анимации */ strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'rect') { actx.beginPath(); actx.lineWidth = stroke.s; actx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) actx.strokeRect(canvasEl.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'circle') { actx.beginPath(); actx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); actx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke(); if(stroke.sym) { actx.beginPath(); actx.arc(canvasEl.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke(); } strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'line') { actx.beginPath(); actx.lineWidth = stroke.s; actx.moveTo(stroke.p[0], stroke.p[1]); actx.lineTo(stroke.p[2], stroke.p[3]); actx.stroke(); if(stroke.sym) { actx.beginPath(); actx.moveTo(canvasEl.width - stroke.p[0], stroke.p[1]); actx.lineTo(canvasEl.width - stroke.p[2], stroke.p[3]); actx.stroke(); } strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
