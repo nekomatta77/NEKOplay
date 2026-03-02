@@ -26,9 +26,6 @@ else document.getElementById('guest-waiting').style.display = 'flex';
 function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 function requestFullscreen() { window.parent.postMessage({ type: 'request_fullscreen' }, '*'); }
 
-// ==========================================
-// ЛОББИ: ВКЛАДКИ, ИГРОКИ И РЕЖИМЫ
-// ==========================================
 function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
@@ -39,15 +36,26 @@ function switchTab(tabId) {
 const modeDescriptions = {
     'classic': 'Обычная игра. Рисуй, отгадывай и веселись без жестких ограничений!',
     'icebreaker': 'Ледокол! Игра начинается не с текста, а с рисунка. Нарисуйте на первом этапе что угодно, а следующий игрок попытается это угадать!',
-    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза. Придется думать и рисовать очень быстро!',
-    'nocolor': 'Секретный режим! Палитра заблокирована. Рисуем только черным цветом, как настоящие графики.',
-    'hardcore': 'Без права на ошибку! Ластик, отмена действий и очистка холста отключены. Рисуй с первого раза!',
+    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза.',
     'story': 'История! Рисования нет вообще. Только текст. Вы пишете продолжение предыдущей фразы, создавая смешной рассказ.',
-    'copycat': 'Подделка! Первый пишет фразу, второй рисует, а все остальные пытаются скопировать (перерисовать) предыдущий рисунок.',
-    'blind': 'Вслепую! Во время рисования ваши штрихи невидимы на холсте. Рисуйте по памяти!',
+    'plagiarism': 'Плагиат! Рисуют ВСЕ и СРАЗУ. Текста нет. На каждом этапе вам показывают чужой рисунок, который нужно запомнить и перерисовать по памяти. С каждым этапом времени всё меньше!',
+    'finishit': 'Дорисуй-ка! Первый этап — 10 секунд на каракулю. Дальше вы получаете чужие заготовки и должны сделать из них полноценный рисунок! Заготовку стереть нельзя.',
+    'tagteam': 'Эстафета! Игроки по очереди дополняют один и тот же рисунок по 5 секунд.',
+    'timebomb': 'Таймер-убийца! Каждое ваше касание экрана ускоряет таймер в два раза. Думайте перед тем, как провести линию!',
+    'impostor': 'Предатель! Все получают одинаковое слово для рисования, а один игрок получает похожее. Вычислите предателя в конце!',
+    'coop': 'Командная работа! Ваш холст разделен пополам. Вы рисуете только на одной половине экрана, а ваш напарник на другой.',
+    'babel': 'Переводчик! Слова автоматически прогоняются через случайный язык и возвращаются искаженными!',
+    'duotone': 'Два цвета! На каждый раунд выдается только два случайных цвета. Остальная палитра заблокирована.',
+    'inkmeter': 'Ограниченные чернила! Сверху показан уровень чернил. Провели слишком длинную линию — кисть перестает рисовать.',
+    'connectdots': 'Коннектор! На холсте раскиданы точки. Рисовать можно только соединяя их между собой!',
+    'lasso': 'Лассо-арт! Вы получаете фрагмент (Глаз, Ухо). Ваша задача — собрать картинку исключительно из готовых штампов.',
+    'triplethreat': 'Три слова! Вам дается не одно, а сразу три случайных слова. Вы обязаны нарисовать их все на одном холсте.',
+    'nohands': 'Без рук! Нажмите на экран, чтобы поставить начальную точку, а затем рисуйте наклоняя телефон (гироскоп)!',
+    'nocolor': 'Секретный режим! Палитра заблокирована. Рисуем только черным цветом.',
     'onecolor': 'Один цвет! На раунд выдается один случайный цвет на всех. Палитра спрятана.',
-    'chaos': 'Хаос! При каждом касании экрана цвет и размер кисти меняются случайным образом.',
-    'masterpiece': 'Шедевр! Времени на рисование дается в 2 раза больше. Создайте картины великих художников!',
+    'darkmode': 'Ночь! Темная тема. Холст становится черным, а рисуем мы белым.',
+    'hardcore': 'Без права на ошибку! Ластик, отмена действий и очистка холста отключены. Рисуй с первого раза!',
+    'masterpiece': 'Шедевр! Времени на рисование дается в 2 раза больше.',
     'mirror': 'Зазеркалье! Холст аппаратно отзеркален. Попробуйте нарисовать хоть что-то ровно!',
     'earthquake': 'Землетрясение! Во время рисования мольберт постоянно трясется.',
     'drunk': 'Пьяный мастер! Ваши координаты немного смещаются. Кисть живет своей жизнью!',
@@ -55,8 +63,8 @@ const modeDescriptions = {
     'oneline': 'Один штрих! Как только вы отрываете палец от экрана, ваше рисование окончено.',
     'tiny': 'Лилипут! Холст отдалился в 2 раза. Придется щуриться.',
     'giant': 'Великан! Размер кисти заблокирован на абсолютном максимуме.',
-    'fading': 'Призрак! Прозрачность заблокирована на 5%. Придется сильно постараться, чтобы линии было видно.',
-    'darkmode': 'Ночь! Темная тема. Холст становится черным, а рисуем мы белым.'
+    'fading': 'Призрак! Прозрачность заблокирована на 5%.',
+    'chaos': 'Хаос! При каждом касании экрана цвет и размер кисти меняются случайным образом.'
 };
 
 function selectMode(mode) {
@@ -86,9 +94,6 @@ function renderPlayersList(players) {
     }).join('');
 }
 
-// ==========================================
-// АУДИО И ТАЙМЕРЫ
-// ==========================================
 let audioCtx = null;
 function initAudio() {
     if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
@@ -109,6 +114,9 @@ function playWarningBeep() {
 let phaseTimerInterval = null;
 let currentPhaseSubmitted = false;
 let isCurrentPhaseDrawing = false;
+let timeMultiplier = 1; // Для режима Timebomb
+let maxInk = 5000;
+let currentInk = 5000;
 
 function updateTimerUI(remaining, limit) {
     let targetPrefix = currentPhaseSubmitted ? 'waiting' : (isCurrentPhaseDrawing ? 'draw' : 'text');
@@ -116,14 +124,14 @@ function updateTimerUI(remaining, limit) {
     let timerPath = document.getElementById(`${targetPrefix}-timer-path`);
     let timerContainer = document.getElementById(`${targetPrefix}-timer-container`);
 
-    if (timerText) timerText.innerText = remaining;
+    if (timerText) timerText.innerText = Math.ceil(remaining);
     if (timerPath) {
         let dashoffset = 100 - (remaining / limit) * 100;
-        timerPath.style.strokeDashoffset = dashoffset;
+        timerPath.style.strokeDashoffset = Math.max(0, dashoffset);
         timerPath.style.stroke = '#22c55e'; 
         if (remaining <= 10 && remaining > 0) {
             if (timerContainer) timerContainer.classList.add('timer-warning');
-            if (!currentPhaseSubmitted) playWarningBeep(); 
+            if (!currentPhaseSubmitted && Math.floor(remaining) !== Math.floor(remaining + timeMultiplier)) playWarningBeep(); 
         } else if (remaining <= limit / 2 && remaining > 10) {
             timerPath.style.stroke = '#eab308'; 
             if (timerContainer) timerContainer.classList.remove('timer-warning');
@@ -137,21 +145,32 @@ function startPhaseTimer(isDrawing) {
     clearInterval(phaseTimerInterval);
     currentPhaseSubmitted = false;
     isCurrentPhaseDrawing = isDrawing;
+    timeMultiplier = 1;
     
     let timeLimit = globalState.settings?.time || 90;
+    
+    if (globalState.settings?.mode === 'tagteam') timeLimit = 5;
+    if (globalState.settings?.mode === 'plagiarism' && currentLocalRound > 1) {
+        timeLimit = Math.max(15, timeLimit - (currentLocalRound - 1) * 15);
+    }
+    if (globalState.settings?.mode === 'finishit' && currentLocalRound === 1) {
+        timeLimit = 10;
+    }
+
     let timeRemaining = timeLimit;
     updateTimerUI(timeRemaining, timeLimit);
 
+    // Запускаем таймер с интервалом 100мс для плавности timebomb
     phaseTimerInterval = setInterval(() => {
-        timeRemaining--;
-        if (timeRemaining < 0) {
+        timeRemaining -= (0.1 * timeMultiplier);
+        if (timeRemaining <= 0) {
             clearInterval(phaseTimerInterval);
             if (!currentPhaseSubmitted) {
                 if (isDrawing) submitDrawing(false);
                 else submitWord(false);
             }
         } else { updateTimerUI(timeRemaining, timeLimit); }
-    }, 1000);
+    }, 100);
 }
 
 function updateWaitingScreen() {
@@ -170,9 +189,6 @@ function updateWaitingScreen() {
     }).join('');
 }
 
-// ==========================================
-// СТАРТ ИГРЫ
-// ==========================================
 function startGame() {
   if (!isHost) return;
   initAudio(); requestFullscreen();
@@ -183,7 +199,16 @@ function startGame() {
   if (selectedMode === 'masterpiece') finalTime = baseTime * 2;
 
   let roundsMult = parseInt(document.getElementById('setting-rounds').value);
-  window.parent.postMessage({ type: 'start_game', settings: { mode: selectedMode, time: finalTime, roundsMultiplier: roundsMult } }, '*');
+
+  // Валидация Co-op
+  if (selectedMode === 'coop' && (playersCountParam % 2 !== 0)) {
+      alert("Для Командной работы нужно четное количество игроков!"); return;
+  }
+
+  // Генерация сида (чтобы у всех был один Предатель или цвета)
+  const seed = Math.floor(Math.random() * 1000000);
+
+  window.parent.postMessage({ type: 'start_game', settings: { mode: selectedMode, time: finalTime, roundsMultiplier: roundsMult, seed: seed } }, '*');
 }
 
 function playAgain() {
@@ -199,6 +224,15 @@ window.addEventListener('message', (event) => {
 });
 
 let hasDrawnStrokeOneline = false;
+let finishitBaseImg = new Image();
+let dotsArray = []; // Для Connect-the-dots
+let isGyroEnabled = false;
+
+// Random seeded
+function seededRandom(seed) {
+    var x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+}
 
 function handleStateChange() {
   const players = globalState.players || [];
@@ -207,6 +241,8 @@ function handleStateChange() {
   if (!globalState.status || globalState.status === 'waiting') {
     currentLocalRound = 0; clearInterval(phaseTimerInterval);
     document.getElementById('play-again-btn').style.display = 'none';
+    document.getElementById('chat-messages').innerHTML = ''; // ОЧИСТКА ЧАТА БАГФИКС
+    renderedPresentationState = '';
     showPhase('lobby-screen'); return;
   }
 
@@ -236,13 +272,30 @@ function handleStateChange() {
       document.getElementById('color-palette').style.display = 'none'; 
       document.getElementById('tool-divider-2').style.display = 'none';
       currentColor = mode === 'darkmode' ? '#ffffff' : '#000000';
+  } else if (mode === 'duotone') {
+      // Duotone генерация
+      document.getElementById('color-palette').style.display = 'grid'; 
+      let colors = document.querySelectorAll('#color-palette .swatch');
+      colors.forEach(c => c.style.display = 'none');
+      let seed = (globalState.settings.seed || 1) + globalState.round;
+      let i1 = Math.floor(seededRandom(seed) * 8);
+      let i2 = Math.floor(seededRandom(seed+1) * 8);
+      if (i1===i2) i2 = (i2+1)%8;
+      colors[i1].style.display = 'block';
+      colors[i2].style.display = 'block';
+      setColor(colors[i1].style.backgroundColor, colors[i1]);
   } else { 
       document.getElementById('color-palette').style.display = 'grid'; 
+      document.querySelectorAll('#color-palette .swatch').forEach(c => c.style.display = 'block');
       document.getElementById('tool-divider-2').style.display = 'block';
   }
 
   if (mode === 'hardcore') { document.getElementById('action-tools').style.display = 'none'; document.getElementById('tool-divider-1').style.display = 'none';} 
-  else { document.getElementById('action-tools').style.display = 'flex'; document.getElementById('tool-divider-1').style.display = 'block'; }
+  else { document.getElementById('action-tools').style.display = 'grid'; document.getElementById('tool-divider-1').style.display = 'block'; }
+
+  if (mode === 'lasso' && globalState.round > 1) {
+      // В лассо-арт инструменты заменяются на штампы, но для простоты мы оставим пока обычные + заготовка
+  }
 
   if (globalState.round > currentLocalRound) startRound(globalState.round, players);
   updateWaitingScreen();
@@ -268,24 +321,29 @@ function showPhase(phaseId) {
 }
 
 function getCurrentNotebookId(round, players) {
+    // Для эстафеты все всегда рисуют в первой книжке (или смещение по-другому)
+    if (globalState.settings?.mode === 'tagteam') return players[0]; 
     const myIndex = players.indexOf(myUserId);
     if (myIndex === -1) return myUserId; 
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
 }
 
-function getRandomHex() {
-    return "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
-}
+function getRandomHex() { return "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0'); }
+
+function hidePlagiarism() { document.getElementById('plagiarism-overlay').style.display = 'none'; }
 
 function startRound(round, players) {
   currentLocalRound = round;
   const mode = globalState.settings?.mode;
   hasDrawnStrokeOneline = false;
+  isGyroEnabled = false;
   
   let isDrawingPhase = (round % 2 === 0);
-  if (mode === 'icebreaker') isDrawingPhase = (round % 2 !== 0);
+  if (mode === 'icebreaker' || mode === 'tagteam') isDrawingPhase = (round % 2 !== 0);
   if (mode === 'story') isDrawingPhase = false;
+  if (mode === 'plagiarism' || mode === 'finishit') isDrawingPhase = true;
   if (mode === 'copycat') isDrawingPhase = (round > 1);
+  if (mode === 'tagteam') isDrawingPhase = true;
   
   if (mode === 'onecolor' && isDrawingPhase) currentColor = getRandomHex();
 
@@ -301,27 +359,71 @@ function startRound(round, players) {
   if (isDrawingPhase) {
       const zContainer = document.getElementById('zoom-container');
       zContainer.className = ''; 
-      document.getElementById('blindfold').style.display = 'none';
       document.getElementById('brush-settings').style.display = 'flex';
+      document.getElementById('plagiarism-overlay').style.display = 'none';
+      document.getElementById('drawing-board').style.backgroundImage = 'none';
+      document.getElementById('ink-meter-container').style.display = 'none';
+      document.getElementById('coop-divider').style.display = 'none';
+      document.getElementById('btn-gyro-start').style.display = 'none';
+      document.getElementById('gyro-cursor').style.display = 'none';
       
       if (mode === 'mirror') zContainer.classList.add('mode-mirror');
       if (mode === 'earthquake') zContainer.classList.add('mode-earthquake');
       if (mode === 'tiny') zContainer.classList.add('mode-tiny');
-      if (mode === 'blind') document.getElementById('blindfold').style.display = 'block';
       if (mode === 'giant') { document.getElementById('brush-settings').style.display = 'none'; document.getElementById('brush-size').value = 40; }
       if (mode === 'fading') { document.getElementById('brush-settings').style.display = 'none'; document.getElementById('brush-opacity').value = 0.05; }
       if (mode === 'pixelart') { document.getElementById('brush-settings').style.display = 'none'; document.getElementById('brush-size').value = 15; }
       
+      if (mode === 'inkmeter') {
+          document.getElementById('ink-meter-container').style.display = 'block';
+          currentInk = maxInk;
+          document.getElementById('ink-meter-bar').style.width = '100%';
+      }
+
+      if (mode === 'coop') {
+          document.getElementById('coop-divider').style.display = 'block';
+      }
+
+      if (mode === 'nohands') {
+          document.getElementById('btn-gyro-start').style.display = 'block';
+      }
+
       resetCanvasTransform(); clearCanvas(); initHistory(); setBrush(document.querySelector('.brush-tool'));
       
+      // Генерация точек для ConnectDots
+      if (mode === 'connectdots') {
+          dotsArray = [];
+          for(let i=0; i<30; i++) {
+              dotsArray.push({x: Math.random()*700+50, y: Math.random()*500+50});
+          }
+          ctx.fillStyle = '#000';
+          dotsArray.forEach(d => { ctx.beginPath(); ctx.arc(d.x, d.y, 5, 0, Math.PI*2); ctx.fill(); });
+      }
+
       if (round === 1) { 
-          document.getElementById('word-to-draw').innerHTML = "Что угодно!";
+          if (mode === 'finishit') document.getElementById('word-to-draw').innerHTML = "Нарисуйте заготовку!";
+          else if (mode === 'lasso') document.getElementById('word-to-draw').innerHTML = "Нарисуй: " + getRandomLassoPart();
+          else if (mode === 'triplethreat') document.getElementById('word-to-draw').innerHTML = getRandomTriple();
+          else document.getElementById('word-to-draw').innerHTML = "Что угодно!";
       } else {
-          if (mode === 'copycat' && typeof previousData === 'string' && previousData.startsWith('{')) {
-             try { 
-                 const pdImg = JSON.parse(previousData).img;
-                 document.getElementById('word-to-draw').innerHTML = `<img src="${pdImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`;
-             } catch(e) {}
+          let prevImg = null;
+          if (typeof previousData === 'string' && previousData.startsWith('{')) {
+              try { prevImg = JSON.parse(previousData).img; } catch(e){}
+          } else { prevImg = previousData; } 
+
+          if (mode === 'plagiarism') {
+              document.getElementById('word-to-draw').innerText = "Перерисуй по памяти!";
+              document.getElementById('plagiarism-overlay').style.display = 'flex';
+              document.getElementById('plagiarism-img').src = prevImg;
+          } else if (mode === 'finishit' || mode === 'tagteam') {
+              document.getElementById('word-to-draw').innerText = mode === 'finishit' ? "Дорисуй-ка!" : "Продолжи рисунок!";
+              finishitBaseImg.src = prevImg;
+              document.getElementById('drawing-board').style.backgroundImage = `url(${prevImg})`;
+              document.getElementById('drawing-board').style.backgroundSize = '100% 100%';
+              document.getElementById('drawing-board').style.backgroundPosition = 'center';
+              document.getElementById('drawing-board').style.backgroundRepeat = 'no-repeat';
+          } else if (mode === 'copycat' && prevImg && prevImg.length > 50) {
+              document.getElementById('word-to-draw').innerHTML = `<img src="${prevImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`;
           } else {
              document.getElementById('word-to-draw').innerText = previousData || "...";
           }
@@ -330,10 +432,26 @@ function startRound(round, players) {
   } else {
       document.getElementById('word-input').value = '';
       if (round === 1) {
+          document.getElementById('babel-translation').style.display = 'none';
           document.getElementById('text-instruction').innerText = mode==='story'?'Начните историю...':'Придумайте фразу';
           document.getElementById('image-to-guess').style.display = 'none';
           document.getElementById('text-to-continue').style.display = 'none';
+          
+          if (mode === 'impostor') {
+              let pair = IMPOSTOR_PAIRS[Math.floor(seededRandom(globalState.settings.seed) * IMPOSTOR_PAIRS.length)];
+              // Если игрок индекс 0 - предатель
+              let isImpostor = players.indexOf(myUserId) === 0;
+              document.getElementById('word-input').value = isImpostor ? pair[1] : pair[0];
+              document.getElementById('word-input').disabled = true;
+              document.getElementById('text-instruction').innerText = "Ваше слово:";
+          } else {
+              document.getElementById('word-input').disabled = false;
+          }
+
       } else {
+          document.getElementById('word-input').disabled = false;
+          document.getElementById('babel-translation').style.display = 'none';
+
           if (mode === 'story') {
               document.getElementById('text-instruction').innerText = 'Продолжите историю...';
               document.getElementById('image-to-guess').style.display = 'none';
@@ -358,8 +476,24 @@ function submitWord(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
   currentPhaseSubmitted = true;
+  clearInterval(phaseTimerInterval);
   let word = document.getElementById('word-input').value.trim();
   if (!word) word = "Секретик"; 
+
+  // Babel Effect
+  if (globalState.settings?.mode === 'babel' && currentLocalRound > 1) {
+      document.getElementById('babel-translation').style.display = 'block';
+      document.getElementById('babel-translation').innerText = "Переводим...";
+      setTimeout(() => {
+          let translated = getBabelTranslation(word);
+          const updates = {};
+          updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = translated;
+          window.parent.postMessage({ type: 'update_state', updates }, '*');
+          showPhase('waiting-phase'); updateWaitingScreen();
+      }, 1500);
+      return;
+  }
+
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = word;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -370,13 +504,28 @@ function submitDrawing(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
   currentPhaseSubmitted = true;
+  clearInterval(phaseTimerInterval);
   
-  const tempCtx = canvas.getContext('2d');
-  tempCtx.globalCompositeOperation = 'destination-over';
-  tempCtx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff';
-  tempCtx.fillRect(0, 0, canvas.width, canvas.height);
+  const mode = globalState.settings?.mode;
+  let finalDataUrl = '';
+
+  if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) {
+      const tc = document.createElement('canvas');
+      tc.width = canvas.width; tc.height = canvas.height;
+      const tCtx = tc.getContext('2d');
+      tCtx.fillStyle = '#ffffff'; tCtx.fillRect(0,0,tc.width,tc.height);
+      tCtx.drawImage(finishitBaseImg, 0, 0, tc.width, tc.height);
+      tCtx.drawImage(canvas, 0, 0);
+      finalDataUrl = tc.toDataURL('image/png');
+  } else {
+      const tempCtx = canvas.getContext('2d');
+      tempCtx.globalCompositeOperation = 'destination-over';
+      tempCtx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff';
+      tempCtx.fillRect(0, 0, canvas.width, canvas.height);
+      finalDataUrl = canvas.toDataURL('image/png');
+  }
   
-  const finalData = JSON.stringify({ img: canvas.toDataURL('image/png'), strokes: recordedStrokes });
+  const finalData = JSON.stringify({ img: finalDataUrl, strokes: recordedStrokes });
 
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = finalData;
@@ -385,21 +534,47 @@ function submitDrawing(isManual = false) {
   resetCanvasTransform(); showPhase('waiting-phase'); updateWaitingScreen();
 }
 
-// ГЛОБАЛЬНАЯ ФУНКЦИЯ ДЛЯ СТРЕЛКИ
-function drawArrow(actx, fromx, fromy, tox, toy) {
-    let headlen = actx.lineWidth * 3;
-    let angle = Math.atan2(toy - fromy, tox - fromx);
-    actx.moveTo(fromx, fromy); actx.lineTo(tox, toy); actx.stroke();
-    actx.beginPath();
-    actx.moveTo(tox, toy);
-    actx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-    actx.moveTo(tox, toy);
-    actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
-    actx.stroke();
+// GYRO (NO HANDS)
+function startGyro() {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(res => {
+        if (res === 'granted') enableGyro();
+      });
+    } else enableGyro();
 }
 
+let gyroX = 400, gyroY = 300;
+function enableGyro() {
+    isGyroEnabled = true;
+    document.getElementById('btn-gyro-start').style.display = 'none';
+    document.getElementById('gyro-cursor').style.display = 'block';
+    
+    // Начальная точка по центру
+    gyroX = 400; gyroY = 300;
+    ctx.beginPath(); ctx.moveTo(gyroX, gyroY);
+    preZoomState = canvas.toDataURL();
+    isDrawing = true;
+    currentStroke = { c: currentColor, s: document.getElementById('brush-size').value, e: 0, p: [gyroX, gyroY] };
+
+    window.addEventListener('deviceorientation', (e) => {
+        if (!isDrawing || !isGyroEnabled) return;
+        // Чувствительность
+        gyroX += e.gamma * 0.5;
+        gyroY += e.beta * 0.5;
+        gyroX = Math.max(0, Math.min(800, gyroX));
+        gyroY = Math.max(0, Math.min(600, gyroY));
+        
+        document.getElementById('gyro-cursor').style.left = `${(gyroX/800)*100}%`;
+        document.getElementById('gyro-cursor').style.top = `${(gyroY/600)*100}%`;
+
+        currentStroke.p.push(Math.round(gyroX), Math.round(gyroY));
+        ctx.lineTo(gyroX, gyroY); ctx.stroke();
+    });
+}
+
+
 // ==========================================
-// ХОЛСТ: ИНСТРУМЕНТЫ (ФИКС СИММЕТРИИ И UX)
+// ХОЛСТ: ИНСТРУМЕНТЫ 
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
@@ -423,8 +598,7 @@ let initialDistance = 0;
 let lastZoomCenter = { x: 0, y: 0 };
 let preZoomState = null; 
 
-let shapeStartX = 0;
-let shapeStartY = 0;
+let shapeStartX = 0, shapeStartY = 0;
 let shapeImgData = null;
 let isDrawingShape = false;
 let lastX = 0, lastY = 0;
@@ -465,7 +639,6 @@ function clearTools() {
     }); 
 }
 
-// Умный выбор цвета: не сбрасывает инструмент (если это не ластик)
 function setColor(color, element) {
     currentColor = color; ctx.globalCompositeOperation = 'source-over';
     document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active-swatch'));
@@ -483,11 +656,7 @@ function setCircle(element) { clearTools(); isCircle = true; ctx.globalComposite
 function setLine(element) { clearTools(); isLine = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setArrow(element) { clearTools(); isArrow = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setNeon(element) { clearTools(); isNeon = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
-
-function toggleSymmetry(element) {
-    isSymmetry = !isSymmetry;
-    element.classList.toggle('active-swatch', isSymmetry);
-}
+function toggleSymmetry(element) { isSymmetry = !isSymmetry; element.classList.toggle('active-swatch', isSymmetry); }
 
 function clearCanvas() {
   ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; 
@@ -514,14 +683,12 @@ function getCoordinates(e) {
 }
 
 function hexToRgba(hex) {
-    let r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16);
-    return [r, g, b, 255];
+    let r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16); return [r, g, b, 255];
 }
 function matchColor(data, pos, color) { return data[pos]==color[0] && data[pos+1]==color[1] && data[pos+2]==color[2]; }
 function floodFillCore(startX, startY, fillHex) {
     const w = canvas.width, h = canvas.height;
-    const imgData = ctx.getImageData(0, 0, w, h);
-    const data = imgData.data;
+    const imgData = ctx.getImageData(0, 0, w, h); const data = imgData.data;
     const startPos = (startY * w + startX) * 4;
     const startColor = [data[startPos], data[startPos+1], data[startPos+2]];
     const fillColor = hexToRgba(fillHex);
@@ -529,11 +696,9 @@ function floodFillCore(startX, startY, fillHex) {
     
     const stack = [[startX, startY]];
     while(stack.length > 0) {
-        let [x, y] = stack.pop();
-        let pos = (y * w + x) * 4;
+        let [x, y] = stack.pop(); let pos = (y * w + x) * 4;
         while (y >= 0 && matchColor(data, pos, startColor)) { y--; pos -= w * 4; }
-        y++; pos += w * 4;
-        let reachLeft = false, reachRight = false;
+        y++; pos += w * 4; let reachLeft = false, reachRight = false;
         while (y < h && matchColor(data, pos, startColor)) {
             data[pos] = fillColor[0]; data[pos+1] = fillColor[1]; data[pos+2] = fillColor[2]; data[pos+3] = 255;
             if (x > 0) {
@@ -555,6 +720,19 @@ function startPosition(e) {
     let pos = getCoordinates(e);
     const mode = globalState.settings?.mode;
 
+    // Режим Co-op блокировка
+    if (mode === 'coop') {
+        const players = globalState.players || [];
+        const isLeft = players.indexOf(myUserId) % 2 === 0;
+        if (isLeft && pos.x > 400) return;
+        if (!isLeft && pos.x < 400) return;
+    }
+
+    if (mode === 'nohands') return; // Рисуем только гироскопом
+
+    if (mode === 'timebomb') timeMultiplier *= 1.2;
+    if (mode === 'inkmeter' && currentInk <= 0) return;
+
     if (mode === 'oneline' && hasDrawnStrokeOneline) return;
 
     if (isEyedropper) {
@@ -574,22 +752,26 @@ function startPosition(e) {
         document.getElementById('brush-size').value = Math.floor(Math.random() * 35) + 5;
     }
 
-    if (mode === 'pixelart') {
-        pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15;
-    }
-    if (mode === 'drunk') {
-        pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40;
+    if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
+    if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
+
+    if (mode === 'connectdots') {
+        // Ищем ближайшую точку
+        let closest = null; let minDist = Infinity;
+        dotsArray.forEach(d => {
+            let dist = Math.hypot(d.x - pos.x, d.y - pos.y);
+            if (dist < 40 && dist < minDist) { minDist = dist; closest = d; }
+        });
+        if (closest) pos = {x: closest.x, y: closest.y};
+        else return; // Рисуем только по точкам
     }
 
     let opacity = parseFloat(document.getElementById('brush-opacity').value);
 
-    // ИНСТРУМЕНТЫ: ФИГУРЫ И ЛИНИИ
     if (isRect || isCircle || isLine || isArrow) {
-        shapeStartX = Math.round(pos.x);
-        shapeStartY = Math.round(pos.y);
+        shapeStartX = Math.round(pos.x); shapeStartY = Math.round(pos.y);
         shapeImgData = ctx.getImageData(0,0,canvas.width, canvas.height);
-        isDrawingShape = true;
-        return;
+        isDrawingShape = true; return;
     }
 
     preZoomState = canvas.toDataURL(); isDrawing = true; 
@@ -602,27 +784,20 @@ function startPosition(e) {
     
     lastX = pos.x; lastY = pos.y;
     
-    // Рисуем первую точку (для обычного клика без движения)
-    if (mode !== 'blind') {
-        ctx.lineWidth = document.getElementById('brush-size').value;
-        ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
-        ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
-        ctx.globalAlpha = isErasing ? 1 : opacity;
-        ctx.filter = isBlur ? 'blur(5px)' : 'none';
-        ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
+    ctx.lineWidth = document.getElementById('brush-size').value;
+    ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
+    ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
+    ctx.globalAlpha = isErasing ? 1 : opacity;
+    ctx.filter = isBlur ? 'blur(5px)' : 'none';
+    ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
 
-        if (isNeon && !isErasing) {
-            ctx.shadowBlur = Math.max(10, document.getElementById('brush-size').value * 2);
-            ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff';
-        } else {
-            ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor;
-        }
+    if (isNeon && !isErasing) {
+        ctx.shadowBlur = Math.max(10, document.getElementById('brush-size').value * 2);
+        ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff';
+    } else { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor; }
 
-        ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
-        if (isSymmetry) {
-            ctx.beginPath(); ctx.moveTo(canvas.width - pos.x, pos.y); ctx.lineTo(canvas.width - pos.x, pos.y); ctx.stroke();
-        }
-    }
+    ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+    if (isSymmetry) { ctx.beginPath(); ctx.moveTo(canvas.width - pos.x, pos.y); ctx.lineTo(canvas.width - pos.x, pos.y); ctx.stroke(); }
 }
 
 function draw(e) {
@@ -633,8 +808,33 @@ function draw(e) {
   let pos = getCoordinates(e);
   const mode = globalState.settings?.mode;
 
+  if (mode === 'coop') {
+      const players = globalState.players || [];
+      const isLeft = players.indexOf(myUserId) % 2 === 0;
+      if (isLeft && pos.x > 400) pos.x = 400;
+      if (!isLeft && pos.x < 400) pos.x = 400;
+  }
+
   if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
   if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
+
+  if (mode === 'connectdots') {
+      let closest = null; let minDist = Infinity;
+      dotsArray.forEach(d => {
+          let dist = Math.hypot(d.x - pos.x, d.y - pos.y);
+          if (dist < 40 && dist < minDist) { minDist = dist; closest = d; }
+      });
+      if (closest) pos = {x: closest.x, y: closest.y};
+      else return; 
+  }
+
+  if (mode === 'inkmeter') {
+      let dist = Math.hypot(pos.x - lastX, pos.y - lastY);
+      currentInk -= dist * (document.getElementById('brush-size').value / 5);
+      if (currentInk < 0) currentInk = 0;
+      document.getElementById('ink-meter-bar').style.width = `${(currentInk/maxInk)*100}%`;
+      if (currentInk === 0) return;
+  }
 
   let opacity = parseFloat(document.getElementById('brush-opacity').value);
   ctx.lineWidth = document.getElementById('brush-size').value;
@@ -644,17 +844,11 @@ function draw(e) {
 
   if (isNeon && !isErasing) {
       ctx.shadowBlur = Math.max(10, document.getElementById('brush-size').value * 2);
-      ctx.shadowColor = currentColor;
-      ctx.strokeStyle = '#ffffff';
-  } else {
-      ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor;
-  }
+      ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff';
+  } else { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor; }
 
-  // ФИГУРЫ (ПРЕВЬЮ В РЕАЛЬНОМ ВРЕМЕНИ)
   if (isDrawingShape) {
-      ctx.putImageData(shapeImgData, 0, 0);
-      ctx.beginPath();
-      
+      ctx.putImageData(shapeImgData, 0, 0); ctx.beginPath();
       if (isRect) {
           ctx.strokeRect(shapeStartX, shapeStartY, pos.x - shapeStartX, pos.y - shapeStartY);
           if (isSymmetry) ctx.strokeRect(canvas.width - shapeStartX, shapeStartY, -(pos.x - shapeStartX), pos.y - shapeStartY);
@@ -673,25 +867,13 @@ function draw(e) {
       return;
   }
 
-  // ИДЕАЛЬНАЯ НЕПРЕРЫВНАЯ КИСТЬ
   if(currentStroke) { currentStroke.p.push(Math.round(pos.x), Math.round(pos.y)); }
 
-  if (mode !== 'blind') {
-      ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
-      ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
-      
-      ctx.beginPath();
-      ctx.moveTo(lastX, lastY);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-      
-      if (isSymmetry) {
-          ctx.beginPath();
-          ctx.moveTo(canvas.width - lastX, lastY);
-          ctx.lineTo(canvas.width - pos.x, pos.y);
-          ctx.stroke();
-      }
-  }
+  ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
+  ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
+  
+  ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+  if (isSymmetry) { ctx.beginPath(); ctx.moveTo(canvas.width - lastX, lastY); ctx.lineTo(canvas.width - pos.x, pos.y); ctx.stroke(); }
   
   lastX = pos.x; lastY = pos.y;
 }
@@ -708,8 +890,7 @@ function endPosition() {
             b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0,
             p: [shapeStartX, shapeStartY, lastX, lastY]
         });
-        saveState();
-        return;
+        saveState(); return;
     }
 
     if (!isDrawing) return; 
@@ -723,7 +904,7 @@ function endPosition() {
 function handlePinchZoom(e) {
     if (isDrawing || isDrawingShape) {
         isDrawing = false; isDrawingShape = false; ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0; currentStroke = null;
-        if (preZoomState && globalState.settings?.mode !== 'blind') {
+        if (preZoomState) {
             let img = new Image(); img.src = preZoomState;
             img.onload = () => { ctx.globalAlpha=1; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0); }
         }
@@ -752,7 +933,7 @@ canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave'
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ (ИДЕАЛЬНАЯ АНИМАЦИЯ)
+// ЧАТ-ПРЕЗЕНТАЦИЯ 
 // ==========================================
 let voices = [];
 window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
@@ -856,16 +1037,9 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             }
             
             if (pointIdx < pts.length) {
-                actx.beginPath();
-                actx.moveTo(pts[pointIdx-2], pts[pointIdx-1]);
-                actx.lineTo(pts[pointIdx], pts[pointIdx+1]);
-                actx.stroke();
-                
+                actx.beginPath(); actx.moveTo(pts[pointIdx-2], pts[pointIdx-1]); actx.lineTo(pts[pointIdx], pts[pointIdx+1]); actx.stroke();
                 if (stroke.sym) {
-                    actx.beginPath();
-                    actx.moveTo(canvasEl.width - pts[pointIdx-2], pts[pointIdx-1]);
-                    actx.lineTo(canvasEl.width - pts[pointIdx], pts[pointIdx+1]);
-                    actx.stroke();
+                    actx.beginPath(); actx.moveTo(canvasEl.width - pts[pointIdx-2], pts[pointIdx-1]); actx.lineTo(canvasEl.width - pts[pointIdx], pts[pointIdx+1]); actx.stroke();
                 }
                 pointIdx += 2; pointsDrawn++;
             } else { strokeIdx++; pointIdx = 0; }
@@ -901,15 +1075,25 @@ function syncPresentationView(players) {
     
     const mode = globalState.settings?.mode;
     let isText = (pres.round % 2 !== 0);
-    if (mode === 'icebreaker') isText = (pres.round % 2 === 0);
+    if (mode === 'icebreaker' || mode === 'tagteam') isText = (pres.round % 2 === 0);
     if (mode === 'story') isText = true;
     if (mode === 'copycat') isText = (pres.round === 1);
+    if (mode === 'plagiarism' || mode === 'finishit') isText = false;
+    if (mode === 'tagteam') isText = false;
 
     const side = isText ? 'left' : 'right';
 
-    const visualContent = isText 
-        ? `<div class="msg-text">${rawData}</div>` 
-        : `<canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas>`;
+    let visualContent = '';
+    if (isText) {
+        visualContent = `<div class="msg-text">${rawData}</div>`;
+    } else {
+        // Добавлена кнопка "Лайк/Аукцион"
+        let auctionHtml = mode === 'auction' ? `<button class="btn-like" onclick="this.innerHTML='❤️ '+(parseInt(this.innerText.replace('❤️ ',''))+1)">❤️ 0</button>` : '';
+        visualContent = `<div style="position:relative; width:100%;">
+            <canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas>
+            <div style="position:absolute; bottom:10px; right:10px;">${auctionHtml}</div>
+        </div>`;
+    }
 
     const msgHTML = `<div class="msg-row ${side}"><img src="${authorAvatar}" class="msg-avatar"><div class="msg-bubble"><div class="msg-author">${authorName}</div>${visualContent}</div></div>`;
 
