@@ -32,7 +32,6 @@ else setDisplay('guest-waiting', 'flex');
 function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 function requestFullscreen() { window.parent.postMessage({ type: 'request_fullscreen' }, '*'); }
 
-// ВЕРНУЛ ПОТЕРЯННУЮ ФУНКЦИЮ
 function showPhase(phaseId) {
   document.querySelectorAll('.screen, .phase-container').forEach(el => el.classList.remove('active'));
   const target = document.getElementById(phaseId);
@@ -175,7 +174,7 @@ function updateWaitingScreen() {
     if (!listEl) return;
     
     const iconReady = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#22c55e" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-    const iconWaiting = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#eab308" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 16 14"></polyline></svg>`;
+    const iconWaiting = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#eab308" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
 
     listEl.innerHTML = players.map(id => {
         const name = globalState.playerNames?.[id] || "Аноним";
@@ -366,7 +365,6 @@ function handleStateChange() {
 }
 
 function getCurrentNotebookId(round, players) {
-    if (globalState.settings?.mode === 'tagteam') return players[0]; 
     const myIndex = players.indexOf(myUserId);
     if (globalState.settings?.mode === 'coop') {
         const primaryIndex = myIndex % 2 === 0 ? myIndex : myIndex - 1;
@@ -374,6 +372,15 @@ function getCurrentNotebookId(round, players) {
     }
     if (myIndex === -1) return myUserId; 
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
+}
+
+function getReadNotebookId(round, players) {
+    const myIndex = players.indexOf(myUserId);
+    if (globalState.settings?.mode === 'coop' && round === 2) {
+        const primaryIndex = myIndex % 2 === 0 ? myIndex : myIndex - 1;
+        return players[primaryIndex];
+    }
+    return getCurrentNotebookId(round, players);
 }
 
 function startRound(round, players) {
@@ -395,8 +402,8 @@ function startRound(round, players) {
 
   startPhaseTimer(isDrawingPhase);
 
-  const notebookId = getCurrentNotebookId(round, players);
-  let previousData = round > 1 ? globalState.submissions?.[`round_${round - 1}`]?.[notebookId] : null;
+  const readNotebookId = getReadNotebookId(round, players);
+  let previousData = round > 1 ? globalState.submissions?.[`round_${round - 1}`]?.[readNotebookId] : null;
 
   const bgRef = document.getElementById('bg-reference-img');
   if (bgRef) { bgRef.style.display = 'none'; bgRef.src = ''; }
@@ -519,6 +526,33 @@ function startRound(round, players) {
   }
 }
 
+// НАСТОЯЩИЙ СЛОМАННЫЙ ПЕРЕВОДЧИК ЧЕРЕЗ GOOGLE TRANSLATE API
+async function getRealBabelTranslation(text) {
+    const langs = ['ja', 'zh-CN', 'ar', 'hi', 'ko', 'de', 'es', 'fr', 'zu', 'vi', 'th'];
+    const l1 = langs[Math.floor(Math.random() * langs.length)];
+    let l2 = langs[Math.floor(Math.random() * langs.length)];
+    while(l1 === l2) l2 = langs[Math.floor(Math.random() * langs.length)];
+    
+    try {
+        const res1 = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=${l1}&dt=t&q=${encodeURIComponent(text)}`);
+        const data1 = await res1.json();
+        const t1 = data1[0].map(x => x[0]).join('');
+        
+        const res2 = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${l1}&tl=${l2}&dt=t&q=${encodeURIComponent(t1)}`);
+        const data2 = await res2.json();
+        const t2 = data2[0].map(x => x[0]).join('');
+
+        const res3 = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${l2}&tl=ru&dt=t&q=${encodeURIComponent(t2)}`);
+        const data3 = await res3.json();
+        const finalT = data3[0].map(x => x[0]).join('');
+        
+        return `[Через ${l1.toUpperCase()} и ${l2.toUpperCase()}] -> ${finalT}`;
+    } catch(e) {
+        console.error("Translate API error:", e);
+        return `[Сбой авто-перевода] ${text}`;
+    }
+}
+
 function submitWord(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
@@ -528,15 +562,14 @@ function submitWord(isManual = false) {
   if (wi && wi.value.trim()) word = wi.value.trim();
 
   if (globalState.settings?.mode === 'babel' && !isCurrentPhaseDrawing) {
-      setDisplay('babel-translation', 'block'); setText('babel-translation', "Сломанный переводчик...");
-      setTimeout(() => {
-          let trans = typeof getBabelTranslation === 'function' ? getBabelTranslation(word) : word;
+      setDisplay('babel-translation', 'block'); setText('babel-translation', "Сломанный переводчик работает...");
+      getRealBabelTranslation(word).then(trans => {
           let dataToSave = JSON.stringify({ type: 'babel', original: word, translated: trans });
           const updates = {};
           updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = dataToSave;
           window.parent.postMessage({ type: 'update_state', updates }, '*');
           showPhase('waiting-phase'); updateWaitingScreen();
-      }, 1500); 
+      });
       return;
   }
   
@@ -581,6 +614,7 @@ function submitDrawing(isManual = false) {
   const finalData = JSON.stringify({ img: finalDataUrl, strokes: recordedStrokes });
   const updates = {};
   
+  // В Коопе и Эстафете логика ID тетради зависит от фазы
   let targetId = getCurrentNotebookId(currentLocalRound, globalState.players || []);
   if (mode === 'coop') targetId = myUserId; 
 
@@ -1040,7 +1074,7 @@ function syncPresentationView(players) {
                <img src="${p2Data.imgUrl}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain;">
                <div style="position:absolute; left:50%; top:0; bottom:0; width:4px; background:#d946ef; opacity:0.8; box-shadow: 0 0 10px #d946ef;"></div>
             </div>`;
-        } else if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism') {
+        } else if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism' || mode === 'impostor') {
             visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img"></div>`;
         } else {
             visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas></div>`;
