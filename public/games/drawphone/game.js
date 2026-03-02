@@ -51,7 +51,6 @@ function showModeInfo(e, mode) {
     e.stopPropagation(); 
     const el = document.querySelector(`.mode-card[data-mode="${mode}"] h4`);
     if(el) setText('info-modal-title', el.innerText);
-    
     let desc = "Описание режима отсутствует.";
     if (typeof modeDescriptions !== 'undefined' && modeDescriptions[mode]) desc = modeDescriptions[mode];
     setText('info-modal-desc', desc);
@@ -59,7 +58,22 @@ function showModeInfo(e, mode) {
 }
 
 function closeInfoModal() { setDisplay('info-modal', 'none'); }
-function hidePlagiarism() { setDisplay('plagiarism-overlay', 'none'); }
+
+// Защищенное закрытие плагиата для мобилок
+function hidePlagiarism(e) { if(e) e.preventDefault(); setDisplay('plagiarism-overlay', 'none'); }
+
+// Закрываем выезжающее меню инструментов на мобилках при клике мимо
+function toggleMobileTools(e) {
+    if (e) e.stopPropagation();
+    document.getElementById('tools-popup').classList.toggle('show');
+}
+document.addEventListener('touchstart', (e) => {
+    const popup = document.getElementById('tools-popup');
+    const trigger = document.querySelector('.mobile-tool-trigger');
+    if (popup && popup.classList.contains('show') && !popup.contains(e.target) && trigger && !trigger.contains(e.target)) {
+        popup.classList.remove('show');
+    }
+});
 
 function renderPlayersList(players) {
     const listEl = document.getElementById('lobby-players-list');
@@ -215,7 +229,11 @@ function handleStateChange() {
     renderedPresentationState = ''; showPhase('lobby-screen'); return;
   }
 
+  // ОГРАНИЧИВАЕМ ЭТАПЫ ДЛЯ ОСОБЫХ РЕЖИМОВ (чтобы рисунок не превращался в кашу)
   calculatedTotalRounds = players.length * (globalState.settings?.roundsMultiplier || 1);
+  if (globalState.settings?.mode === 'finishit' || globalState.settings?.mode === 'plagiarism') {
+      calculatedTotalRounds = 2; 
+  }
 
   if (globalState.status === 'finished') {
     currentLocalRound = -1; clearInterval(phaseTimerInterval);
@@ -237,7 +255,7 @@ function handleStateChange() {
       setDisplay('color-palette', 'none'); setDisplay('tool-divider-2', 'none');
       currentColor = mode === 'darkmode' ? '#ffffff' : '#000000';
   } else if (mode === 'duotone') {
-      setDisplay('color-palette', 'grid'); 
+      setDisplay('color-palette', 'flex'); 
       let colors = document.querySelectorAll('#color-palette .swatch');
       colors.forEach(c => c.style.display = 'none');
       let seed = (globalState.settings.seed || 1) + globalState.round;
@@ -246,7 +264,7 @@ function handleStateChange() {
       if (colors[i1]) colors[i1].style.display = 'block'; 
       if (colors[i2]) colors[i2].style.display = 'block';
   } else { 
-      setDisplay('color-palette', 'grid'); setDisplay('tool-divider-2', 'block');
+      setDisplay('color-palette', 'flex'); setDisplay('tool-divider-2', 'block');
       document.querySelectorAll('#color-palette .swatch').forEach(c => c.style.display = 'block');
   }
 
@@ -364,8 +382,8 @@ function startRound(round, players) {
           } else if (mode === 'finishit' || mode === 'tagteam') {
               setText('word-to-draw', mode === 'finishit' ? "Дорисуй-ка!" : "Продолжи рисунок!");
               finishitBaseImg.src = prevImg;
-              // Ставим картинку как реальный HTML элемент под прозрачный холст для 100% работы на телефонах
-              if (bgRef) { bgRef.src = prevImg; bgRef.style.display = 'block'; bgRef.style.opacity = mode === 'finishit' ? '0.4' : '1'; }
+              // Защита для мобилок: используем реальный тег img под прозрачным холстом
+              if (bgRef) { bgRef.src = prevImg; bgRef.style.display = 'block'; bgRef.style.opacity = '1'; }
           } else if (mode === 'copycat' && prevImg && prevImg.length > 50) {
               setHTML('word-to-draw', `<img src="${prevImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`);
           } else if (mode === 'lasso' && round > 2) {
@@ -455,7 +473,8 @@ function submitDrawing(isManual = false) {
   } else if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) {
       const tc = document.createElement('canvas'); tc.width = canvas.width; tc.height = canvas.height;
       const tCtx = tc.getContext('2d'); tCtx.fillStyle = '#ffffff'; tCtx.fillRect(0,0,tc.width,tc.height);
-      tCtx.drawImage(finishitBaseImg, 0, 0, tc.width, tc.height); tCtx.drawImage(canvas, 0, 0);
+      tCtx.drawImage(finishitBaseImg, 0, 0, tc.width, tc.height);
+      tCtx.drawImage(canvas, 0, 0);
       finalDataUrl = tc.toDataURL('image/png');
   } else {
       const tempCtx = canvas.getContext('2d'); tempCtx.globalCompositeOperation = 'destination-over'; tempCtx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff';
@@ -497,7 +516,7 @@ function drawArrow(actx, fromx, fromy, tox, toy) {
     actx.moveTo(tox, toy); actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6)); actx.stroke();
 }
 
-// УЛЬТРА-ОПТИМИЗИРОВАННАЯ ЗАЛИВКА SCANLINE
+// ОПТИМИЗИРОВАННЫЙ АЛГОРИТМ SCANLINE ЗАЛИВКИ (Без зависаний)
 function floodFillCore(startX, startY, fillColorHex) {
     startX = Math.round(startX); startY = Math.round(startY);
     const w = canvas.width, h = canvas.height;
@@ -515,7 +534,6 @@ function floodFillCore(startX, startY, fillColorHex) {
     
     if (startColor === fillColor) return;
     
-    // Используем типизированный массив для невероятной скорости без фризов на телефоне
     const stack = new Int32Array(w * h);
     let stackPtr = 0;
     stack[stackPtr++] = startPos;
@@ -557,7 +575,6 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
         
         if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { targetCtx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); continue; }
         if (stroke.type === 'clear') { targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
-        else if (stroke.type === 'fill') { /* пропускаем при анимации для оптимизации */ }
         else if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
         else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
@@ -595,7 +612,7 @@ function undo() { if (historyIndex > 0) { historyIndex--; restoreState(historyIn
 function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; restoreState(historyIndex); } }
 
 function clearTools() { 
-    isErasing = false; isFilling = false; isEyedropper = false; isRect = false; isCircle = false; isLine = false; isArrow = false; 
+    isErasing = false; isFilling = false; isEyedropper = false; isBlur = false; isRect = false; isCircle = false; isLine = false; isArrow = false; isNeon = false; 
     document.querySelectorAll('.tool-btn').forEach(s => { 
         if (!s.classList.contains('sym-tool')) s.classList.remove('active-swatch'); 
     }); 
@@ -748,7 +765,7 @@ canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave'
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ
+// ЧАТ-ПРЕЗЕНТАЦИЯ (Умная логика данных и Аватарки)
 // ==========================================
 let voices = []; window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
 function speakText(text) {
@@ -800,25 +817,72 @@ function syncPresentationView(players) {
     const pres = globalState.presentation; if (!pres) return;
     const currentStateId = `${pres.bookIndex}-${pres.round}`; if (renderedPresentationState === currentStateId) return;
 
-    if (pres.round === 1) setHTML('chat-messages', '');
     const bookOwnerId = players[pres.bookIndex];
     setText('chat-book-title', `История: ${globalState.playerNames?.[bookOwnerId] || "Аноним"}`);
+    
+    const avatarsContainer = document.getElementById('presentation-avatars');
+    
+    // СТРОИМ КРАСИВУЮ ЛИНИЮ АВАТАРОК В НАЧАЛЕ ИСТОРИИ
+    if (pres.round === 1) { 
+        setHTML('chat-messages', ''); 
+        if (avatarsContainer) {
+            avatarsContainer.innerHTML = '';
+            for (let i = 0; i < calculatedTotalRounds; i++) {
+                const stepAuthorId = players[(players.indexOf(bookOwnerId) + i + players.length * 10) % players.length];
+                const avatar = globalState.playerAvatars?.[stepAuthorId] || "https://picsum.photos/100";
+                
+                const wrap = document.createElement('div');
+                wrap.className = 'pres-avatar-node';
+                
+                const img = document.createElement('img');
+                img.src = avatar;
+                img.className = `pres-avatar-img`;
+                img.id = `pres-av-${i + 1}`;
+                wrap.appendChild(img);
+                avatarsContainer.appendChild(wrap);
+                
+                if (i < calculatedTotalRounds - 1) {
+                    const conn = document.createElement('div');
+                    conn.className = `pres-connector`;
+                    conn.id = `pres-conn-${i + 1}`;
+                    avatarsContainer.appendChild(conn);
+                }
+            }
+        }
+    }
+
+    // ОБНОВЛЯЕМ СВЕЧЕНИЕ (АНИМАЦИЯ ХОДА)
+    if (avatarsContainer) {
+        for (let i = 1; i <= calculatedTotalRounds; i++) {
+            const av = document.getElementById(`pres-av-${i}`);
+            const conn = document.getElementById(`pres-conn-${i}`);
+            if (av) {
+                if (i === pres.round) { av.classList.add('current'); av.classList.remove('done'); }
+                else if (i < pres.round) { av.classList.add('done'); av.classList.remove('current'); }
+                else { av.classList.remove('current'); av.classList.remove('done'); }
+            }
+            if (conn) {
+                if (i < pres.round) conn.classList.add('active');
+                else conn.classList.remove('active');
+            }
+        }
+    }
 
     let rawData = globalState.submissions?.[`round_${pres.round}`]?.[bookOwnerId];
     let imgUrl = rawData; let strokesData = null;
 
-    // Умная система: вместо угадывания мы ТОЧНО проверяем, прислал ли игрок рисунок или текст!
-    let actuallyHasImage = false;
-    if (typeof rawData === 'string' && rawData.startsWith('{')) {
-        try { let parsed = JSON.parse(rawData); if (parsed.img) { imgUrl = parsed.img; strokesData = parsed.strokes; actuallyHasImage = true; } } catch(e) {}
+    // СТРОГАЯ логика распознавания (Рисунок или Текст)
+    let isText = true;
+    if (typeof rawData === 'string') {
+        if (rawData.startsWith('{')) {
+            try { let parsed = JSON.parse(rawData); if (parsed.img) { imgUrl = parsed.img; strokesData = parsed.strokes; isText = false; } } catch(e) {}
+        } else if (rawData.length > 1000 && rawData.startsWith('data:image')) {
+            isText = false;
+        }
     }
-    if (rawData && rawData.length > 1000 && rawData.startsWith('data:image')) actuallyHasImage = true;
-
-    let isText = !actuallyHasImage;
-    if (globalState.settings?.mode === 'story') isText = true;
-
-    // Защита от потери слова
-    if (isText && (!rawData || rawData.length === 0)) { rawData = "(Слово отсутствует)"; }
+    const mode = globalState.settings?.mode;
+    if (mode === 'story') isText = true;
+    if (isText && (!rawData || rawData.length === 0)) { rawData = "(Слово не сохранилось)"; }
 
     const authorId = players[(players.indexOf(bookOwnerId) + pres.round - 1 + players.length * 10) % players.length];
     const authorName = globalState.playerNames?.[authorId] || "Аноним";
@@ -826,13 +890,18 @@ function syncPresentationView(players) {
     
     const side = isText ? 'left' : 'right';
     let visualContent = '';
-    
     const heartSvg = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="#ef4444" fill="#ef4444" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
 
-    if (isText) { visualContent = `<div class="msg-text">${rawData}</div>`; } 
-    else {
-        let auctionHtml = globalState.settings?.mode === 'auction' ? `<button class="btn-like" onclick="let v=parseInt(this.innerText); this.innerHTML='${heartSvg} '+(isNaN(v)?1:v+1)">${heartSvg} 0</button>` : '';
-        visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas><div style="position:absolute; bottom:10px; right:10px;">${auctionHtml}</div></div>`;
+    if (isText) { 
+        visualContent = `<div class="msg-text">${rawData}</div>`; 
+    } else {
+        let auctionHtml = mode === 'auction' ? `<button class="btn-like" onclick="let v=parseInt(this.innerText); this.innerHTML='${heartSvg} '+(isNaN(v)?1:v+1)">${heartSvg} 0</button>` : '';
+        // Плагиат и дорисуй-ка выводим чистой картинкой (без анимации), чтобы избежать багов с наложениями слоев
+        if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism') {
+            visualContent = `<div style="position:relative; width:100%;"><img src="${imgUrl}" class="msg-img"><div style="position:absolute; bottom:10px; right:10px;">${auctionHtml}</div></div>`;
+        } else {
+            visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas><div style="position:absolute; bottom:10px; right:10px;">${auctionHtml}</div></div>`;
+        }
     }
 
     const msgHTML = `<div class="msg-row ${side}"><img src="${authorAvatar}" class="msg-avatar"><div class="msg-bubble"><div class="msg-author">${authorName}</div>${visualContent}</div></div>`;
@@ -843,13 +912,9 @@ function syncPresentationView(players) {
     else {
         setTimeout(() => {
             const canvasAnim = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);
-            const mode = globalState.settings?.mode;
-            const isDark = mode === 'darkmode';
+            const isDark = globalState.settings?.mode === 'darkmode';
             if (canvasAnim) {
-                if ((mode === 'finishit' || mode === 'tagteam') && pres.round > 1) {
-                    const cctx = canvasAnim.getContext('2d');
-                    let im = new Image(); im.src = imgUrl; im.onload = () => cctx.drawImage(im, 0, 0);
-                } else if (strokesData && strokesData.length > 0) { 
+                if (strokesData && strokesData.length > 0) { 
                     playDrawingAnimation(canvasAnim, strokesData, imgUrl, isDark); 
                 } else { 
                     const cctx = canvasAnim.getContext('2d'); 

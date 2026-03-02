@@ -99,78 +99,100 @@
     </div>
 
     <div id="draw-phase" class="phase-container draw-layout">
-      <div class="sidebar-tools" id="sidebar-tools">
-        <div class="tools-group-row" id="action-tools">
-          <div class="tool-btn w-100" onclick="undo()" title="Назад"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></div>
-          <div class="tool-btn w-100" onclick="redo()" title="Вперед"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg></div>
-        </div>
-        <div class="tool-divider" id="tool-divider-1"></div>
-        
-        <div class="palette grid-palette-4" id="color-palette">
-          <div class="swatch active-swatch" style="background:#000000" onclick="setColor('#000000', this)"></div>
-          <div class="swatch" style="background:#ffffff; border: 1px solid #ccc;" onclick="setColor('#ffffff', this)"></div>
-          <div class="swatch" style="background:#ef4444" onclick="setColor('#ef4444', this)"></div>
-          <div class="swatch" style="background:#f97316" onclick="setColor('#f97316', this)"></div>
-          <div class="swatch" style="background:#eab308" onclick="setColor('#eab308', this)"></div>
-          <div class="swatch" style="background:#22c55e" onclick="setColor('#22c55e', this)"></div>
-          <div class="swatch" style="background:#3b82f6" onclick="setColor('#3b82f6', this)"></div>
-          <div class="swatch" style="background:#a855f7" onclick="setColor('#a855f7', this)"></div>
-          <div class="swatch rgb-wrapper" style="grid-column: span 4; width: 100%; border-radius: 8px; height: 18px;"><input type="color" id="rgb-picker" value="#ff0000" onchange="setColor(this.value, this.parentElement)"></div>
-        </div>
-        
-        <div class="tool-divider" id="tool-divider-2"></div>
-        <div class="tools-label">Инструменты</div>
-        <div class="tools-grid-2">
-          <div class="tool-btn active-swatch brush-tool" onclick="setBrush(this)" title="Кисть"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></div>
-          <div class="tool-btn eraser-tool" onclick="setEraser(this)" title="Ластик"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20"/></svg></div>
-          <div class="tool-btn fill-tool" onclick="setFill(this)" title="Заливка"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11l-8-8-8 8h16z"/><path d="M3 11v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8"/><path d="M12 3v8"/></svg></div>
-          <div class="tool-btn eyedropper-tool" onclick="setEyedropper(this)" title="Пипетка"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l5.5-1.5L21.17 6.83a2.828 2.828 0 1 0-4-4L3.5 16.5 2 22z"/><path d="M15.5 5.5l3 3"/></svg></div>
-        </div>
-        <div class="tools-label mt-2">Фигуры</div>
-        <div class="tools-grid-2">
-          <div class="tool-btn shape-tool" onclick="setLine(this)" title="Линия"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/></svg></div>
-          <div class="tool-btn shape-tool" onclick="setArrow(this)" title="Стрелка"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
-          <div class="tool-btn shape-tool" onclick="setRect(this)" title="Квадрат"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg></div>
-          <div class="tool-btn shape-tool" onclick="setCircle(this)" title="Круг"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
-        </div>
-        <div class="tools-label mt-2">Эффекты</div>
-        <div class="tools-grid-3">
-          <div class="tool-btn sym-tool" onclick="toggleSymmetry(this)" title="Симметрия"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M4 6h4l2-4 2 4h4M4 18h4l2 4 2-4h4"/></svg></div>
-          <div class="tool-btn sym-tool" onclick="toggleNeon(this)" title="Свечение"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
-          <div class="tool-btn sym-tool" onclick="toggleBlur(this)" title="Размытие"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-4.97-4.03-9-9-9z"/><path d="M12 8v8"/><path d="M8 12h8"/></svg></div>
-        </div>
-        <div class="tool-btn clear w-100 mt-2" onclick="clearCanvas()" title="Очистить всё"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Очистить</div>
-        
-        <button class="btn-submit-draw" onclick="submitDrawing(true)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></button>
+      
+      <div class="top-tool-bar">
+          <div style="display:flex; width:100%; justify-content:space-between; align-items:center;">
+              <div class="round-badge" id="draw-round-badge">Этап 1/3</div>
+              <h2 id="word-to-draw" class="target-word" style="text-align:center; flex-grow:1;">Слово</h2>
+              <div class="timer-container" id="draw-timer-container">
+                <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path class="timer-path" id="draw-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>
+                <div class="timer-text" id="draw-timer-text">60</div>
+              </div>
+          </div>
+          <div class="brush-settings" id="brush-settings" style="display:flex; width:100%; justify-content:center; gap: 15px; margin-top: 10px;">
+              <div class="brush-slider-horizontal" style="flex: 1;"><span style="font-size:11px; opacity:0.8;">Размер</span><input type="range" id="brush-size" min="1" max="40" value="5"></div>
+              <div class="brush-slider-horizontal" style="flex: 1;"><span style="font-size:11px; opacity:0.8;">Прозр.</span><input type="range" id="brush-opacity" min="0.1" max="1" step="0.1" value="1"></div>
+          </div>
       </div>
 
       <div class="canvas-area">
-        <div class="top-tool-bar" style="flex-wrap: wrap; position: relative;">
-          <div id="lasso-stamps-container" style="display:none; width: 100%; gap: 10px; overflow-x: auto; padding: 5px; background: rgba(0,0,0,0.3); border-radius: 12px; margin-bottom: 10px;"></div>
-          <div id="ink-meter-container" style="display:none; position: absolute; bottom: -8px; left: 20px; right: 20px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden;"><div id="ink-meter-bar" style="width: 100%; height: 100%; background: #3b82f6; transition: width 0.1s linear;"></div></div>
-          <div class="draw-header"><div class="round-badge" id="draw-round-badge">Этап 1/3</div><h2 id="word-to-draw" class="target-word">Слово</h2></div>
-          <div class="timer-container" id="draw-timer-container">
-            <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path class="timer-path" id="draw-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>
-            <div class="timer-text" id="draw-timer-text">60</div>
-          </div>
-          <div class="brush-settings" id="brush-settings"><div class="brush-slider-horizontal"><span style="font-size:10px; opacity:0.7;">Размер</span><input type="range" id="brush-size" min="1" max="40" value="5"></div></div>
-        </div>
+        <div id="lasso-stamps-container" style="display:none; width: 100%; gap: 10px; overflow-x: auto; padding: 5px; background: rgba(0,0,0,0.3); border-radius: 12px; margin-bottom: 10px;"></div>
+        <div id="ink-meter-container" style="display:none; position: absolute; bottom: 5px; left: 20px; right: 20px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; z-index:10;"><div id="ink-meter-bar" style="width: 100%; height: 100%; background: #3b82f6; transition: width 0.1s linear;"></div></div>
         
         <div id="zoom-container-wrapper" style="flex-grow: 1; width: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative;">
           <div id="zoom-container" style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; transition: transform 0.1s ease-out; will-change: transform;">
             <div class="canvas-wrapper-outer">
                <div class="canvas-wrapper" id="canvas-wrapper">
-                  <div id="plagiarism-overlay" class="plagiarism-overlay"><h3>Запомни рисунок!</h3><img id="plagiarism-img" src=""><button class="btn-primary" onclick="hidePlagiarism()" ontouchstart="hidePlagiarism()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:8px;"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg> Рисовать</button></div>
-                  <div id="coop-divider" style="display:none; position:absolute; left:50%; top:0; bottom:0; width:4px; background:#d946ef; box-shadow: 0 0 15px #d946ef; z-index: 10; pointer-events: none;"></div>
+                  <div id="plagiarism-overlay" class="plagiarism-overlay" onclick="hidePlagiarism(event)" ontouchstart="hidePlagiarism(event)">
+                      <h3>Запомни рисунок! (Нажми чтобы рисовать)</h3>
+                      <img id="plagiarism-img" src="">
+                      <button class="btn-primary">Рисовать</button>
+                  </div>
                   
-                  <img id="bg-reference-img" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:none;">
-                  <canvas id="drawing-board" width="800" height="600"></canvas>
+                  <div id="coop-divider" style="display:none; position:absolute; left:50%; top:0; bottom:0; width:4px; background:#d946ef; box-shadow: 0 0 15px #d946ef; z-index: 10; pointer-events: none;"></div>
+                  <img id="bg-reference-img" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain; pointer-events:none; display:none; z-index:1;">
+                  <canvas id="drawing-board" width="800" height="600" style="position:absolute; top:0; left:0; z-index:2;"></canvas>
                   
                   <div id="gyro-cursor" style="display:none; position:absolute; width:15px; height:15px; border-radius:50%; border:2px solid #ef4444; pointer-events:none; z-index: 20; transform: translate(-50%, -50%);"></div>
                   <button id="btn-gyro-start" class="btn-primary" style="display:none; position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 30; width: auto;" onclick="startGyro()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:5px;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/></svg>Начать гироскоп</button>
                </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div class="sidebar-tools" id="sidebar-tools">
+        <div class="tools-popup" id="tools-popup">
+            <div class="tools-group-row" id="action-tools">
+              <div class="tool-btn w-100" onclick="undo()" title="Назад"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></div>
+              <div class="tool-btn w-100" onclick="redo()" title="Вперед"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg></div>
+            </div>
+            <div class="tool-divider" id="tool-divider-1"></div>
+            
+            <div class="tools-label mt-2">Инструменты</div>
+            <div class="tools-grid-2">
+              <div class="tool-btn active-swatch brush-tool" onclick="setBrush(this)" title="Кисть"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></div>
+              <div class="tool-btn eraser-tool" onclick="setEraser(this)" title="Ластик"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20"/></svg></div>
+              <div class="tool-btn fill-tool" onclick="setFill(this)" title="Заливка"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11l-8-8-8 8h16z"/><path d="M3 11v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8"/><path d="M12 3v8"/></svg></div>
+              <div class="tool-btn eyedropper-tool" onclick="setEyedropper(this)" title="Пипетка"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l5.5-1.5L21.17 6.83a2.828 2.828 0 1 0-4-4L3.5 16.5 2 22z"/><path d="M15.5 5.5l3 3"/></svg></div>
+            </div>
+            
+            <div class="tools-label mt-2">Фигуры</div>
+            <div class="tools-grid-2">
+              <div class="tool-btn shape-tool" onclick="setLine(this)" title="Линия"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/></svg></div>
+              <div class="tool-btn shape-tool" onclick="setArrow(this)" title="Стрелка"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+              <div class="tool-btn shape-tool" onclick="setRect(this)" title="Квадрат"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg></div>
+              <div class="tool-btn shape-tool" onclick="setCircle(this)" title="Круг"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></div>
+            </div>
+            
+            <div class="tools-label mt-2">Эффекты</div>
+            <div class="tools-grid-3">
+              <div class="tool-btn sym-tool" onclick="toggleSymmetry(this)" title="Симметрия"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M4 6h4l2-4 2 4h4M4 18h4l2 4 2-4h4"/></svg></div>
+              <div class="tool-btn sym-tool" onclick="toggleNeon(this)" title="Свечение"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
+              <div class="tool-btn sym-tool" onclick="toggleBlur(this)" title="Размытие"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-4.97-4.03-9-9-9z"/><path d="M12 8v8"/><path d="M8 12h8"/></svg></div>
+            </div>
+            
+            <div class="tool-btn clear w-100 mt-2" onclick="clearCanvas()" title="Очистить всё"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 5px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Очистить</div>
+        </div>
+
+        <div class="bottom-row-ui">
+            <div class="mobile-tool-trigger tool-btn" onclick="toggleMobileTools(event)">
+              <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </div>
+            
+            <div class="palette grid-palette-scroll" id="color-palette">
+              <div class="swatch active-swatch" style="background:#000000" onclick="setColor('#000000', this)"></div>
+              <div class="swatch" style="background:#ffffff; border: 1px solid #ccc;" onclick="setColor('#ffffff', this)"></div>
+              <div class="swatch" style="background:#ef4444" onclick="setColor('#ef4444', this)"></div>
+              <div class="swatch" style="background:#f97316" onclick="setColor('#f97316', this)"></div>
+              <div class="swatch" style="background:#eab308" onclick="setColor('#eab308', this)"></div>
+              <div class="swatch" style="background:#22c55e" onclick="setColor('#22c55e', this)"></div>
+              <div class="swatch" style="background:#3b82f6" onclick="setColor('#3b82f6', this)"></div>
+              <div class="swatch" style="background:#a855f7" onclick="setColor('#a855f7', this)"></div>
+              <div class="swatch rgb-wrapper"><input type="color" id="rgb-picker" value="#ff0000" onchange="setColor(this.value, this.parentElement)"></div>
+            </div>
+            
+            <button class="btn-submit-draw" onclick="submitDrawing(true)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></button>
         </div>
       </div>
     </div>
@@ -195,7 +217,10 @@
   </div>
 
   <div id="presentation-phase" class="screen chat-layout">
-    <div class="chat-header"><h2 id="chat-book-title">История</h2></div>
+    <div class="chat-header">
+        <h2 id="chat-book-title">История</h2>
+        <div id="presentation-avatars" class="pres-avatars-row"></div>
+    </div>
     <div class="chat-scroll-area" id="chat-messages"></div>
     <div class="chat-footer">
       <button class="btn-primary full-width" id="next-slide-btn" onclick="nextSlide()">Показать дальше</button>
