@@ -16,7 +16,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
     </div>
     <h2>Поверните телефон</h2>
-    <p>Для рисования нужен горизонтальный экран</p>
+    <p>Для игры нужен горизонтальный экран</p>
   </div>
 
   <button id="leave-btn" class="leave-btn" onclick="leaveGame()" title="Выйти">
@@ -35,11 +35,7 @@
     <div class="glass-card main-lobby">
       <div class="lobby-header text-center">
         <h1 class="logo">NEKO<span>Phone</span></h1>
-        
-        <div class="lobby-players-container">
-          <div id="lobby-players-list" class="players-row"></div>
-        </div>
-
+        <div class="lobby-players-container"><div id="lobby-players-list" class="players-row"></div></div>
         <div class="stats-row">
           <div class="stat-pill"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span id="players-count-display">0</span> игроков</div>
           <div class="stat-pill"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><span id="player-name-display">Аноним</span></div>
@@ -55,31 +51,18 @@
 
           <div id="tab-modes" class="tab-content active">
             <div class="modes-grid">
-              <div class="mode-card active" data-mode="classic" onclick="selectMode('classic')">
-                <div class="mode-info-btn" onclick="showModeInfo(event, 'classic')">?</div>
-                <div class="mode-icon"><svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></div>
-                <h4>Классика</h4>
-              </div>
-              <div class="mode-card" data-mode="icebreaker" onclick="selectMode('icebreaker')">
-                <div class="mode-info-btn" onclick="showModeInfo(event, 'icebreaker')">?</div>
-                <div class="mode-icon"><svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-                <h4>Ледокол</h4>
-              </div>
-              <div class="mode-card" data-mode="speedrun" onclick="selectMode('speedrun')">
-                <div class="mode-info-btn" onclick="showModeInfo(event, 'speedrun')">?</div>
-                <div class="mode-icon"><svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-                <h4>Спидран</h4>
-              </div>
-              <div class="mode-card" data-mode="nocolor" onclick="selectMode('nocolor')">
-                <div class="mode-info-btn" onclick="showModeInfo(event, 'nocolor')">?</div>
-                <div class="mode-icon"><svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/></svg></div>
-                <h4>Секрет</h4>
-              </div>
-              <div class="mode-card" data-mode="hardcore" onclick="selectMode('hardcore')">
-                <div class="mode-info-btn" onclick="showModeInfo(event, 'hardcore')">?</div>
-                <div class="mode-icon"><svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-                <h4>Хардкор</h4>
-              </div>
+              <div class="mode-card active" data-mode="classic" onclick="selectMode('classic')"><div class="mode-info-btn" onclick="showModeInfo(event, 'classic')">?</div><div class="mode-icon">🌟</div><h4>Классика</h4></div>
+              <div class="mode-card" data-mode="icebreaker" onclick="selectMode('icebreaker')"><div class="mode-info-btn" onclick="showModeInfo(event, 'icebreaker')">?</div><div class="mode-icon">🧊</div><h4>Ледокол</h4></div>
+              <div class="mode-card" data-mode="speedrun" onclick="selectMode('speedrun')"><div class="mode-info-btn" onclick="showModeInfo(event, 'speedrun')">?</div><div class="mode-icon">⚡</div><h4>Спидран</h4></div>
+              <div class="mode-card" data-mode="nocolor" onclick="selectMode('nocolor')"><div class="mode-info-btn" onclick="showModeInfo(event, 'nocolor')">?</div><div class="mode-icon">🖤</div><h4>Секрет</h4></div>
+              <div class="mode-card" data-mode="hardcore" onclick="selectMode('hardcore')"><div class="mode-info-btn" onclick="showModeInfo(event, 'hardcore')">?</div><div class="mode-icon">🔥</div><h4>Хардкор</h4></div>
+              
+              <div class="mode-card" data-mode="story" onclick="selectMode('story')"><div class="mode-info-btn" onclick="showModeInfo(event, 'story')">?</div><div class="mode-icon">📖</div><h4>История</h4></div>
+              <div class="mode-card" data-mode="copycat" onclick="selectMode('copycat')"><div class="mode-info-btn" onclick="showModeInfo(event, 'copycat')">?</div><div class="mode-icon">📠</div><h4>Подделка</h4></div>
+              <div class="mode-card" data-mode="blind" onclick="selectMode('blind')"><div class="mode-info-btn" onclick="showModeInfo(event, 'blind')">?</div><div class="mode-icon">👁️</div><h4>Вслепую</h4></div>
+              <div class="mode-card" data-mode="onecolor" onclick="selectMode('onecolor')"><div class="mode-info-btn" onclick="showModeInfo(event, 'onecolor')">?</div><div class="mode-icon">🎨</div><h4>Один Цвет</h4></div>
+              <div class="mode-card" data-mode="chaos" onclick="selectMode('chaos')"><div class="mode-info-btn" onclick="showModeInfo(event, 'chaos')">?</div><div class="mode-icon">🌀</div><h4>Хаос</h4></div>
+              <div class="mode-card" data-mode="masterpiece" onclick="selectMode('masterpiece')"><div class="mode-info-btn" onclick="showModeInfo(event, 'masterpiece')">?</div><div class="mode-icon">🖼️</div><h4>Шедевр</h4></div>
             </div>
             <button class="btn-primary mt-auto" onclick="startGame()">ЗАПУСТИТЬ ИГРУ</button>
           </div>
@@ -107,10 +90,7 @@
             <button class="btn-primary mt-auto" onclick="startGame()">СОХРАНИТЬ И ЗАПУСТИТЬ</button>
           </div>
         </div>
-
-        <div id="guest-waiting" class="waiting-state" style="display: none;">
-          <div class="spinner"></div><p>Ожидание настройки хостом...</p>
-        </div>
+        <div id="guest-waiting" class="waiting-state" style="display: none;"><div class="spinner"></div><p>Ожидание хоста...</p></div>
       </div>
     </div>
   </div>
@@ -121,10 +101,7 @@
         <div class="phase-top-bar">
           <div class="round-badge" id="text-round-badge">Этап 1/3</div>
           <div class="timer-container" id="text-timer-container">
-            <svg class="timer-svg" viewBox="0 0 36 36">
-              <path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path class="timer-path" id="text-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            </svg>
+            <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path class="timer-path" id="text-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>
             <div class="timer-text" id="text-timer-text">60</div>
           </div>
         </div>
@@ -132,8 +109,9 @@
         <h2 id="text-instruction" class="task-title" style="margin-top: 20px;">Придумайте фразу</h2>
         <div class="image-showcase">
           <img id="image-to-guess" src="" style="display:none;">
+          <div id="text-to-continue" style="display:none; font-size:1.2rem; font-style:italic; padding:15px; background:rgba(0,0,0,0.3); border-radius:12px; margin-bottom:15px;"></div>
         </div>
-        <input type="text" id="word-input" class="glass-input" placeholder="Введите идею..." autocomplete="off">
+        <input type="text" id="word-input" class="glass-input" placeholder="Введите текст..." autocomplete="off">
         <button class="btn-primary mt-4" onclick="submitWord(true)">Готово</button>
       </div>
     </div>
@@ -149,44 +127,44 @@
           <div class="swatch" style="background:#22c55e" onclick="setColor('#22c55e', this)"></div>
           <div class="swatch" style="background:#3b82f6" onclick="setColor('#3b82f6', this)"></div>
           <div class="swatch" style="background:#a855f7" onclick="setColor('#a855f7', this)"></div>
-          <div class="swatch rgb-wrapper">
-             <input type="color" id="rgb-picker" value="#ff0000" onchange="setColor(this.value, this.parentElement)">
-          </div>
+          <div class="swatch rgb-wrapper"><input type="color" id="rgb-picker" value="#ff0000" onchange="setColor(this.value, this.parentElement)"></div>
         </div>
         
         <div class="tool-divider"></div>
         
-        <div class="tools-grid" id="action-tools">
+        <div class="tools-grid-3" id="action-tools">
           <div class="tool-btn" onclick="undo()" title="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 12l6-6M3 12l6 6"></path></svg></div>
           <div class="tool-btn" onclick="redo()" title="Вперед"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12H3M21 12l-6-6M21 12l-6 6"></path></svg></div>
           <div class="tool-btn eraser" onclick="setEraser(this)" title="Ластик"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20"></path></svg></div>
+          <div class="tool-btn fill-tool" onclick="setFill(this)" title="Заливка"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11l-8-8-8 8h16z"></path><path d="M3 11v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8"></path><path d="M12 3v8"></path></svg></div>
+          <div class="tool-btn eyedropper" onclick="setEyedropper(this)" title="Пипетка"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></div>
           <div class="tool-btn clear" onclick="clearCanvas()" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></div>
         </div>
 
-        <button class="btn-submit-draw" onclick="submitDrawing(true)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        </button>
+        <button class="btn-submit-draw" onclick="submitDrawing(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
       </div>
 
       <div class="canvas-area">
-        <div class="top-tool-bar">
+        <div class="top-tool-bar" style="flex-wrap: wrap;">
           <div class="draw-header">
              <div class="round-badge" id="draw-round-badge">Этап 1/3</div>
              <h2 id="word-to-draw" class="target-word">Слово</h2>
           </div>
           
           <div class="timer-container" id="draw-timer-container">
-            <svg class="timer-svg" viewBox="0 0 36 36">
-              <path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              <path class="timer-path" id="draw-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            </svg>
+            <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path class="timer-path" id="draw-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>
             <div class="timer-text" id="draw-timer-text">60</div>
           </div>
 
-          <div class="brush-slider-horizontal">
-            <div class="dot small-dot"></div>
-            <input type="range" id="brush-size" min="1" max="40" value="5">
-            <div class="dot large-dot"></div>
+          <div class="brush-settings">
+            <div class="brush-slider-horizontal">
+              <span style="font-size:10px; opacity:0.7;">Размер</span>
+              <input type="range" id="brush-size" min="1" max="40" value="5">
+            </div>
+            <div class="brush-slider-horizontal">
+              <span style="font-size:10px; opacity:0.7;">Прозрач.</span>
+              <input type="range" id="brush-opacity" min="0.1" max="1" step="0.1" value="1">
+            </div>
           </div>
         </div>
         
@@ -206,17 +184,11 @@
       <div class="glass-card text-center" style="width: 100%; max-width: 400px;">
         <h2 class="task-title">Отлично!</h2>
         <p class="text-muted mb-4">Ждем остальных гениев...</p>
-        
         <div class="timer-container mx-auto mb-4" id="waiting-timer-container" style="transform: scale(1.5); margin: 30px auto;">
-          <svg class="timer-svg" viewBox="0 0 36 36">
-            <path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-            <path class="timer-path" id="waiting-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-          </svg>
+          <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path class="timer-path" id="waiting-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>
           <div class="timer-text" id="waiting-timer-text">60</div>
         </div>
-        
-        <div class="waiting-players-list" id="waiting-players-list">
-           </div>
+        <div class="waiting-players-list" id="waiting-players-list"></div>
       </div>
     </div>
   </div>
@@ -229,9 +201,7 @@
   </div>
 
   <div id="presentation-phase" class="screen chat-layout">
-    <div class="chat-header">
-      <h2 id="chat-book-title">История</h2>
-    </div>
+    <div class="chat-header"><h2 id="chat-book-title">История</h2></div>
     <div class="chat-scroll-area" id="chat-messages"></div>
     <div class="chat-footer">
       <button class="btn-primary full-width" id="next-slide-btn" onclick="nextSlide()">Показать дальше</button>
