@@ -25,6 +25,15 @@ else document.getElementById('guest-waiting').style.display = 'flex';
 function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 function requestFullscreen() { window.parent.postMessage({ type: 'request_fullscreen' }, '*'); }
 
+// ==========================================
+// ЛОББИ: РЕЖИМЫ И ОПИСАНИЯ
+// ==========================================
+const modeDescriptions = {
+    'classic': 'Обычная игра. Рисуй, отгадывай и веселись без жестких ограничений!',
+    'speedrun': 'Экстремальный режим! Базовое время раунда автоматически урезается ровно в 2 раза. Придется думать и рисовать очень быстро!',
+    'nocolor': 'Секретный режим! Палитра красок заблокирована. Всем игрокам придется рисовать только черным цветом, как настоящим художникам-графикам.'
+};
+
 function selectMode(mode) {
   if (!isHost) return;
   selectedMode = mode;
@@ -32,11 +41,34 @@ function selectMode(mode) {
   document.querySelector(`.mode-card[data-mode="${mode}"]`).classList.add('active');
 }
 
+function showModeInfo(e, mode) {
+    e.stopPropagation(); // Чтобы карточка не выделялась при клике на "?"
+    document.getElementById('info-modal-title').innerText = 
+        mode === 'classic' ? 'Классика' : mode === 'speedrun' ? 'Спидран' : 'Секрет';
+    document.getElementById('info-modal-desc').innerText = modeDescriptions[mode];
+    document.getElementById('info-modal').style.display = 'flex';
+}
+
+function closeInfoModal() {
+    document.getElementById('info-modal').style.display = 'none';
+}
+
+// ==========================================
+// СТАРТ ИГРЫ (ОБРАБОТКА ВРЕМЕНИ ДЛЯ СПИДРАНА)
+// ==========================================
 function startGame() {
   if (!isHost) return;
   requestFullscreen();
-  const time = document.getElementById('setting-time').value;
-  window.parent.postMessage({ type: 'start_game', settings: { mode: selectedMode, time: parseInt(time) } }, '*');
+  
+  let baseTime = parseInt(document.getElementById('setting-time').value);
+  
+  // Логика режима Спидран - режем время пополам, но не меньше 30 сек
+  let finalTime = selectedMode === 'speedrun' ? Math.max(30, Math.floor(baseTime / 2)) : baseTime;
+
+  window.parent.postMessage({ 
+      type: 'start_game', 
+      settings: { mode: selectedMode, time: finalTime } 
+  }, '*');
 }
 
 function playAgain() {
@@ -59,21 +91,15 @@ function handleStateChange() {
     return;
   }
 
-  // СИНХРОНИЗАЦИЯ ПРЕЗЕНТАЦИИ ОТ ХОСТА (ЗАДАЧА 5)
   if (globalState.status === 'finished') {
     currentLocalRound = -1; 
     
-    // Если хост уже запустил презентацию
     if (globalState.presentation?.active) {
         showPhase('presentation-phase');
-        if (isHost) {
-            document.getElementById('next-slide-btn').style.display = 'block';
-        } else {
-            document.getElementById('next-slide-btn').style.display = 'none'; // Гости просто смотрят
-        }
+        if (isHost) document.getElementById('next-slide-btn').style.display = 'block';
+        else document.getElementById('next-slide-btn').style.display = 'none';
         syncPresentationView();
     } else {
-        // Ожидание в лобби результатов
         showPhase('ready-to-present-phase');
         if (!isHost) {
             document.getElementById('btn-start-pres').style.display = 'none';
@@ -105,11 +131,22 @@ function handleStateChange() {
   }
 }
 
+// ==========================================
+// УПРАВЛЕНИЕ ОТОБРАЖЕНИЕМ И КНОПКОЙ ВЫХОДА
+// ==========================================
 function showPhase(phaseId) {
   document.querySelectorAll('.screen, .phase-container').forEach(el => el.classList.remove('active'));
   const target = document.getElementById(phaseId);
   if (target.classList.contains('screen')) target.classList.add('active');
   else { document.getElementById('game-screen').classList.add('active'); target.classList.add('active'); }
+
+  // Скрытие кнопки выхода во время игры
+  const leaveBtn = document.getElementById('leave-btn');
+  if (phaseId === 'lobby-screen' || phaseId === 'ready-to-present-phase' || phaseId === 'presentation-phase') {
+      leaveBtn.style.display = 'flex';
+  } else {
+      leaveBtn.style.display = 'none';
+  }
 }
 
 function getCurrentNotebookId(round, players) {
@@ -136,7 +173,7 @@ function startRound(round, players, totalRounds) {
       showPhase('draw-phase');
       resetCanvasTransform();
       clearCanvas(); 
-      initHistory(); // Сбрасываем историю при новом раунде
+      initHistory(); 
     } else {
       document.getElementById('text-instruction').innerText = 'Что здесь нарисовано?';
       const imgEl = document.getElementById('image-to-guess');
@@ -161,7 +198,6 @@ function submitWord() {
 function submitDrawing() {
   requestFullscreen();
   const updates = {};
-  // Белый фон сохраняем
   ctx.globalCompositeOperation = 'destination-over';
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -173,7 +209,7 @@ function submitDrawing() {
 }
 
 // ==========================================
-// ХОЛСТ: ИСТОРИЯ, ЗУМ, ТОЧНЫЕ КООРДИНАТЫ
+// ИДЕАЛЬНЫЙ ХОЛСТ: КООРДИНАТЫ И ЗУМ
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const ctx = canvas.getContext('2d');
@@ -181,27 +217,22 @@ let isDrawing = false;
 let currentColor = '#000000'; 
 let isErasing = false;
 
-// Трансформации для зума
 let canvasTransform = { x: 0, y: 0, scale: 1 };
 let initialDistance = 0;
 let lastZoomCenter = { x: 0, y: 0 };
-let preZoomState = null; // Защита от случайных точек
+let preZoomState = null; 
 
-// ИСТОРИЯ (UNDO / REDO)
 let drawHistory = [];
 let historyIndex = -1;
 
 function initHistory() {
     drawHistory = [];
     historyIndex = -1;
-    saveState(); // Базовое белое состояние
+    saveState(); 
 }
 
 function saveState() {
-    // Если мы откатились и рисуем заново, удаляем "будущее"
-    if (historyIndex < drawHistory.length - 1) {
-        drawHistory.length = historyIndex + 1;
-    }
+    if (historyIndex < drawHistory.length - 1) drawHistory.length = historyIndex + 1;
     drawHistory.push(canvas.toDataURL());
     historyIndex++;
 }
@@ -217,19 +248,8 @@ function restoreState(index) {
     };
 }
 
-function undo() {
-    if (historyIndex > 0) {
-        historyIndex--;
-        restoreState(historyIndex);
-    }
-}
-
-function redo() {
-    if (historyIndex < drawHistory.length - 1) {
-        historyIndex++;
-        restoreState(historyIndex);
-    }
-}
+function undo() { if (historyIndex > 0) { historyIndex--; restoreState(historyIndex); } }
+function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; restoreState(historyIndex); } }
 
 ctx.fillStyle = '#ffffff';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -266,17 +286,17 @@ function updateTransform() {
     canvas.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`;
 }
 
-// ТОЧНЫЕ КООРДИНАТЫ ДЛЯ ЛЮБОГО ЭКРАНА (ЗАДАЧА 7)
+// ТОЧНЫЕ КООРДИНАТЫ (Теперь без смещения!)
 function getCoordinates(e) {
   const rect = canvas.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
   
-  // Вычисляем процент касания от видимой области холста
+  // Поскольку мы жестко зафиксировали пропорции обертки холста (aspect-ratio),
+  // rect всегда в точности соответствует размеру внутреннего разрешения 800x600.
   const relX = (clientX - rect.left) / rect.width;
   const relY = (clientY - rect.top) / rect.height;
   
-  // Умножаем на внутреннее разрешение (800x600)
   return { 
       x: relX * canvas.width, 
       y: relY * canvas.height 
@@ -285,7 +305,6 @@ function getCoordinates(e) {
 
 function startPosition(e) { 
     if (e.touches && e.touches.length >= 2) return; 
-    // Запоминаем состояние ДО касания (на случай если это окажется ЗУМ)
     preZoomState = canvas.toDataURL();
     isDrawing = true; 
     draw(e); 
@@ -312,11 +331,10 @@ function endPosition() {
     if (!isDrawing) return;
     isDrawing = false; 
     ctx.beginPath(); 
-    saveState(); // Успешно нарисовали линию - сохраняем в историю
+    saveState();
 }
 
 function handlePinchZoom(e) {
-    // ЗАЩИТА ОТ ТОЧЕК (ЗАДАЧА 2): Если мы начали рисовать точку, но это зум - стираем точку!
     if (isDrawing) {
         isDrawing = false;
         ctx.beginPath();
@@ -368,9 +386,8 @@ canvas.addEventListener('mouseleave', endPosition);
 canvas.addEventListener('touchstart', startPosition, {passive: false});
 canvas.addEventListener('touchmove', draw, {passive: false});
 
-
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ (СИНХРОНИЗИРОВАННАЯ)
+// ЧАТ-ПРЕЗЕНТАЦИЯ
 // ==========================================
 let voices = [];
 window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
@@ -387,7 +404,6 @@ function speakText(text) {
     window.speechSynthesis.speak(utterance);
 }
 
-// Эту функцию вызывает ТОЛЬКО Хост
 function startPresentation() {
     if (!isHost) return;
     window.parent.postMessage({ type: 'update_state', updates: {
@@ -395,26 +411,20 @@ function startPresentation() {
     }}, '*');
 }
 
-// Вызывается у всех игроков при изменении globalState.presentation
 let renderedPresentationState = '';
 function syncPresentationView() {
     const pres = globalState.presentation;
     if (!pres) return;
 
     const currentStateId = `${pres.bookIndex}-${pres.round}`;
-    if (renderedPresentationState === currentStateId) return; // Уже отрендерено
+    if (renderedPresentationState === currentStateId) return;
 
     const players = globalState.players || [];
-    
-    // Если сменилась книжка - очищаем чат
-    if (pres.round === 1) {
-        document.getElementById('chat-messages').innerHTML = '';
-    }
+    if (pres.round === 1) document.getElementById('chat-messages').innerHTML = '';
 
     const bookOwnerId = players[pres.bookIndex];
     document.getElementById('chat-book-title').innerText = `История: ${globalState.playerNames?.[bookOwnerId] || "Аноним"}`;
 
-    // Рендерим новый элемент
     const data = globalState.submissions?.[`round_${pres.round}`]?.[bookOwnerId];
     const authorId = players[(players.indexOf(bookOwnerId) + pres.round - 1) % players.length];
     
@@ -439,7 +449,6 @@ function syncPresentationView() {
 
     if (isText) speakText(data);
 
-    // Логика кнопки для хоста
     if (isHost) {
         const btn = document.getElementById('next-slide-btn');
         if (pres.round === globalState.totalRounds) {
@@ -457,7 +466,6 @@ function syncPresentationView() {
     renderedPresentationState = currentStateId;
 }
 
-// Эту функцию вызывает ТОЛЬКО Хост
 function nextSlide() {
     if (!isHost) return;
     const pres = globalState.presentation;
