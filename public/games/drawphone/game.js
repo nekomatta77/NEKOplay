@@ -1,16 +1,6 @@
-// БЕЗОПАСНЫЙ ДОСТУП К DOM (Чтобы ничего не крашилось!)
-function setDisplay(id, display) {
-    const el = document.getElementById(id);
-    if (el) el.style.display = display;
-}
-function setText(id, text) {
-    const el = document.getElementById(id);
-    if (el) el.innerText = text;
-}
-function setHTML(id, html) {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = html;
-}
+function setDisplay(id, display) { const el = document.getElementById(id); if (el) el.style.display = display; }
+function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
+function setHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
 
 function setViewportHeight() {
   let vh = window.innerHeight * 0.01;
@@ -43,80 +33,48 @@ function requestFullscreen() { window.parent.postMessage({ type: 'request_fullsc
 function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    document.getElementById(`tab-btn-${tabId}`).classList.add('active');
-    document.getElementById(`tab-${tabId}`).classList.add('active');
+    const btn = document.getElementById(`tab-btn-${tabId}`);
+    const tab = document.getElementById(`tab-${tabId}`);
+    if(btn) btn.classList.add('active');
+    if(tab) tab.classList.add('active');
 }
 
-// Загрузка словарей из файлов (или фолбэк на базовые)
 let gameWords = ["Слон", "Космонавт", "Пылесос", "Монстр", "Пицца", "Дракон"];
 let impostorPairs = [["Яблоко", "Груша"], ["Кот", "Собака"], ["Машина", "Трактор"]];
 
-fetch('words.json')
-  .then(r => r.json())
-  .then(data => { if(Array.isArray(data) && data.length) gameWords = data; })
-  .catch(e => console.log("words.json не найден, использую базу."));
-
-fetch('words_imposter.json')
-  .then(r => r.json())
-  .then(data => { if(Array.isArray(data) && data.length) impostorPairs = data; })
-  .catch(e => console.log("words_imposter.json не найден, использую базу."));
-
-const modeDescriptions = {
-    'classic': 'Обычная игра. Рисуй, отгадывай и веселись!',
-    'icebreaker': 'Ледокол! Игра начинается не с текста, а с рисунка.',
-    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза.',
-    'story': 'История! Рисования нет вообще. Только текст.',
-    'plagiarism': 'Плагиат! Рисуют ВСЕ и СРАЗУ. Текста нет. Перерисовываем по памяти чужой рисунок.',
-    'finishit': 'Дорисуй-ка! Первый этап — 10 секунд на каракулю. Дальше дорисовываем чужие заготовки.',
-    'tagteam': 'Эстафета! Игроки по очереди дополняют один рисунок по 5 секунд.',
-    'timebomb': 'Таймер-убийца! Каждое касание экрана ускоряет таймер.',
-    'impostor': 'Предатель! Все получают одинаковое слово, а один игрок похожее.',
-    'coop': 'Командная работа! Ваш холст разделен пополам.',
-    'babel': 'Переводчик! Слова автоматически прогоняются через случайный язык.',
-    'duotone': 'Два цвета! Выдается только два случайных цвета.',
-    'inkmeter': 'Ограниченные чернила! Провели слишком длинную линию — кисть перестает рисовать.',
-    'connectdots': 'Коннектор! На холсте раскиданы точки. Рисовать можно только по ним.',
-    'lasso': 'Лассо-арт! Вы получаете фрагмент. Ваша задача — собрать картинку.',
-    'triplethreat': 'Три слова! Сразу три случайных слова. Нарисуйте их все.',
-    'nohands': 'Без рук! Нажмите на экран и рисуйте наклоняя телефон!',
-    'nocolor': 'Секретный режим! Палитра заблокирована.',
-    'onecolor': 'Один цвет! Выдается один случайный цвет на всех.',
-    'darkmode': 'Ночь! Темная тема. Рисуем белым по черному.',
-    'hardcore': 'Без права на ошибку! Ластик и отмена отключены.',
-    'masterpiece': 'Шедевр! Времени на рисование в 2 раза больше.',
-    'mirror': 'Зазеркалье! Холст аппаратно отзеркален.',
-    'earthquake': 'Землетрясение! Во время рисования мольберт трясется.',
-    'drunk': 'Пьяный мастер! Ваши координаты немного смещаются.',
-    'pixelart': 'Пиксель-арт! Рисуем лесенкой.',
-    'oneline': 'Один штрих! Отрываете палец от экрана - рисование окончено.',
-    'tiny': 'Лилипут! Холст отдалился в 2 раза.',
-    'giant': 'Великан! Размер кисти заблокирован на максимуме.',
-    'fading': 'Призрак! Прозрачность заблокирована на 5%.',
-    'chaos': 'Хаос! При каждом касании цвет меняется.'
-};
+fetch('words.json').then(r => r.json()).then(data => { if(Array.isArray(data) && data.length) gameWords = data; }).catch(e => console.log("words.json не найден."));
+fetch('words_imposter.json').then(r => r.json()).then(data => { if(Array.isArray(data) && data.length) impostorPairs = data; }).catch(e => console.log("words_imposter.json не найден."));
 
 function selectMode(mode) {
   if (!isHost) return;
   selectedMode = mode;
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
-  document.querySelector(`.mode-card[data-mode="${mode}"]`).classList.add('active');
+  const el = document.querySelector(`.mode-card[data-mode="${mode}"]`);
+  if (el) el.classList.add('active');
 }
+
 function showModeInfo(e, mode) {
     e.stopPropagation(); 
-    let title = document.querySelector(`.mode-card[data-mode="${mode}"] h4`).innerText;
-    setText('info-modal-title', title);
-    setText('info-modal-desc', modeDescriptions[mode] || "Описание отсутствует");
+    const el = document.querySelector(`.mode-card[data-mode="${mode}"] h4`);
+    if(el) setText('info-modal-title', el.innerText);
+    
+    // Безопасное получение описания из modes.js (если подключен) или из локального словаря
+    let desc = "Описание режима отсутствует.";
+    if (typeof modeDescriptions !== 'undefined' && modeDescriptions[mode]) desc = modeDescriptions[mode];
+    setText('info-modal-desc', desc);
     setDisplay('info-modal', 'flex');
 }
+
 function closeInfoModal() { setDisplay('info-modal', 'none'); }
 
 function renderPlayersList(players) {
     const listEl = document.getElementById('lobby-players-list');
     if (!listEl) return;
+    const hostSvg = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="#fbbf24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="2 16 4 4 10 9 12 2 14 9 20 4 22 16 2 16"></polygon><line x1="2" y1="20" x2="22" y2="20"></line></svg>`;
     listEl.innerHTML = players.map(id => {
         const name = globalState.playerNames?.[id] || "Аноним";
         const avatar = globalState.playerAvatars?.[id] || "https://picsum.photos/100";
-        const isHostIcon = id === players[0] ? `<div class="host-crown">👑</div>` : ''; 
+        const isHostIcon = id === players[0] ? `<div class="host-crown">${hostSvg}</div>` : ''; 
         return `<div class="player-avatar-wrap">${isHostIcon}<img src="${avatar}"><span class="player-name-mini">${name}</span></div>`;
     }).join('');
 }
@@ -129,8 +87,7 @@ function initAudio() {
 
 function playWarningBeep() {
     if (!audioCtx) return;
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
+    const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain();
     osc.connect(gainNode); gainNode.connect(audioCtx.destination);
     osc.type = 'sine'; osc.frequency.value = 880; 
     gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
@@ -148,7 +105,6 @@ let currentInk = 5000;
 function updateTimerUI(remaining, limit) {
     let targetPrefix = currentPhaseSubmitted ? 'waiting' : (isCurrentPhaseDrawing ? 'draw' : 'text');
     setText(`${targetPrefix}-timer-text`, Math.ceil(remaining));
-    
     let timerPath = document.getElementById(`${targetPrefix}-timer-path`);
     let timerContainer = document.getElementById(`${targetPrefix}-timer-container`);
 
@@ -170,25 +126,20 @@ function updateTimerUI(remaining, limit) {
 
 function startPhaseTimer(isDrawing) {
     clearInterval(phaseTimerInterval);
-    currentPhaseSubmitted = false;
-    isCurrentPhaseDrawing = isDrawing;
-    timeMultiplier = 1;
-    
+    currentPhaseSubmitted = false; isCurrentPhaseDrawing = isDrawing; timeMultiplier = 1;
     let timeLimit = globalState.settings?.time || 90;
+    
     if (globalState.settings?.mode === 'tagteam') timeLimit = 5;
     if (globalState.settings?.mode === 'plagiarism' && currentLocalRound > 1) timeLimit = Math.max(15, timeLimit - (currentLocalRound - 1) * 15);
     if (globalState.settings?.mode === 'finishit' && currentLocalRound === 1) timeLimit = 10;
 
-    let timeRemaining = timeLimit;
-    updateTimerUI(timeRemaining, timeLimit);
+    let timeRemaining = timeLimit; updateTimerUI(timeRemaining, timeLimit);
 
     phaseTimerInterval = setInterval(() => {
         timeRemaining -= (0.1 * timeMultiplier);
         if (timeRemaining <= 0) {
             clearInterval(phaseTimerInterval);
-            if (!currentPhaseSubmitted) {
-                if (isDrawing) submitDrawing(false); else submitWord(false);
-            }
+            if (!currentPhaseSubmitted) { if (isDrawing) submitDrawing(false); else submitWord(false); }
         } else { updateTimerUI(timeRemaining, timeLimit); }
     }, 100);
 }
@@ -199,21 +150,28 @@ function updateWaitingScreen() {
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
     const listEl = document.getElementById('waiting-players-list');
     if (!listEl) return;
+    
+    const iconReady = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#22c55e" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    const iconWaiting = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#eab308" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+
     listEl.innerHTML = players.map(id => {
         const name = globalState.playerNames?.[id] || "Аноним";
         const isReady = currentSubs[id] !== undefined;
-        return `<div class="waiting-player-item ${isReady ? 'ready' : 'not-ready'}"><span>${name}</span><span>${isReady ? '✅' : '⏳'}</span></div>`;
+        return `<div class="waiting-player-item ${isReady ? 'ready' : 'not-ready'}"><span>${name}</span><span>${isReady ? iconReady : iconWaiting}</span></div>`;
     }).join('');
 }
 
 function startGame() {
   if (!isHost) return;
   initAudio(); requestFullscreen();
-  let baseTime = parseInt(document.getElementById('setting-time').value);
+  const stElement = document.getElementById('setting-time');
+  const srElement = document.getElementById('setting-rounds');
+  let baseTime = stElement ? parseInt(stElement.value) : 90;
   let finalTime = baseTime;
   if (selectedMode === 'speedrun') finalTime = Math.max(30, Math.floor(baseTime / 2));
   if (selectedMode === 'masterpiece') finalTime = baseTime * 2;
-  let roundsMult = parseInt(document.getElementById('setting-rounds').value);
+  let roundsMult = srElement ? parseInt(srElement.value) : 1;
+  
   if (selectedMode === 'coop' && (playersCountParam % 2 !== 0)) { alert("Для Коопа нужно четное число игроков!"); return; }
   const seed = Math.floor(Math.random() * 1000000);
   window.parent.postMessage({ type: 'start_game', settings: { mode: selectedMode, time: finalTime, roundsMultiplier: roundsMult, seed: seed } }, '*');
@@ -236,30 +194,32 @@ let finishitBaseImg = new Image();
 let dotsArray = []; 
 let isGyroEnabled = false;
 
-function seededRandom(seed) { var x = Math.sin(seed++) * 10000; return x - Math.floor(x); }
+let lassoStampsCache = {};
+let activeLassoStampRef = null;
 
-function getBabelTranslation(word) {
-    const langs = ["Японский", "Китайский", "Хинди", "Эльфийский", "Французский"];
-    const adjs = ["Странный", "Большой", "Красный", "Смешной", "Святой"];
-    let l = langs[Math.floor(Math.random() * langs.length)];
-    let a = adjs[Math.floor(Math.random() * adjs.length)];
-    return `[через ${l}] -> ${a} ${word.toLowerCase()}`;
+function preloadLassoStamps() {
+    lassoStampsCache = {};
+    const r1 = globalState.submissions?.round_1;
+    if (!r1) return;
+    Object.keys(r1).forEach(k => {
+        let data = r1[k];
+        if (typeof data === 'string' && data.startsWith('{')) { try { data = JSON.parse(data).img; } catch(e){} }
+        if (data) { let img = new Image(); img.src = data; lassoStampsCache[k] = img; }
+    });
 }
+
+function seededRandom(seed) { var x = Math.sin(seed++) * 10000; return x - Math.floor(x); }
 
 function handleStateChange() {
   const players = globalState.players || [];
   if (players.length > 0) renderPlayersList(players);
 
-  // ФИКС БАГА С РЕЗУЛЬТАТАМИ: Жесткая очистка при новой игре
+  // ЖЕСТКАЯ ОЧИСТКА ПРИ НОВОЙ ИГРЕ
   if (!globalState.status || globalState.status === 'waiting') {
-    currentLocalRound = 0; 
-    clearInterval(phaseTimerInterval);
-    if (animationFrameId) cancelAnimationFrame(animationFrameId); // Останавливаем анимацию
-    setDisplay('play-again-btn', 'none');
-    setHTML('chat-messages', ''); // Очищаем чат
-    renderedPresentationState = '';
-    showPhase('lobby-screen'); 
-    return;
+    currentLocalRound = 0; clearInterval(phaseTimerInterval);
+    if (animationFrameId) cancelAnimationFrame(animationFrameId); 
+    setDisplay('play-again-btn', 'none'); setHTML('chat-messages', ''); 
+    renderedPresentationState = ''; showPhase('lobby-screen'); return;
   }
 
   calculatedTotalRounds = players.length * (globalState.settings?.roundsMultiplier || 1);
@@ -272,10 +232,7 @@ function handleStateChange() {
         syncPresentationView(players);
     } else {
         showPhase('ready-to-present-phase');
-        if (!isHost) {
-            setDisplay('btn-start-pres', 'none');
-            setHTML('presentation-status-text', 'ОЖИДАНИЕ <span>ХОСТА</span>');
-        }
+        if (!isHost) { setDisplay('btn-start-pres', 'none'); setHTML('presentation-status-text', 'ОЖИДАНИЕ <span>ХОСТА</span>'); }
     }
     return;
   }
@@ -293,8 +250,8 @@ function handleStateChange() {
       let seed = (globalState.settings.seed || 1) + globalState.round;
       let i1 = Math.floor(seededRandom(seed) * 8); let i2 = Math.floor(seededRandom(seed+1) * 8);
       if (i1===i2) i2 = (i2+1)%8;
-      colors[i1].style.display = 'block'; colors[i2].style.display = 'block';
-      setColor(colors[i1].style.backgroundColor, colors[i1]);
+      if (colors[i1]) colors[i1].style.display = 'block'; 
+      if (colors[i2]) colors[i2].style.display = 'block';
   } else { 
       setDisplay('color-palette', 'grid'); setDisplay('tool-divider-2', 'block');
       document.querySelectorAll('#color-palette .swatch').forEach(c => c.style.display = 'block');
@@ -302,6 +259,8 @@ function handleStateChange() {
 
   if (mode === 'hardcore') { setDisplay('action-tools', 'none'); setDisplay('tool-divider-1', 'none'); } 
   else { setDisplay('action-tools', 'grid'); setDisplay('tool-divider-1', 'block'); }
+
+  if (mode === 'lasso' && globalState.round > 2) preloadLassoStamps();
 
   if (globalState.round > currentLocalRound) startRound(globalState.round, players);
   updateWaitingScreen();
@@ -320,7 +279,7 @@ function showPhase(phaseId) {
   const target = document.getElementById(phaseId);
   if (target) {
       if (target.classList.contains('screen')) target.classList.add('active');
-      else { document.getElementById('game-screen').classList.add('active'); target.classList.add('active'); }
+      else { const gs = document.getElementById('game-screen'); if(gs) gs.classList.add('active'); target.classList.add('active'); }
   }
   setDisplay('leave-btn', (phaseId === 'lobby-screen' || phaseId === 'ready-to-present-phase' || phaseId === 'presentation-phase') ? 'flex' : 'none');
 }
@@ -331,8 +290,6 @@ function getCurrentNotebookId(round, players) {
     if (myIndex === -1) return myUserId; 
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
 }
-
-function hidePlagiarism() { setDisplay('plagiarism-overlay', 'none'); }
 
 function startRound(round, players) {
   currentLocalRound = round;
@@ -359,9 +316,11 @@ function startRound(round, players) {
   if (isDrawingPhase) {
       const zContainer = document.getElementById('zoom-container');
       if(zContainer) zContainer.className = ''; 
+      
       setDisplay('brush-settings', 'flex'); setDisplay('plagiarism-overlay', 'none');
       setDisplay('ink-meter-container', 'none'); setDisplay('coop-divider', 'none');
       setDisplay('btn-gyro-start', 'none'); setDisplay('gyro-cursor', 'none');
+      setDisplay('lasso-stamps-container', 'none'); setDisplay('sidebar-tools', 'flex');
       
       const db = document.getElementById('drawing-board');
       if (db) db.style.backgroundImage = 'none';
@@ -369,11 +328,11 @@ function startRound(round, players) {
       if (mode === 'mirror' && zContainer) zContainer.classList.add('mode-mirror');
       if (mode === 'earthquake' && zContainer) zContainer.classList.add('mode-earthquake');
       if (mode === 'tiny' && zContainer) zContainer.classList.add('mode-tiny');
-      if (mode === 'giant') { setDisplay('brush-settings', 'none'); document.getElementById('brush-size').value = 40; }
-      if (mode === 'fading') { setDisplay('brush-settings', 'none'); document.getElementById('brush-opacity').value = 0.05; }
-      if (mode === 'pixelart') { setDisplay('brush-settings', 'none'); document.getElementById('brush-size').value = 15; }
+      if (mode === 'giant') { setDisplay('brush-settings', 'none'); const bs = document.getElementById('brush-size'); if(bs) bs.value = 40; }
+      if (mode === 'fading') { setDisplay('brush-settings', 'none'); const bo = document.getElementById('brush-opacity'); if(bo) bo.value = 0.05; }
+      if (mode === 'pixelart') { setDisplay('brush-settings', 'none'); const bs = document.getElementById('brush-size'); if(bs) bs.value = 15; }
       
-      if (mode === 'inkmeter') { setDisplay('ink-meter-container', 'block'); currentInk = maxInk; document.getElementById('ink-meter-bar').style.width = '100%'; }
+      if (mode === 'inkmeter') { setDisplay('ink-meter-container', 'block'); currentInk = maxInk; const im = document.getElementById('ink-meter-bar'); if(im) im.style.width = '100%'; }
       if (mode === 'coop') setDisplay('coop-divider', 'block');
       if (mode === 'nohands') setDisplay('btn-gyro-start', 'block');
 
@@ -388,67 +347,73 @@ function startRound(round, players) {
 
       if (round === 1) { 
           if (mode === 'finishit') setHTML('word-to-draw', "Нарисуйте заготовку!");
-          else if (mode === 'lasso') setHTML('word-to-draw', "Нарисуй: " + gameWords[Math.floor(Math.random() * gameWords.length)]);
+          else if (mode === 'lasso') {
+              let p = "Фрагмент";
+              if (typeof getRandomLassoPart === 'function') p = getRandomLassoPart();
+              setHTML('word-to-draw', "Нарисуй: " + p);
+          }
           else if (mode === 'triplethreat') {
-              let w1 = gameWords[Math.floor(Math.random() * gameWords.length)];
-              let w2 = gameWords[Math.floor(Math.random() * gameWords.length)];
-              let w3 = gameWords[Math.floor(Math.random() * gameWords.length)];
-              setHTML('word-to-draw', `${w1} + ${w2} + ${w3}`);
+              let w = "Три случайных слова";
+              if (typeof getRandomTriple === 'function') w = getRandomTriple();
+              setHTML('word-to-draw', w);
           }
           else setHTML('word-to-draw', "Что угодно!");
       } else {
           let prevImg = null;
-          if (typeof previousData === 'string' && previousData.startsWith('{')) {
-              try { prevImg = JSON.parse(previousData).img; } catch(e){}
-          } else { prevImg = previousData; } 
+          if (typeof previousData === 'string' && previousData.startsWith('{')) { try { prevImg = JSON.parse(previousData).img; } catch(e){} } 
+          else { prevImg = previousData; } 
 
           if (mode === 'plagiarism') {
-              setText('word-to-draw', "Перерисуй по памяти!");
-              setDisplay('plagiarism-overlay', 'flex');
-              document.getElementById('plagiarism-img').src = prevImg;
+              setText('word-to-draw', "Перерисуй по памяти!"); setDisplay('plagiarism-overlay', 'flex');
+              const pi = document.getElementById('plagiarism-img'); if(pi) pi.src = prevImg;
           } else if (mode === 'finishit' || mode === 'tagteam') {
               setText('word-to-draw', mode === 'finishit' ? "Дорисуй-ка!" : "Продолжи рисунок!");
               finishitBaseImg.src = prevImg;
-              if (db) {
-                  db.style.backgroundImage = `url(${prevImg})`;
-                  db.style.backgroundSize = '100% 100%';
-                  db.style.backgroundPosition = 'center';
-                  db.style.backgroundRepeat = 'no-repeat';
-              }
+              if (db) { db.style.backgroundImage = `url(${prevImg})`; db.style.backgroundSize = '100% 100%'; db.style.backgroundPosition = 'center'; db.style.backgroundRepeat = 'no-repeat'; }
           } else if (mode === 'copycat' && prevImg && prevImg.length > 50) {
               setHTML('word-to-draw', `<img src="${prevImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`);
+          } else if (mode === 'lasso' && round > 2) {
+              setText('word-to-draw', "Собери: " + previousData);
+              setDisplay('sidebar-tools', 'none'); setDisplay('lasso-stamps-container', 'flex');
+              const sc = document.getElementById('lasso-stamps-container'); if(sc) sc.innerHTML = '';
+              Object.keys(lassoStampsCache).forEach(k => {
+                  let im = new Image(); im.src = lassoStampsCache[k].src; im.className = 'lasso-stamp-img';
+                  im.onclick = () => { document.querySelectorAll('.lasso-stamp-img').forEach(i=>i.classList.remove('active')); im.classList.add('active'); activeLassoStampRef = k; };
+                  if(sc) sc.appendChild(im);
+              });
           } else { setText('word-to-draw', previousData || "..."); }
       }
       showPhase('draw-phase');
   } else {
-      document.getElementById('word-input').value = '';
+      const wi = document.getElementById('word-input'); if(wi) wi.value = '';
       if (round === 1) {
           setDisplay('babel-translation', 'none');
           setText('text-instruction', mode==='story'?'Начните историю...':'Придумайте фразу');
           setDisplay('image-to-guess', 'none'); setDisplay('text-to-continue', 'none');
           
           if (mode === 'impostor') {
-              let pair = impostorPairs[Math.floor(seededRandom(globalState.settings.seed) * impostorPairs.length)];
+              let p = ["Слово", "Слово"];
+              if (typeof getImpostorPair === 'function') p = getImpostorPair();
               let isImpostor = players.indexOf(myUserId) === 0;
-              document.getElementById('word-input').value = isImpostor ? pair[1] : pair[0];
-              document.getElementById('word-input').disabled = true;
+              if(wi) { wi.value = isImpostor ? p[1] : p[0]; wi.disabled = true; }
               setText('text-instruction', "Ваше слово:");
-          } else { document.getElementById('word-input').disabled = false; }
+          } else { if(wi) wi.disabled = false; }
 
       } else {
-          document.getElementById('word-input').disabled = false;
+          if(wi) wi.disabled = false;
           setDisplay('babel-translation', 'none');
 
           if (mode === 'story') {
               setText('text-instruction', 'Продолжите историю...');
               setDisplay('image-to-guess', 'none'); setDisplay('text-to-continue', 'block');
               setText('text-to-continue', `"...${previousData}"`);
+          } else if (mode === 'lasso') {
+              setText('text-instruction', 'Придумайте безумную тему (что соберем?):');
+              setDisplay('image-to-guess', 'none'); setDisplay('text-to-continue', 'none');
           } else {
               setText('text-instruction', 'Что здесь нарисовано?');
               const imgEl = document.getElementById('image-to-guess');
-              if (typeof previousData === 'string' && previousData.startsWith('{')) {
-                  try { previousData = JSON.parse(previousData).img; } catch(e){}
-              }
+              if (typeof previousData === 'string' && previousData.startsWith('{')) { try { previousData = JSON.parse(previousData).img; } catch(e){} }
               if (imgEl) imgEl.src = previousData || ""; 
               setDisplay('image-to-guess', 'inline-block'); setDisplay('text-to-continue', 'none');
           }
@@ -460,21 +425,22 @@ function startRound(round, players) {
 function submitWord(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
-  currentPhaseSubmitted = true;
-  clearInterval(phaseTimerInterval);
-  let word = document.getElementById('word-input').value.trim() || "Секретик"; 
+  currentPhaseSubmitted = true; clearInterval(phaseTimerInterval);
+  let word = "Секретик";
+  const wi = document.getElementById('word-input');
+  if (wi && wi.value.trim()) word = wi.value.trim();
 
   if (globalState.settings?.mode === 'babel' && currentLocalRound > 1) {
       setDisplay('babel-translation', 'block'); setText('babel-translation', "Переводим...");
       setTimeout(() => {
+          let trans = word;
+          if (typeof getBabelTranslation === 'function') trans = getBabelTranslation(word);
           const updates = {};
-          updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = getBabelTranslation(word);
+          updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = trans;
           window.parent.postMessage({ type: 'update_state', updates }, '*');
           showPhase('waiting-phase'); updateWaitingScreen();
-      }, 1500);
-      return;
+      }, 1500); return;
   }
-
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = word;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -484,27 +450,20 @@ function submitWord(isManual = false) {
 function submitDrawing(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
-  currentPhaseSubmitted = true;
-  clearInterval(phaseTimerInterval);
-  
-  const mode = globalState.settings?.mode;
-  let finalDataUrl = '';
+  currentPhaseSubmitted = true; clearInterval(phaseTimerInterval);
+  const mode = globalState.settings?.mode; let finalDataUrl = '';
 
   if (mode === 'amnesia') {
       redrawFromStrokesSync(recordedStrokes, ctx, canvas, mode === 'darkmode');
       finalDataUrl = canvas.toDataURL('image/png');
   } else if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) {
       const tc = document.createElement('canvas'); tc.width = canvas.width; tc.height = canvas.height;
-      const tCtx = tc.getContext('2d');
-      tCtx.fillStyle = '#ffffff'; tCtx.fillRect(0,0,tc.width,tc.height);
+      const tCtx = tc.getContext('2d'); tCtx.fillStyle = '#ffffff'; tCtx.fillRect(0,0,tc.width,tc.height);
       tCtx.drawImage(finishitBaseImg, 0, 0, tc.width, tc.height); tCtx.drawImage(canvas, 0, 0);
       finalDataUrl = tc.toDataURL('image/png');
   } else {
-      const tempCtx = canvas.getContext('2d');
-      tempCtx.globalCompositeOperation = 'destination-over';
-      tempCtx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff';
-      tempCtx.fillRect(0, 0, canvas.width, canvas.height);
-      finalDataUrl = canvas.toDataURL('image/png');
+      const tempCtx = canvas.getContext('2d'); tempCtx.globalCompositeOperation = 'destination-over'; tempCtx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff';
+      tempCtx.fillRect(0, 0, canvas.width, canvas.height); finalDataUrl = canvas.toDataURL('image/png');
   }
   
   const finalData = JSON.stringify({ img: finalDataUrl, strokes: recordedStrokes });
@@ -528,7 +487,8 @@ function enableGyro() {
         if (!isDrawing || !isGyroEnabled) return;
         gyroX += e.gamma * 0.5; gyroY += e.beta * 0.5;
         gyroX = Math.max(0, Math.min(800, gyroX)); gyroY = Math.max(0, Math.min(600, gyroY));
-        document.getElementById('gyro-cursor').style.left = `${(gyroX/800)*100}%`; document.getElementById('gyro-cursor').style.top = `${(gyroY/600)*100}%`;
+        const gc = document.getElementById('gyro-cursor');
+        if(gc) { gc.style.left = `${(gyroX/800)*100}%`; gc.style.top = `${(gyroY/600)*100}%`; }
         currentStroke.p.push(Math.round(gyroX), Math.round(gyroY));
         ctx.lineTo(gyroX, gyroY); ctx.stroke();
     });
@@ -546,10 +506,10 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
     targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
     for (let stroke of strokes) {
         targetCtx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
-        targetCtx.filter = stroke.b ? 'blur(5px)' : 'none'; targetCtx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
-        if (stroke.n && !stroke.e) { targetCtx.shadowBlur = Math.max(10, stroke.s * 2); targetCtx.shadowColor = stroke.c; targetCtx.strokeStyle = '#ffffff'; } 
-        else { targetCtx.shadowBlur = 0; targetCtx.shadowColor = 'transparent'; targetCtx.strokeStyle = stroke.c; targetCtx.fillStyle = stroke.c; }
-        if (stroke.type === 'clear') { targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over'; targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
+        targetCtx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
+        
+        if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { targetCtx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); continue; }
+        if (stroke.type === 'clear') { targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
         else if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
         else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
@@ -561,10 +521,9 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
 const ctx = canvas.getContext('2d');
-
 let isDrawing = false; let currentColor = '#000000'; let isErasing = false; let isFilling = false; let isEyedropper = false; let isBlur = false; let isRect = false; let isCircle = false; let isLine = false; let isArrow = false; let isSymmetry = false; let isNeon = false;
 let canvasTransform = { x: 0, y: 0, scale: 1 }; let initialDistance = 0; let lastZoomCenter = { x: 0, y: 0 }; let preZoomState = null; 
-let shapeStartX = 0, shapeStartY = 0; let shapeImgData = null; let isDrawingShape = false; let lastX = 0, lastY = 0; let lastConstellationPoint = null;
+let shapeStartX = 0, shapeStartY = 0; let shapeImgData = null; let isDrawingShape = false; let lastX = 0, lastY = 0;
 let recordedStrokes = []; let strokesHistory = []; let currentStroke = null; let drawHistory = []; let historyIndex = -1;
 
 function initHistory() { drawHistory = []; strokesHistory = []; recordedStrokes = []; historyIndex = -1; saveState(); }
@@ -578,14 +537,12 @@ function setBrush(element) { clearTools(); ctx.globalCompositeOperation = 'sourc
 function setEraser(element) { clearTools(); isErasing = true; ctx.globalCompositeOperation = 'destination-out'; element.classList.add('active-swatch'); }
 function setFill(element) { clearTools(); isFilling = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setEyedropper(element) { clearTools(); isEyedropper = true; element.classList.add('active-swatch'); }
-function setBlur(element) { clearTools(); isBlur = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setRect(element) { clearTools(); isRect = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setCircle(element) { clearTools(); isCircle = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setLine(element) { clearTools(); isLine = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setArrow(element) { clearTools(); isArrow = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
-function setNeon(element) { clearTools(); isNeon = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function toggleSymmetry(element) { isSymmetry = !isSymmetry; element.classList.toggle('active-swatch', isSymmetry); }
-function clearCanvas() { ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; const isDark = globalState.settings?.mode === 'darkmode'; ctx.fillStyle = isDark ? '#000000' : '#ffffff'; document.getElementById('canvas-wrapper').style.backgroundColor = isDark ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); if(isErasing) ctx.globalCompositeOperation = 'destination-out'; recordedStrokes.push({ type: 'clear' }); saveState(); }
+function clearCanvas() { ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; const isDark = globalState.settings?.mode === 'darkmode'; ctx.fillStyle = isDark ? '#000000' : '#ffffff'; const cw = document.getElementById('canvas-wrapper'); if(cw) cw.style.backgroundColor = isDark ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); if(isErasing) ctx.globalCompositeOperation = 'destination-out'; recordedStrokes.push({ type: 'clear' }); saveState(); }
 function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; updateTransform(); }
 function updateTransform() { if (!zoomContainer) return; if (canvasTransform.scale <= 1) { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; } zoomContainer.style.transformOrigin = `0 0`; zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
 function getCoordinates(e) { const rect = canvas.getBoundingClientRect(); const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY; return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height }; }
@@ -593,36 +550,43 @@ function getCoordinates(e) { const rect = canvas.getBoundingClientRect(); const 
 function startPosition(e) { 
     if (e.touches && e.touches.length >= 2) return; 
     let pos = getCoordinates(e); const mode = globalState.settings?.mode;
+    
+    if (mode === 'lasso' && currentLocalRound > 2) {
+        if (!activeLassoStampRef) return alert("Выберите фрагмент сверху!");
+        let size = document.getElementById('brush-size').value * 10;
+        let opacity = parseFloat(document.getElementById('brush-opacity').value);
+        let img = lassoStampsCache[activeLassoStampRef];
+        if (img) {
+            ctx.globalAlpha = opacity; ctx.drawImage(img, pos.x - size/2, pos.y - size/2, size, size);
+            recordedStrokes.push({ type: 'stamp', ref: activeLassoStampRef, s: size, o: opacity, p: [pos.x, pos.y] }); saveState();
+        }
+        isDrawing = false; return;
+    }
+
     if (mode === 'coop') { const players = globalState.players || []; const isLeft = players.indexOf(myUserId) % 2 === 0; if (isLeft && pos.x > 400) return; if (!isLeft && pos.x < 400) return; }
     if (mode === 'nohands') return; 
     if (mode === 'timebomb') timeMultiplier *= 1.2;
     if (mode === 'inkmeter' && currentInk <= 0) return;
     if (mode === 'oneline' && hasDrawnStrokeOneline) return;
+    
     if (isEyedropper) { const p = ctx.getImageData(pos.x, pos.y, 1, 1).data; const hex = "#" + ("000000" + ((p[0] << 16) | (p[1] << 8) | p[2]).toString(16)).slice(-6); setColor(hex); setBrush(document.querySelector('.brush-tool')); return; }
     if (isFilling) { floodFillCore(Math.round(pos.x), Math.round(pos.y), currentColor); recordedStrokes.push({ type: 'fill', c: currentColor, p: [Math.round(pos.x), Math.round(pos.y)] }); saveState(); return; }
-    if (mode === 'chaos') { currentColor = getRandomHex(); document.getElementById('brush-size').value = Math.floor(Math.random() * 35) + 5; }
+    if (mode === 'chaos') { currentColor = getRandomHex(); const bs = document.getElementById('brush-size'); if(bs) bs.value = Math.floor(Math.random() * 35) + 5; }
     if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
     if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
     if (mode === 'connectdots') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return;  }
     
-    let opacity = parseFloat(document.getElementById('brush-opacity').value);
+    let opacity = 1;
+    const bo = document.getElementById('brush-opacity');
+    if (bo) opacity = parseFloat(bo.value);
     
-    if (mode === 'constellation') {
-        if (lastConstellationPoint) {
-            ctx.beginPath(); ctx.lineWidth = document.getElementById('brush-size').value; ctx.lineCap = 'round'; ctx.strokeStyle = currentColor;
-            ctx.moveTo(lastConstellationPoint.x, lastConstellationPoint.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
-            recordedStrokes.push({ type: 'line', c: currentColor, s: ctx.lineWidth, o: opacity, p: [lastConstellationPoint.x, lastConstellationPoint.y, pos.x, pos.y] });
-            saveState();
-        }
-        lastConstellationPoint = pos; isDrawing = false; return;
-    }
-
     if (isRect || isCircle || isLine || isArrow) { shapeStartX = Math.round(pos.x); shapeStartY = Math.round(pos.y); shapeImgData = ctx.getImageData(0,0,canvas.width, canvas.height); isDrawingShape = true; return; }
     preZoomState = canvas.toDataURL(); isDrawing = true; 
-    currentStroke = { c: currentColor, s: document.getElementById('brush-size').value, e: isErasing?1:0, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [Math.round(pos.x), Math.round(pos.y)] };
+    let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
+    currentStroke = { c: currentColor, s: bsVal, e: isErasing?1:0, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [Math.round(pos.x), Math.round(pos.y)] };
     lastX = pos.x; lastY = pos.y;
-    ctx.lineWidth = document.getElementById('brush-size').value; ctx.lineCap = mode === 'pixelart' ? 'square' : 'round'; ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round'; ctx.globalAlpha = isErasing ? 1 : opacity; ctx.filter = isBlur ? 'blur(5px)' : 'none'; ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
-    if (isNeon && !isErasing) { ctx.shadowBlur = Math.max(10, document.getElementById('brush-size').value * 2); ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff'; } else { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor; }
+    ctx.lineWidth = bsVal; ctx.lineCap = mode === 'pixelart' ? 'square' : 'round'; ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round'; ctx.globalAlpha = isErasing ? 1 : opacity; ctx.filter = isBlur ? 'blur(5px)' : 'none'; ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
+    if (isNeon && !isErasing) { ctx.shadowBlur = Math.max(10, bsVal * 2); ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff'; } else { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor; }
     ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.lineTo(pos.x, pos.y); ctx.stroke(); if (isSymmetry) { ctx.beginPath(); ctx.moveTo(canvas.width - pos.x, pos.y); ctx.lineTo(canvas.width - pos.x, pos.y); ctx.stroke(); }
 }
 
@@ -634,11 +598,16 @@ function draw(e) {
   if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
   if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
   if (mode === 'connectdots') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return; }
-  if (mode === 'inkmeter') { let dist = Math.hypot(pos.x - lastX, pos.y - lastY); currentInk -= dist * (document.getElementById('brush-size').value / 5); if (currentInk < 0) currentInk = 0; document.getElementById('ink-meter-bar').style.width = `${(currentInk/maxInk)*100}%`; if (currentInk === 0) return; }
   
-  let opacity = parseFloat(document.getElementById('brush-opacity').value);
-  ctx.lineWidth = document.getElementById('brush-size').value; ctx.globalAlpha = isErasing ? 1 : opacity; ctx.filter = isBlur ? 'blur(5px)' : 'none'; ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
-  if (isNeon && !isErasing) { ctx.shadowBlur = Math.max(10, document.getElementById('brush-size').value * 2); ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff'; } else { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor; }
+  let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
+  if (mode === 'inkmeter') { let dist = Math.hypot(pos.x - lastX, pos.y - lastY); currentInk -= dist * (bsVal / 5); if (currentInk < 0) currentInk = 0; const im = document.getElementById('ink-meter-bar'); if(im) im.style.width = `${(currentInk/maxInk)*100}%`; if (currentInk === 0) return; }
+  
+  let opacity = 1;
+  const bo = document.getElementById('brush-opacity');
+  if (bo) opacity = parseFloat(bo.value);
+
+  ctx.lineWidth = bsVal; ctx.globalAlpha = isErasing ? 1 : opacity; ctx.filter = isBlur ? 'blur(5px)' : 'none'; ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
+  if (isNeon && !isErasing) { ctx.shadowBlur = Math.max(10, bsVal * 2); ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff'; } else { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor; }
 
   if (isDrawingShape) {
       ctx.putImageData(shapeImgData, 0, 0); ctx.beginPath();
@@ -657,9 +626,12 @@ function draw(e) {
 
 function endPosition() { 
     ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0;
+    let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
+    let opacity = 1; const bo = document.getElementById('brush-opacity'); if (bo) opacity = parseFloat(bo.value);
+
     if (isDrawingShape) {
         isDrawingShape = false; let t = isRect ? 'rect' : (isCircle ? 'circle' : (isLine ? 'line' : 'arrow'));
-        recordedStrokes.push({ type: t, c: currentColor, s: document.getElementById('brush-size').value, o: parseFloat(document.getElementById('brush-opacity').value), b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [shapeStartX, shapeStartY, lastX, lastY] });
+        recordedStrokes.push({ type: t, c: currentColor, s: bsVal, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [shapeStartX, shapeStartY, lastX, lastY] });
         saveState(); return;
     }
     if (!isDrawing) return; isDrawing = false; 
@@ -682,7 +654,8 @@ function handlePinchZoom(e) {
     canvasTransform.scale = newScale; initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; updateTransform();
 }
 canvas.addEventListener('touchend', (e) => { if (e.touches.length < 2) { initialDistance = 0; if (canvasTransform.scale <= 1) resetCanvasTransform(); } endPosition(); });
-canvas.addEventListener('mousedown', startPosition); canvas.addEventListener('mouseup', endPosition); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave', endPosition);
+canvas.addEventListener('mousedown', startPosition); canvas.addEventListener('mouseup', endPosition);
+canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave', endPosition);
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
@@ -713,9 +686,10 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
         let pointsDrawn = 0;
         while (pointsDrawn < pointsPerFrame && strokeIdx < strokes.length) {
             let stroke = strokes[strokeIdx];
-            actx.globalAlpha = stroke.o !== undefined ? stroke.o : 1; actx.filter = stroke.b ? 'blur(5px)' : 'none'; actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
-            if (stroke.n && !stroke.e) { actx.shadowBlur = Math.max(10, stroke.s * 2); actx.shadowColor = stroke.c; actx.strokeStyle = '#ffffff'; } else { actx.shadowBlur = 0; actx.shadowColor = 'transparent'; actx.strokeStyle = stroke.c; }
-            if (stroke.type === 'clear') { actx.globalAlpha = 1; actx.filter = 'none'; actx.shadowBlur = 0; actx.globalCompositeOperation = 'source-over'; actx.fillStyle = isDarkMode ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
+            actx.globalAlpha = stroke.o !== undefined ? stroke.o : 1; actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
+            
+            if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { actx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
+            if (stroke.type === 'clear') { actx.globalAlpha = 1; actx.globalCompositeOperation = 'source-over'; actx.fillStyle = isDarkMode ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'fill') { strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'rect') { actx.beginPath(); actx.lineWidth = stroke.s; actx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) actx.strokeRect(canvasEl.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'circle') { actx.beginPath(); actx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); actx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke(); if(stroke.sym) { actx.beginPath(); actx.arc(canvasEl.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke(); } strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
@@ -724,16 +698,12 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             
             let pts = stroke.p; if (!pts || pts.length < 2) { strokeIdx++; pointIdx = 0; continue; }
             if (pointIdx === 0) { actx.beginPath(); actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round'; actx.moveTo(pts[0], pts[1]); pointIdx = 2; }
-            if (pointIdx < pts.length) {
-                actx.beginPath(); actx.moveTo(pts[pointIdx-2], pts[pointIdx-1]); actx.lineTo(pts[pointIdx], pts[pointIdx+1]); actx.stroke();
-                if (stroke.sym) { actx.beginPath(); actx.moveTo(canvasEl.width - pts[pointIdx-2], pts[pointIdx-1]); actx.lineTo(canvasEl.width - pts[pointIdx], pts[pointIdx+1]); actx.stroke(); }
-                pointIdx += 2; pointsDrawn++;
+            if (pointIdx < pts.length) { actx.beginPath(); actx.moveTo(pts[pointIdx-2], pts[pointIdx-1]); actx.lineTo(pts[pointIdx], pts[pointIdx+1]); actx.stroke(); if (stroke.sym) { actx.beginPath(); actx.moveTo(canvasEl.width - pts[pointIdx-2], pts[pointIdx-1]); actx.lineTo(canvasEl.width - pts[pointIdx], pts[pointIdx+1]); actx.stroke(); } pointIdx += 2; pointsDrawn++;
             } else { strokeIdx++; pointIdx = 0; }
         }
         animationFrameId = requestAnimationFrame(drawStep);
     }
-    if (animationFrameId) cancelAnimationFrame(animationFrameId);
-    animationFrameId = requestAnimationFrame(drawStep);
+    if (animationFrameId) cancelAnimationFrame(animationFrameId); animationFrameId = requestAnimationFrame(drawStep);
 }
 
 let renderedPresentationState = '';
@@ -765,9 +735,12 @@ function syncPresentationView(players) {
 
     const side = isText ? 'left' : 'right';
     let visualContent = '';
+    
+    const heartSvg = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="#ef4444" fill="#ef4444" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`;
+
     if (isText) { visualContent = `<div class="msg-text">${rawData}</div>`; } 
     else {
-        let auctionHtml = mode === 'auction' ? `<button class="btn-like" onclick="this.innerHTML='❤️ '+(parseInt(this.innerText.replace('❤️ ',''))+1)">❤️ 0</button>` : '';
+        let auctionHtml = mode === 'auction' ? `<button class="btn-like" onclick="let v=parseInt(this.innerText); this.innerHTML='${heartSvg} '+(isNaN(v)?1:v+1)">${heartSvg} 0</button>` : '';
         visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas><div style="position:absolute; bottom:10px; right:10px;">${auctionHtml}</div></div>`;
     }
 
