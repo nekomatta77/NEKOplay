@@ -59,7 +59,9 @@ function showModeInfo(e, mode) {
 
 function closeInfoModal() { setDisplay('info-modal', 'none'); }
 
+// Безопасное закрытие полноэкранного плагиата
 function hidePlagiarism(e) { 
+    if(e) e.preventDefault();
     setDisplay('plagiarism-overlay', 'none'); 
 }
 
@@ -164,7 +166,7 @@ function updateWaitingScreen() {
 
     listEl.innerHTML = players.map(id => {
         const name = globalState.playerNames?.[id] || "Аноним";
-        const isReady = currentSubs[id] !== undefined;
+        const isReady = typeof currentSubs[id] === 'string' && currentSubs[id].length > 0;
         return `<div class="waiting-player-item ${isReady ? 'ready' : 'not-ready'}"><span>${name}</span><span>${isReady ? iconReady : iconWaiting}</span></div>`;
     }).join('');
 }
@@ -182,16 +184,33 @@ function startGame() {
   
   if (selectedMode === 'coop' && (playersCountParam % 2 !== 0)) { alert("Для Коопа нужно четное число игроков!"); return; }
   const seed = Math.floor(Math.random() * 1000000);
-  window.parent.postMessage({ type: 'start_game', settings: { mode: selectedMode, time: finalTime, roundsMultiplier: roundsMult, seed: seed } }, '*');
+  
+  // ГАРАНТИРОВАННАЯ ОЧИСТКА БАЗЫ ДАННЫХ ПЕРЕД НОВОЙ ИГРОЙ
+  let resetSubs = {};
+  for(let i=1; i<=30; i++) resetSubs[`round_${i}`] = {};
+
+  window.parent.postMessage({ 
+      type: 'update_state', 
+      updates: { submissions: resetSubs, presentation: { active: false, bookIndex: 0, round: 1 } } 
+  }, '*');
+
+  window.parent.postMessage({ 
+      type: 'start_game', 
+      settings: { mode: selectedMode, time: finalTime, roundsMultiplier: roundsMult, seed: seed } 
+  }, '*');
 }
 
 function playAgain() {
   if (!isHost) return;
+  // ГАРАНТИРОВАННАЯ ОЧИСТКА ПРИ ВЫХОДЕ В ЛОББИ
+  let resetSubs = {};
+  for(let i=1; i<=30; i++) resetSubs[`round_${i}`] = {};
+  window.parent.postMessage({ type: 'update_state', updates: { submissions: resetSubs, presentation: null, round: 0 } }, '*');
   window.parent.postMessage({ type: 'play_again' }, '*');
 }
 
 // -----------------------------------------------------
-// ГЛОБАЛЬНЫЙ СБРОС ЛОКАЛЬНЫХ ДАННЫХ ПРИ НОВОЙ ИГРЕ
+// ГЛОБАЛЬНЫЙ СБРОС ЛОКАЛЬНЫХ ДАННЫХ БРАУЗЕРА ПРИ НОВОЙ ИГРЕ
 // -----------------------------------------------------
 function resetLocalGameData() {
     currentLocalRound = 0;
@@ -211,7 +230,7 @@ function resetLocalGameData() {
     isGyroEnabled = false;
     finishitBaseImg = new Image();
     
-    // Сбрасываем все эффекты и цвета в дефолт
+    // Сбрасываем инструменты в дефолт
     currentColor = '#000000';
     isErasing = false; isFilling = false; isEyedropper = false; 
     isBlur = false; isRect = false; isCircle = false; 
@@ -220,18 +239,15 @@ function resetLocalGameData() {
     const bs = document.getElementById('brush-size'); if(bs) bs.value = 5;
     const bo = document.getElementById('brush-opacity'); if(bo) bo.value = 1;
     
-    // Снимаем выделение со всех кнопок
     document.querySelectorAll('.tool-btn').forEach(el => el.classList.remove('active-swatch'));
     document.querySelectorAll('.swatch').forEach(el => el.classList.remove('active-swatch'));
     
-    // Активируем черную кисть
     const brushBtn = document.querySelector('.brush-tool');
     if (brushBtn) brushBtn.classList.add('active-swatch');
     
     const defaultColor = Array.from(document.querySelectorAll('.swatch')).find(el => el.style.background.includes('000000') || el.style.backgroundColor === 'rgb(0, 0, 0)');
     if (defaultColor) defaultColor.classList.add('active-swatch');
     
-    // Очищаем физический холст и его историю
     if (ctx && canvas) {
         ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; 
         ctx.globalCompositeOperation = 'source-over';
@@ -246,11 +262,6 @@ window.addEventListener('message', (event) => {
     handleStateChange();
   }
 });
-
-let hasDrawnStrokeOneline = false;
-let finishitBaseImg = new Image();
-let dotsArray = []; 
-let isGyroEnabled = false;
 
 let lassoStampsCache = {};
 let activeLassoStampRef = null;
@@ -272,7 +283,7 @@ function handleStateChange() {
   const players = globalState.players || [];
   if (players.length > 0) renderPlayersList(players);
 
-  // ЕСЛИ СТАТУС ОЖИДАНИЯ (ЛОББИ) - ЖЕСТКО СБРАСЫВАЕМ ВСЕ!
+  // ТОТАЛЬНЫЙ СБРОС ЕСЛИ МЫ В ЛОББИ (Решает баг со старой игрой)
   if (!globalState.status || globalState.status === 'waiting') {
     resetLocalGameData();
     showPhase('lobby-screen'); 
@@ -324,7 +335,11 @@ function handleStateChange() {
 
   if (isHost) {
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
-    if (Object.keys(currentSubs).length >= players.length) {
+    
+    // БРОНЕБОЙНАЯ ПРОВЕРКА ГОТОВНОСТИ (игнорирует старые пустые файлы)
+    let activeReadyCount = players.filter(pid => typeof currentSubs[pid] === 'string' && currentSubs[pid].length > 0).length;
+    
+    if (activeReadyCount >= players.length) {
       if (globalState.round >= calculatedTotalRounds) window.parent.postMessage({ type: 'update_state', updates: { status: 'finished' } }, '*');
       else window.parent.postMessage({ type: 'update_state', updates: { round: globalState.round + 1 } }, '*');
     }
@@ -381,8 +396,6 @@ function startRound(round, players) {
       setDisplay('ink-meter-container', 'none'); setDisplay('coop-divider', 'none');
       setDisplay('btn-gyro-start', 'none'); setDisplay('gyro-cursor', 'none');
       setDisplay('lasso-stamps-container', 'none'); setDisplay('sidebar-tools', 'flex');
-      
-      const db = document.getElementById('drawing-board');
       
       if (mode === 'mirror' && zContainer) zContainer.classList.add('mode-mirror');
       if (mode === 'earthquake' && zContainer) zContainer.classList.add('mode-earthquake');
@@ -561,6 +574,7 @@ function drawArrow(actx, fromx, fromy, tox, toy) {
     actx.moveTo(tox, toy); actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6)); actx.stroke();
 }
 
+// ОПТИМИЗИРОВАННЫЙ АЛГОРИТМ SCANLINE ЗАЛИВКИ
 function floodFillCore(startX, startY, fillColorHex) {
     startX = Math.round(startX); startY = Math.round(startY);
     const w = canvas.width, h = canvas.height;
@@ -627,6 +641,7 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
     }
 }
 
+// 90 FPS + Аппаратное Ускорение Холста
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
 const ctx = canvas.getContext('2d', { desynchronized: true, willReadFrequently: false });
@@ -776,8 +791,11 @@ function draw(e) {
   lastX = pos.x; lastY = pos.y;
 }
 
+// Защита от красной ошибки PointerCapture
 function endPosition(e) { 
-    if(e && e.pointerId) canvas.releasePointerCapture(e.pointerId);
+    if(e && e.pointerId) {
+        try { if(canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId); } catch(err){}
+    }
     ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0;
     let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
     let opacity = 1; const bo = document.getElementById('brush-opacity'); if (bo) opacity = parseFloat(bo.value);
