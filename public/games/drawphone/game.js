@@ -75,9 +75,7 @@ function renderPlayersList(players) {
 // ==========================================
 let audioCtx = null;
 function initAudio() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
+    if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
     if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
@@ -85,14 +83,11 @@ function playWarningBeep() {
     if (!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
-    osc.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    osc.type = 'sine';
-    osc.frequency.value = 880; 
+    osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+    osc.type = 'sine'; osc.frequency.value = 880; 
     gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.3);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
 }
 
 let phaseTimerInterval = null;
@@ -100,9 +95,7 @@ let currentPhaseSubmitted = false;
 let isCurrentPhaseDrawing = false;
 
 function updateTimerUI(remaining, limit) {
-    // Если игрок уже отправил результат, обновляем таймер на экране ожидания
     let targetPrefix = currentPhaseSubmitted ? 'waiting' : (isCurrentPhaseDrawing ? 'draw' : 'text');
-    
     let timerText = document.getElementById(`${targetPrefix}-timer-text`);
     let timerPath = document.getElementById(`${targetPrefix}-timer-path`);
     let timerContainer = document.getElementById(`${targetPrefix}-timer-container`);
@@ -111,13 +104,12 @@ function updateTimerUI(remaining, limit) {
     if (timerPath) {
         let dashoffset = 100 - (remaining / limit) * 100;
         timerPath.style.strokeDashoffset = dashoffset;
-        
-        timerPath.style.stroke = '#22c55e'; // Зеленый 
+        timerPath.style.stroke = '#22c55e'; 
         if (remaining <= 10 && remaining > 0) {
             if (timerContainer) timerContainer.classList.add('timer-warning');
-            if (!currentPhaseSubmitted) playWarningBeep(); // Пищим только если еще не отправил
+            if (!currentPhaseSubmitted) playWarningBeep(); 
         } else if (remaining <= limit / 2 && remaining > 10) {
-            timerPath.style.stroke = '#eab308'; // Желтый 
+            timerPath.style.stroke = '#eab308'; 
             if (timerContainer) timerContainer.classList.remove('timer-warning');
         } else {
             if (timerContainer) timerContainer.classList.remove('timer-warning');
@@ -132,7 +124,6 @@ function startPhaseTimer(isDrawing) {
     
     let timeLimit = globalState.settings?.time || 90;
     let timeRemaining = timeLimit;
-    
     updateTimerUI(timeRemaining, timeLimit);
 
     phaseTimerInterval = setInterval(() => {
@@ -149,13 +140,10 @@ function startPhaseTimer(isDrawing) {
     }, 1000);
 }
 
-// Обновление списка игроков на экране ожидания
 function updateWaitingScreen() {
     if (!document.getElementById('waiting-phase').classList.contains('active')) return;
-    
     const players = globalState.players || [];
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
-    
     const listEl = document.getElementById('waiting-players-list');
     if (!listEl) return;
 
@@ -164,17 +152,13 @@ function updateWaitingScreen() {
         const isReady = currentSubs[id] !== undefined;
         const statusIcon = isReady ? '✅' : '⏳';
         const statusClass = isReady ? 'ready' : 'not-ready';
-        
-        return `<div class="waiting-player-item ${statusClass}">
-            <span>${name}</span>
-            <span>${statusIcon}</span>
-        </div>`;
+        return `<div class="waiting-player-item ${statusClass}"><span>${name}</span><span>${statusIcon}</span></div>`;
     }).join('');
 }
 
 
 // ==========================================
-// СТАРТ ИГРЫ И СИНХРОНИЗАЦИЯ СОСТОЯНИЙ
+// СТАРТ ИГРЫ И СИНХРОНИЗАЦИЯ
 // ==========================================
 function startGame() {
   if (!isHost) return;
@@ -205,18 +189,15 @@ function handleStateChange() {
   if (players.length > 0) renderPlayersList(players);
 
   if (!globalState.status || globalState.status === 'waiting') {
-    currentLocalRound = 0;
-    clearInterval(phaseTimerInterval);
+    currentLocalRound = 0; clearInterval(phaseTimerInterval);
     document.getElementById('play-again-btn').style.display = 'none';
-    showPhase('lobby-screen');
-    return;
+    showPhase('lobby-screen'); return;
   }
 
   calculatedTotalRounds = players.length * (globalState.settings?.roundsMultiplier || 1);
 
   if (globalState.status === 'finished') {
-    currentLocalRound = -1; 
-    clearInterval(phaseTimerInterval);
+    currentLocalRound = -1; clearInterval(phaseTimerInterval);
     if (globalState.presentation?.active) {
         showPhase('presentation-phase');
         if (isHost) document.getElementById('next-slide-btn').style.display = 'block';
@@ -233,17 +214,14 @@ function handleStateChange() {
   }
 
   if (globalState.settings?.mode === 'nocolor') {
-      document.getElementById('color-palette').style.visibility = 'hidden';
-      currentColor = '#000000';
+      document.getElementById('color-palette').style.visibility = 'hidden'; currentColor = '#000000';
   } else { document.getElementById('color-palette').style.visibility = 'visible'; }
 
-  if (globalState.settings?.mode === 'hardcore') {
-      document.getElementById('action-tools').style.display = 'none'; 
-  } else { document.getElementById('action-tools').style.display = 'grid'; }
+  if (globalState.settings?.mode === 'hardcore') { document.getElementById('action-tools').style.display = 'none'; } 
+  else { document.getElementById('action-tools').style.display = 'grid'; }
 
   if (globalState.round > currentLocalRound) startRound(globalState.round, players);
 
-  // Обновляем список ожидания в реальном времени при получении нового стейта
   updateWaitingScreen();
 
   if (isHost) {
@@ -262,9 +240,8 @@ function showPhase(phaseId) {
   else { document.getElementById('game-screen').classList.add('active'); target.classList.add('active'); }
 
   const leaveBtn = document.getElementById('leave-btn');
-  if (phaseId === 'lobby-screen' || phaseId === 'ready-to-present-phase' || phaseId === 'presentation-phase') {
-      leaveBtn.style.display = 'flex';
-  } else { leaveBtn.style.display = 'none'; }
+  if (phaseId === 'lobby-screen' || phaseId === 'ready-to-present-phase' || phaseId === 'presentation-phase') { leaveBtn.style.display = 'flex'; } 
+  else { leaveBtn.style.display = 'none'; }
 }
 
 function getCurrentNotebookId(round, players) {
@@ -286,34 +263,26 @@ function startRound(round, players) {
 
   if (round === 1) {
     if (isIcebreaker) {
-        document.getElementById('word-to-draw').innerText = "Что угодно!";
-        showPhase('draw-phase');
+        document.getElementById('word-to-draw').innerText = "Что угодно!"; showPhase('draw-phase');
         resetCanvasTransform(); clearCanvas(); initHistory(); 
     } else {
         document.getElementById('text-instruction').innerText = 'Придумайте фразу';
         document.getElementById('image-to-guess').style.display = 'none';
-        document.getElementById('word-input').value = '';
-        showPhase('text-phase');
+        document.getElementById('word-input').value = ''; showPhase('text-phase');
     }
   } else {
     const notebookId = getCurrentNotebookId(round, players);
     let previousData = globalState.submissions?.[`round_${round - 1}`]?.[notebookId];
-    
-    if (typeof previousData === 'string' && previousData.startsWith('{')) {
-        try { previousData = JSON.parse(previousData).img; } catch(e){}
-    }
+    if (typeof previousData === 'string' && previousData.startsWith('{')) { try { previousData = JSON.parse(previousData).img; } catch(e){} }
 
     if (isDrawingPhase) {
-      document.getElementById('word-to-draw').innerText = previousData || "...";
-      showPhase('draw-phase');
+      document.getElementById('word-to-draw').innerText = previousData || "..."; showPhase('draw-phase');
       resetCanvasTransform(); clearCanvas(); initHistory(); 
     } else {
       document.getElementById('text-instruction').innerText = 'Что здесь нарисовано?';
       const imgEl = document.getElementById('image-to-guess');
-      imgEl.src = previousData || "";
-      imgEl.style.display = 'inline-block';
-      document.getElementById('word-input').value = '';
-      showPhase('text-phase');
+      imgEl.src = previousData || ""; imgEl.style.display = 'inline-block';
+      document.getElementById('word-input').value = ''; showPhase('text-phase');
     }
   }
 }
@@ -322,7 +291,6 @@ function submitWord(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
   currentPhaseSubmitted = true;
-  
   let word = document.getElementById('word-input').value.trim();
   if (!word) word = "Секретик"; 
   
@@ -330,8 +298,7 @@ function submitWord(isManual = false) {
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = word;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
   
-  showPhase('waiting-phase');
-  updateWaitingScreen();
+  showPhase('waiting-phase'); updateWaitingScreen();
 }
 
 function submitDrawing(isManual = false) {
@@ -340,28 +307,24 @@ function submitDrawing(isManual = false) {
   currentPhaseSubmitted = true;
   
   ctx.globalCompositeOperation = 'destination-over';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  const finalData = JSON.stringify({
-      img: canvas.toDataURL('image/png'),
-      strokes: recordedStrokes
-  });
+  const finalData = JSON.stringify({ img: canvas.toDataURL('image/png'), strokes: recordedStrokes });
 
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = finalData;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
   
-  resetCanvasTransform();
-  showPhase('waiting-phase');
-  updateWaitingScreen();
+  resetCanvasTransform(); showPhase('waiting-phase'); updateWaitingScreen();
 }
 
 // ==========================================
-// ИДЕАЛЬНЫЙ ХОЛСТ С ЗАПИСЬЮ ИСТОРИИ И ФИКСОМ ЗУМА
+// ИДЕАЛЬНЫЙ ХОЛСТ С ЗАПИСЬЮ И ФИКСОМ ЗУМА
 // ==========================================
 const canvas = document.getElementById('drawing-board');
+const zoomContainer = document.getElementById('zoom-container');
 const ctx = canvas.getContext('2d');
+
 let isDrawing = false;
 let currentColor = '#000000'; 
 let isErasing = false;
@@ -378,28 +341,19 @@ let currentStroke = null;
 let drawHistory = [];
 let historyIndex = -1;
 
-function initHistory() { 
-    drawHistory = []; strokesHistory = []; recordedStrokes = []; historyIndex = -1; saveState(); 
-}
+function initHistory() { drawHistory = []; strokesHistory = []; recordedStrokes = []; historyIndex = -1; saveState(); }
 
 function saveState() {
     if (globalState.settings?.mode === 'hardcore') return;
-    if (historyIndex < drawHistory.length - 1) {
-        drawHistory.length = historyIndex + 1;
-        strokesHistory.length = historyIndex + 1;
-    }
+    if (historyIndex < drawHistory.length - 1) { drawHistory.length = historyIndex + 1; strokesHistory.length = historyIndex + 1; }
     drawHistory.push(canvas.toDataURL());
     strokesHistory.push(JSON.parse(JSON.stringify(recordedStrokes)));
     historyIndex++;
 }
 
 function restoreState(index) {
-    let img = new Image();
-    img.src = drawHistory[index];
-    img.onload = () => { 
-        ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#ffffff'; 
-        ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); 
-    };
+    let img = new Image(); img.src = drawHistory[index];
+    img.onload = () => { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
     recordedStrokes = JSON.parse(JSON.stringify(strokesHistory[index]));
 }
 
@@ -409,8 +363,7 @@ function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; r
 ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 function setColor(color, element) {
-    isErasing = false; currentColor = color;
-    ctx.globalCompositeOperation = 'source-over';
+    isErasing = false; currentColor = color; ctx.globalCompositeOperation = 'source-over';
     document.querySelectorAll('.swatch, .tool-btn').forEach(s => s.classList.remove('active-swatch'));
     if(element) element.classList.add('active-swatch');
 }
@@ -422,17 +375,28 @@ function setEraser(element) {
 function clearCanvas() {
   ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   if(isErasing) ctx.globalCompositeOperation = 'destination-out';
-  recordedStrokes.push({ type: 'clear' });
-  saveState();
+  recordedStrokes.push({ type: 'clear' }); saveState();
 }
 
 function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; updateTransform(); }
-function updateTransform() { 
-    canvas.style.transformOrigin = `0 0`; 
-    canvas.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; 
+
+function updateTransform() {
+    // Теперь мы трансформируем ВЕСЬ мольберт (Дерево + Холст)
+    if (!zoomContainer) return;
+    
+    // Ограничение по отдалению (не меньше 1x)
+    if (canvasTransform.scale <= 1) {
+        canvasTransform.scale = 1;
+        canvasTransform.x = 0;
+        canvasTransform.y = 0;
+    }
+
+    zoomContainer.style.transformOrigin = `0 0`;
+    zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`;
 }
 
 function getCoordinates(e) {
+  // getBoundingClientRect идеально работает даже при зуме родительского контейнера!
   const rect = canvas.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -446,16 +410,17 @@ function startPosition(e) {
     currentStroke = { c: currentColor, s: document.getElementById('brush-size').value, e: isErasing?1:0, p: [Math.round(pos.x), Math.round(pos.y)] };
     draw(e); 
 }
+
 function draw(e) {
   if (e.touches && e.touches.length >= 2) { e.preventDefault(); return handlePinchZoom(e); }
   if (!isDrawing) return; e.preventDefault(); 
   const pos = getCoordinates(e);
-  
   if(currentStroke) { currentStroke.p.push(Math.round(pos.x), Math.round(pos.y)); }
 
   ctx.lineWidth = document.getElementById('brush-size').value;
   ctx.lineCap = 'round'; ctx.strokeStyle = currentColor; ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
 }
+
 function endPosition() { 
     if (!isDrawing) return; 
     isDrawing = false; ctx.beginPath(); 
@@ -474,17 +439,38 @@ function handlePinchZoom(e) {
     const t1 = e.touches[0]; const t2 = e.touches[1];
     const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     const cx = (t1.clientX + t2.clientX) / 2; const cy = (t1.clientY + t2.clientY) / 2;
+    
     if (initialDistance === 0) { initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; }
-    let newScale = Math.min(Math.max(1, canvasTransform.scale * (currentDist / initialDistance)), 5); 
-    const wrapperRect = canvas.parentElement.getBoundingClientRect();
+    
+    let newScale = canvasTransform.scale * (currentDist / initialDistance);
+    
+    // Лимиты масштаба
+    if (newScale < 1) newScale = 1;
+    if (newScale > 5) newScale = 5;
+
+    const wrapperRect = zoomContainer.parentElement.getBoundingClientRect();
+    
     canvasTransform.x -= (cx - wrapperRect.left - canvasTransform.x) * (newScale / canvasTransform.scale - 1);
     canvasTransform.y -= (cy - wrapperRect.top - canvasTransform.y) * (newScale / canvasTransform.scale - 1);
-    canvasTransform.x += (cx - lastZoomCenter.x); canvasTransform.y += (cy - lastZoomCenter.y);
-    canvasTransform.scale = newScale; initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy };
+    
+    canvasTransform.x += (cx - lastZoomCenter.x); 
+    canvasTransform.y += (cy - lastZoomCenter.y);
+    
+    canvasTransform.scale = newScale; 
+    initialDistance = currentDist; 
+    lastZoomCenter = { x: cx, y: cy };
+    
     updateTransform();
 }
 
-canvas.addEventListener('touchend', (e) => { if (e.touches.length < 2) initialDistance = 0; endPosition(); });
+canvas.addEventListener('touchend', (e) => { 
+    if (e.touches.length < 2) { 
+        initialDistance = 0; 
+        // Автоматический возврат на место, если слишком отдалили
+        if (canvasTransform.scale <= 1) resetCanvasTransform();
+    } 
+    endPosition(); 
+});
 canvas.addEventListener('mousedown', startPosition); canvas.addEventListener('mouseup', endPosition);
 canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave', endPosition);
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
@@ -522,33 +508,33 @@ function playDrawingAnimation(canvasEl, strokes, finalImg) {
             return;
         }
         
-        // УСКОРЕНИЕ В 3 РАЗА (Отрисовываем по 45 точек за кадр вместо 15)
-        for (let i = 0; i < 45; i++) {
-            if (strokeIdx >= strokes.length) break;
+        // УСКОРЕНИЕ В 3 РАЗА (Отрисовываем по 100 точек за кадр)
+        let pointsDrawn = 0;
+        while (pointsDrawn < 100 && strokeIdx < strokes.length) {
             let stroke = strokes[strokeIdx];
             
             if (stroke.type === 'clear') {
                 actx.globalCompositeOperation = 'source-over'; actx.fillStyle = '#ffffff';
                 actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
-                strokeIdx++; pointIdx = 0; continue;
+                strokeIdx++; pointIdx = 0; pointsDrawn += 10; continue;
             }
             
             let pts = stroke.p;
-            if (pts && pts.length >= 2) {
-                if (pointIdx === 0) {
-                    actx.beginPath(); actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round';
-                    actx.strokeStyle = stroke.c; actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
-                    actx.moveTo(pts[0], pts[1]); pointIdx = 2;
-                }
-                
-                if (pointIdx < pts.length) {
-                    actx.lineTo(pts[pointIdx], pts[pointIdx+1]); actx.stroke();
-                    actx.beginPath(); actx.moveTo(pts[pointIdx], pts[pointIdx+1]);
-                    pointIdx += 2;
-                } else {
-                    strokeIdx++; pointIdx = 0;
-                }
-            } else { strokeIdx++; pointIdx = 0; }
+            if (!pts || pts.length < 2) { strokeIdx++; pointIdx = 0; continue; }
+
+            if (pointIdx === 0) {
+                actx.beginPath(); actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round';
+                actx.strokeStyle = stroke.c; actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
+                actx.moveTo(pts[0], pts[1]); pointIdx = 2;
+            }
+            
+            if (pointIdx < pts.length) {
+                actx.lineTo(pts[pointIdx], pts[pointIdx+1]); actx.stroke();
+                actx.beginPath(); actx.moveTo(pts[pointIdx], pts[pointIdx+1]);
+                pointIdx += 2; pointsDrawn++;
+            } else {
+                strokeIdx++; pointIdx = 0;
+            }
         }
         requestAnimationFrame(drawStep);
     }
@@ -608,7 +594,7 @@ function syncPresentationView(players) {
     if (isText) {
         speakText(rawData);
     } else {
-        // Задержка в 100мс гарантирует, что canvas успел добавиться в DOM перед стартом анимации
+        // Ожидаем 100мс, чтобы DOM обновился и canvas 100% появился на экране
         setTimeout(() => {
             const canvasAnim = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);
             if (canvasAnim && strokesData && strokesData.length > 0) {
@@ -637,11 +623,7 @@ function nextSlide() {
     if (!isHost) return;
     const pres = globalState.presentation;
     const players = globalState.players || [];
-    
-    let nextR = pres.round + 1;
-    let nextB = pres.bookIndex;
-    
+    let nextR = pres.round + 1; let nextB = pres.bookIndex;
     if (nextR > calculatedTotalRounds) { nextB++; nextR = 1; }
-    
     window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: true, bookIndex: nextB, round: nextR } }}, '*');
 }

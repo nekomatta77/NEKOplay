@@ -108,11 +108,11 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 @keyframes pulseText { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
 
 /* СПИСОК ОЖИДАНИЯ */
-.waiting-players-list { display: flex; flex-direction: column; gap: 8px; text-align: left; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 16px; margin-top: 15px; max-height: 200px; overflow-y: auto; }
+.waiting-players-list { display: flex; flex-direction: column; gap: 8px; text-align: left; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 16px; margin-top: 15px; max-height: 200px; overflow-y: auto; width: 100%; }
 .waiting-player-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; background: rgba(255,255,255,0.05); border-radius: 12px; transition: 0.3s; }
 .waiting-player-item.ready { border: 1px solid #22c55e; background: rgba(34, 197, 94, 0.1); }
 .waiting-player-item.not-ready { border: 1px solid #ef4444; background: rgba(239, 68, 68, 0.1); }
-.waiting-player-item span { font-weight: bold; color: white; font-size: 1.1rem; }
+.waiting-player-item span { font-weight: bold; color: white; font-size: 1rem; }
 
 .draw-layout { flex-direction: row; align-items: stretch; justify-content: flex-start; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); gap: 15px; width: 100vw; height: 100dvh; background: var(--bg-color); }
 .sidebar-tools { display: flex; flex-direction: column; align-items: center; gap: 15px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 15px; width: 110px; min-width: 110px; height: 100%; box-shadow: 5px 0 20px rgba(0,0,0,0.5); overflow-y: auto; z-index: 10; }
@@ -140,9 +140,10 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 .large-dot { width: 12px; height: 12px; }
 input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; border-radius: 3px; cursor: pointer; }
 
-/* ДЕРЕВЯННАЯ РАМКА (МОЛЬБЕРТ) И ФИКС ДВОЙНОГО ХОЛСТА */
+/* ДЕРЕВЯННАЯ РАМКА (МОЛЬБЕРТ) */
 .canvas-wrapper-outer { 
   width: 100%; 
+  max-width: 1000px;
   max-height: calc(100dvh - 90px); 
   aspect-ratio: 4 / 3; 
   padding: 12px; 
@@ -162,31 +163,26 @@ input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; bo
   margin: 0 auto; 
 }
 
-.canvas-wrapper {
-  /* Убрали белый фон отсюда, чтобы не было "двойного холста" */
-  width: 100%; height: 100%; position: relative; 
-  background: transparent;
-}
+.canvas-wrapper { width: 100%; height: 100%; position: relative; background: transparent; }
 
-canvas { 
-  /* Белый фон и тень теперь лежат строго на самом элементе canvas */
+/* ФИКС НАЛОЖЕНИЯ В ЧАТЕ (Используем ID вместо canvas) */
+#drawing-board { 
   width: 100%; height: 100%; position: absolute; top: 0; left: 0; 
   touch-action: none; cursor: crosshair; display: block; 
-  background: #ffffff; 
-  border-radius: 2px;
-  box-shadow: 0 0 15px rgba(0,0,0,0.6);
+  background: #ffffff; border-radius: 2px; box-shadow: 0 0 15px rgba(0,0,0,0.6);
 }
 
-/* ЧАТ ПРЕЗЕНТАЦИИ (ФИКС СПЛЮЩИВАНИЯ) */
+/* ЧАТ ПРЕЗЕНТАЦИИ */
 .chat-layout { padding: 0; background: #0f172a; height: 100dvh; }
 .chat-header { width: 100%; padding: 15px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(15px); text-align: center; border-bottom: 1px solid var(--glass-border); padding-top: max(15px, env(safe-area-inset-top)); z-index: 10; }
 .chat-scroll-area { flex-grow: 1; width: 100%; max-width: 700px; overflow-y: auto; overflow-x: hidden; padding: 20px; display: flex; flex-direction: column; gap: 20px; scroll-behavior: smooth; margin: 0 auto; }
 .chat-footer { width: 100%; padding: 15px; background: rgba(15, 23, 42, 0.9); display: flex; flex-direction: column; gap: 10px; align-items: center; border-top: 1px solid var(--glass-border); padding-bottom: max(15px, env(safe-area-inset-bottom)); z-index: 10; }
+
 .msg-row { display: flex; gap: 12px; width: 100%; opacity: 0; animation: slideUp 0.5s forwards; }
 .msg-row.left { flex-direction: row; }
 .msg-row.right { flex-direction: row-reverse; }
 .msg-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--glass-border); align-self: flex-end; }
-.msg-bubble { max-width: 85%; padding: 12px 16px; border-radius: 20px; position: relative; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 100%;}
+.msg-bubble { max-width: 85%; padding: 12px 16px; border-radius: 20px; position: relative; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); width: 100%; }
 .msg-row.left .msg-bubble { background: #1e293b; border-bottom-left-radius: 6px; }
 .msg-row.right .msg-bubble { background: linear-gradient(135deg, var(--primary), #d946ef); border-bottom-right-radius: 6px; }
 .msg-author { font-size: 0.8rem; font-weight: bold; opacity: 0.8; }
@@ -194,7 +190,7 @@ canvas {
 .msg-row.right .msg-author { color: rgba(255,255,255,0.9); }
 .msg-text { font-size: 1.1rem; line-height: 1.4; color: white; word-wrap: break-word; font-weight: 500; }
 
-/* Жесткие пропорции для холста и картинок (Холст больше не будет узким!) */
+/* ФИКС СПЛЮЩИВАНИЯ КАРТИНОК И АНИМАЦИИ */
 .msg-canvas, .msg-img { 
   width: 100%; 
   height: auto;
@@ -206,4 +202,4 @@ canvas {
   display: block; 
 }
 
-@keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }

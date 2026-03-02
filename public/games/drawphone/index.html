@@ -190,9 +190,13 @@
           </div>
         </div>
         
-        <div class="canvas-wrapper-outer">
-          <div class="canvas-wrapper">
-             <canvas id="drawing-board" width="800" height="600"></canvas>
+        <div id="zoom-container-wrapper" style="flex-grow: 1; width: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative;">
+          <div id="zoom-container" style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; transition: transform 0.1s ease-out; will-change: transform;">
+            <div class="canvas-wrapper-outer">
+               <div class="canvas-wrapper">
+                  <canvas id="drawing-board" width="800" height="600"></canvas>
+               </div>
+            </div>
           </div>
         </div>
       </div>
