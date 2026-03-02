@@ -1,8 +1,7 @@
 // ==========================================
-// ФИКС РАЗМЕРА ЭКРАНА ДЛЯ МОБИЛОК (PWA)
+// ФИКС РАЗМЕРА ЭКРАНА
 // ==========================================
 function setViewportHeight() {
-  // Вычисляем 1% от реальной высоты видимого окна (без учета браузерных панелей)
   let vh = window.innerHeight * 0.01;
   document.documentElement.style.setProperty('--vh', `${vh}px`);
 }
@@ -30,10 +29,7 @@ if (isHost) document.getElementById('host-controls').style.display = 'block';
 else document.getElementById('guest-waiting').style.display = 'flex';
 
 function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
-
-function requestFullscreen() {
-    window.parent.postMessage({ type: 'request_fullscreen' }, '*');
-}
+function requestFullscreen() { window.parent.postMessage({ type: 'request_fullscreen' }, '*'); }
 
 // ==========================================
 // ЛОББИ И УПРАВЛЕНИЕ ИГРОЙ
@@ -82,7 +78,6 @@ function handleStateChange() {
   if (players.length === 0) return;
   const totalRounds = globalState.totalRounds || players.length;
 
-  // Настройки режима "Секрет"
   if (globalState.settings?.mode === 'nocolor') {
       document.getElementById('color-palette').style.visibility = 'hidden';
       currentColor = '#000000';
@@ -92,7 +87,6 @@ function handleStateChange() {
 
   if (globalState.round > currentLocalRound) startRound(globalState.round, players, totalRounds);
 
-  // Хост проверяет, все ли сдали
   if (isHost) {
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
     if (Object.keys(currentSubs).length >= players.length) {
@@ -131,6 +125,7 @@ function startRound(round, players, totalRounds) {
     if (isDrawingPhase) {
       document.getElementById('word-to-draw').innerText = previousData || "...";
       showPhase('draw-phase');
+      resetCanvasTransform();
       clearCanvas(); 
     } else {
       document.getElementById('text-instruction').innerText = 'Что здесь нарисовано?';
@@ -158,22 +153,24 @@ function submitDrawing() {
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = canvas.toDataURL('image/png');
   window.parent.postMessage({ type: 'update_state', updates }, '*');
-  zoomScale = 1; updateTransform();
+  resetCanvasTransform();
   showPhase('waiting-phase');
 }
 
 // ==========================================
-// ИДЕАЛЬНЫЙ CANVAS 800x600 НА МОЛЬБЕРТЕ
+// ИДЕАЛЬНЫЙ CANVAS & PINCH-TO-ZOOM (РЕШЕНИЕ ЗАДАЧИ 7)
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const ctx = canvas.getContext('2d');
 let isDrawing = false;
-let zoomScale = 1;
-let initialDistance = 0;
 let currentColor = '#000000'; 
 let isErasing = false;
 
-// Заливаем фон белым при старте
+// Трансформации для зума
+let canvasTransform = { x: 0, y: 0, scale: 1 };
+let initialDistance = 0;
+let lastZoomCenter = { x: 0, y: 0 };
+
 ctx.fillStyle = '#ffffff';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -198,13 +195,26 @@ function clearCanvas() {
   if(isErasing) ctx.globalCompositeOperation = 'destination-out';
 }
 
+function resetCanvasTransform() {
+    canvasTransform = { x: 0, y: 0, scale: 1 };
+    updateTransform();
+}
+
+function updateTransform() {
+    canvas.style.transformOrigin = `0 0`; // Строго 0 0 для правильной математики матрицы
+    canvas.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`;
+}
+
 function getCoordinates(e) {
+  // getBoundingClientRect возвращает реальные размеры и отступы элемента с УЧЕТОМ scale и translate. Это магия!
   const rect = canvas.getBoundingClientRect();
   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
   
+  // Коэффициент приведения к реальным размерам (800x600)
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
+  
   return { 
       x: (clientX - rect.left) * scaleX, 
       y: (clientY - rect.top) * scaleY 
@@ -212,13 +222,16 @@ function getCoordinates(e) {
 }
 
 function startPosition(e) { 
-    if (e.touches && e.touches.length === 2) return; 
+    if (e.touches && e.touches.length >= 2) return; // Не рисуем при зуме
     isDrawing = true; draw(e); 
 }
 function endPosition() { isDrawing = false; ctx.beginPath(); }
 
 function draw(e) {
-  if (e.touches && e.touches.length === 2) { e.preventDefault(); return handlePinchZoom(e); }
+  if (e.touches && e.touches.length >= 2) { 
+      e.preventDefault(); 
+      return handlePinchZoom(e); 
+  }
   if (!isDrawing) return;
   e.preventDefault(); 
   const pos = getCoordinates(e);
@@ -231,16 +244,49 @@ function draw(e) {
   ctx.moveTo(pos.x, pos.y);
 }
 
-function updateTransform() { canvas.style.transform = `scale(${zoomScale})`; }
-
 function handlePinchZoom(e) {
-    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-    if (initialDistance === 0) initialDistance = dist / zoomScale;
-    zoomScale = Math.min(Math.max(1, dist / initialDistance), 4);
+    const t1 = e.touches[0];
+    const t2 = e.touches[1];
+    
+    // Дистанция между пальцами
+    const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    // Центр щипка (куда зумить)
+    const cx = (t1.clientX + t2.clientX) / 2;
+    const cy = (t1.clientY + t2.clientY) / 2;
+
+    if (initialDistance === 0) {
+        initialDistance = currentDist;
+        lastZoomCenter = { x: cx, y: cy };
+    }
+
+    // Вычисляем новый масштаб
+    const scaleMultiplier = currentDist / initialDistance;
+    let newScale = Math.min(Math.max(1, canvasTransform.scale * scaleMultiplier), 5); // Макс зум 5x
+
+    // 1. СМЕЩЕНИЕ ДЛЯ ЗУМА (Зум в точку касания)
+    const wrapperRect = canvas.parentElement.getBoundingClientRect();
+    const mouseX = cx - wrapperRect.left;
+    const mouseY = cy - wrapperRect.top;
+
+    canvasTransform.x -= (mouseX - canvasTransform.x) * (newScale / canvasTransform.scale - 1);
+    canvasTransform.y -= (mouseY - canvasTransform.y) * (newScale / canvasTransform.scale - 1);
+
+    // 2. СМЕЩЕНИЕ ДЛЯ ПАНАНОРАМИРОВАНИЯ (Движение 2 пальцами)
+    canvasTransform.x += (cx - lastZoomCenter.x);
+    canvasTransform.y += (cy - lastZoomCenter.y);
+
+    // Обновляем состояние
+    canvasTransform.scale = newScale;
+    initialDistance = currentDist;
+    lastZoomCenter = { x: cx, y: cy };
+
     updateTransform();
 }
 
-canvas.addEventListener('touchend', (e) => { if (e.touches.length < 2) initialDistance = 0; endPosition(); });
+canvas.addEventListener('touchend', (e) => { 
+    if (e.touches.length < 2) initialDistance = 0; // Сбрасываем жест
+    endPosition(); 
+});
 canvas.addEventListener('mousedown', startPosition);
 canvas.addEventListener('mouseup', endPosition);
 canvas.addEventListener('mousemove', draw);
@@ -248,8 +294,9 @@ canvas.addEventListener('mouseleave', endPosition);
 canvas.addEventListener('touchstart', startPosition, {passive: false});
 canvas.addEventListener('touchmove', draw, {passive: false});
 
+
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ И ОЗВУЧКА
+// ЧАТ-ПРЕЗЕНТАЦИЯ
 // ==========================================
 let presNotebooks = [];
 let presCurrentBookIndex = 0;

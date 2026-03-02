@@ -25,43 +25,72 @@
 
   <div id="lobby-screen" class="screen active">
     <div class="glass-card main-lobby">
-      <h1 class="logo">NEKO<span>Phone</span></h1>
-      <div class="stats-row">
-        <div class="stat-pill">👥 <span id="players-count-display">0</span> игроков</div>
-        <div class="stat-pill">👤 <span id="player-name-display">Аноним</span></div>
-      </div>
-      <div id="host-controls" style="display: none; width: 100%;">
-        <h3 class="section-title">Выберите режим</h3>
-        <div class="modes-grid">
-          <div class="mode-card active" data-mode="classic" onclick="selectMode('classic')">
-            <div class="mode-icon">🎨</div><h4>Классика</h4>
+      <div class="lobby-header text-center">
+        <h1 class="logo">NEKO<span>Phone</span></h1>
+        <div class="stats-row">
+          <div class="stat-pill">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span id="players-count-display">0</span> игроков
           </div>
-          <div class="mode-card" data-mode="speedrun" onclick="selectMode('speedrun')">
-            <div class="mode-icon">⚡</div><h4>Спидран</h4>
-          </div>
-          <div class="mode-card" data-mode="nocolor" onclick="selectMode('nocolor')">
-            <div class="mode-icon">👻</div><h4>Секрет</h4>
+          <div class="stat-pill">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span id="player-name-display">Аноним</span>
           </div>
         </div>
-        <div class="settings-row">
-          <label>Время раунда:</label>
-          <select id="setting-time" class="glass-select">
-            <option value="60">60 сек</option>
-            <option value="90" selected>90 сек</option>
-            <option value="120">120 сек</option>
-          </select>
-        </div>
-        <button class="btn-primary" onclick="startGame()">ЗАПУСТИТЬ ИГРУ</button>
       </div>
-      <div id="guest-waiting" class="waiting-state" style="display: none;">
-        <div class="spinner"></div><p>Ожидание хоста...</p>
+
+      <div class="lobby-content">
+        <div id="host-controls" style="display: none; width: 100%;">
+          <div class="settings-grid">
+            <div class="settings-panel">
+              <h3 class="section-title">Режим игры</h3>
+              <div class="modes-grid">
+                <div class="mode-card active" data-mode="classic" onclick="selectMode('classic')">
+                  <div class="mode-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+                  </div>
+                  <h4>Классика</h4>
+                </div>
+                <div class="mode-card" data-mode="speedrun" onclick="selectMode('speedrun')">
+                  <div class="mode-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  </div>
+                  <h4>Спидран</h4>
+                </div>
+                <div class="mode-card" data-mode="nocolor" onclick="selectMode('nocolor')">
+                  <div class="mode-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/></svg>
+                  </div>
+                  <h4>Секрет</h4>
+                </div>
+              </div>
+            </div>
+            
+            <div class="settings-panel">
+              <h3 class="section-title">Настройки</h3>
+              <div class="settings-row">
+                <label>Время раунда:</label>
+                <select id="setting-time" class="glass-select">
+                  <option value="60">60 сек</option>
+                  <option value="90" selected>90 сек</option>
+                  <option value="120">120 сек</option>
+                </select>
+              </div>
+              <button class="btn-primary mt-auto" onclick="startGame()">ЗАПУСТИТЬ ИГРУ</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="guest-waiting" class="waiting-state" style="display: none;">
+          <div class="spinner"></div><p>Ожидание хоста...</p>
+        </div>
       </div>
     </div>
   </div>
 
   <div id="game-screen" class="screen">
     <div id="text-phase" class="phase-container">
-      <div class="glass-card text-center">
+      <div class="glass-card text-center text-scroll-wrapper">
         <h2 id="text-instruction" class="task-title">Придумайте фразу</h2>
         <div class="image-showcase">
           <img id="image-to-guess" src="" style="display:none;">
@@ -72,21 +101,7 @@
     </div>
 
     <div id="draw-phase" class="phase-container draw-layout">
-      <div class="draw-header">
-        <span>Ваша цель:</span>
-        <h2 id="word-to-draw" class="target-word">Слово</h2>
-      </div>
-      
-      <div class="easel-container">
-        <div class="easel-clip"></div>
-        <div class="easel-board">
-          <div class="canvas-wrapper" id="canvas-wrapper">
-            <canvas id="drawing-board" width="800" height="600"></canvas>
-          </div>
-        </div>
-      </div>
-      
-      <div class="floating-dock">
+      <div class="sidebar-tools">
         <div class="palette" id="color-palette">
           <div class="swatch active-swatch" style="background:#000000" onclick="setColor('#000000', this)"></div>
           <div class="swatch" style="background:#ef4444" onclick="setColor('#ef4444', this)"></div>
@@ -96,18 +111,38 @@
           <div class="swatch" style="background:#3b82f6" onclick="setColor('#3b82f6', this)"></div>
           <div class="swatch" style="background:#a855f7" onclick="setColor('#a855f7', this)"></div>
           <div class="swatch" style="background:#ffffff; border: 1px solid #ccc;" onclick="setColor('#ffffff', this)"></div>
-          <div class="divider"></div>
+        </div>
+        
+        <div class="tool-divider"></div>
+        
+        <div class="tools-group">
           <div class="tool-btn eraser" onclick="setEraser(this)" title="Ластик">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20"></path></svg>
           </div>
-          <div class="tool-btn clear" onclick="clearCanvas()" title="Очистить">🗑️</div>
+          <div class="tool-btn clear" onclick="clearCanvas()" title="Очистить">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </div>
         </div>
-        <div class="brush-slider">
-          <div class="dot small-dot"></div>
-          <input type="range" id="brush-size" min="1" max="40" value="5">
-          <div class="dot large-dot"></div>
+
+        <div class="brush-slider-vertical">
+          <input type="range" id="brush-size" min="1" max="40" value="5" orient="vertical">
         </div>
-        <button class="btn-primary small" onclick="submitDrawing()">Отправить</button>
+
+        <button class="btn-submit-draw" onclick="submitDrawing()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </button>
+      </div>
+
+      <div class="canvas-area">
+        <div class="draw-header">
+          <span>Ваша цель:</span>
+          <h2 id="word-to-draw" class="target-word">Слово</h2>
+        </div>
+        <div class="canvas-wrapper-outer">
+          <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="drawing-board" width="800" height="600"></canvas>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -123,7 +158,7 @@
   <div id="ready-to-present-phase" class="screen">
     <div class="glass-card text-center">
       <h1 class="logo" style="font-size: 3rem;">ИГРА <span>ОКОНЧЕНА</span></h1>
-      <button class="btn-primary pulse-btn" onclick="startPresentation()">Смотреть результаты</button>
+      <button class="btn-primary pulse-btn mt-4" onclick="startPresentation()">Смотреть результаты</button>
     </div>
   </div>
 
@@ -132,9 +167,9 @@
       <h2 id="chat-book-title">История</h2>
     </div>
     <div class="chat-scroll-area" id="chat-messages"></div>
-    <div class="chat-footer" style="gap: 10px; flex-direction: column; align-items: center;">
+    <div class="chat-footer">
       <button class="btn-primary full-width" id="next-slide-btn" onclick="nextSlide()">Показать дальше</button>
-      <button class="btn-primary full-width" id="play-again-btn" onclick="playAgain()" style="display: none; background: #22c55e;">Сыграть еще раз (В лобби)</button>
+      <button class="btn-primary full-width" id="play-again-btn" onclick="playAgain()" style="display: none; background: #22c55e;">Сыграть еще раз</button>
     </div>
   </div>
 
