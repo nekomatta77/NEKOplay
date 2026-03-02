@@ -234,15 +234,15 @@ function handleStateChange() {
   
   if (noColorModes.includes(mode)) {
       document.getElementById('color-palette').style.display = 'none'; 
-      document.getElementById('tool-divider').style.display = 'none';
+      document.getElementById('tool-divider-2').style.display = 'none';
       currentColor = mode === 'darkmode' ? '#ffffff' : '#000000';
   } else { 
       document.getElementById('color-palette').style.display = 'grid'; 
-      document.getElementById('tool-divider').style.display = 'block';
+      document.getElementById('tool-divider-2').style.display = 'block';
   }
 
-  if (mode === 'hardcore') { document.getElementById('action-tools').style.display = 'none'; } 
-  else { document.getElementById('action-tools').style.display = 'grid'; }
+  if (mode === 'hardcore') { document.getElementById('action-tools').style.display = 'none'; document.getElementById('tool-divider-1').style.display = 'none';} 
+  else { document.getElementById('action-tools').style.display = 'flex'; document.getElementById('tool-divider-1').style.display = 'block'; }
 
   if (globalState.round > currentLocalRound) startRound(globalState.round, players);
   updateWaitingScreen();
@@ -312,7 +312,7 @@ function startRound(round, players) {
       if (mode === 'fading') { document.getElementById('brush-settings').style.display = 'none'; document.getElementById('brush-opacity').value = 0.05; }
       if (mode === 'pixelart') { document.getElementById('brush-settings').style.display = 'none'; document.getElementById('brush-size').value = 15; }
       
-      resetCanvasTransform(); clearCanvas(); initHistory();
+      resetCanvasTransform(); clearCanvas(); initHistory(); setBrush(document.querySelector('.brush-tool'));
       
       if (round === 1) { 
           document.getElementById('word-to-draw').innerHTML = "Что угодно!";
@@ -385,15 +385,11 @@ function submitDrawing(isManual = false) {
   resetCanvasTransform(); showPhase('waiting-phase'); updateWaitingScreen();
 }
 
-// ==========================================
 // ГЛОБАЛЬНАЯ ФУНКЦИЯ ДЛЯ СТРЕЛКИ
-// ==========================================
 function drawArrow(actx, fromx, fromy, tox, toy) {
     let headlen = actx.lineWidth * 3;
     let angle = Math.atan2(toy - fromy, tox - fromx);
-    actx.moveTo(fromx, fromy);
-    actx.lineTo(tox, toy);
-    actx.stroke();
+    actx.moveTo(fromx, fromy); actx.lineTo(tox, toy); actx.stroke();
     actx.beginPath();
     actx.moveTo(tox, toy);
     actx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
@@ -403,7 +399,7 @@ function drawArrow(actx, fromx, fromy, tox, toy) {
 }
 
 // ==========================================
-// ХОЛСТ: НОВЫЕ ИНСТРУМЕНТЫ 
+// ХОЛСТ: ИНСТРУМЕНТЫ (ФИКС СИММЕТРИИ И UX)
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
@@ -419,7 +415,6 @@ let isRect = false;
 let isCircle = false;
 let isLine = false;
 let isArrow = false;
-let isText = false;
 let isSymmetry = false;
 let isNeon = false;
 
@@ -464,17 +459,21 @@ function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; r
 
 function clearTools() { 
     isErasing = false; isFilling = false; isEyedropper = false; isBlur = false; 
-    isRect = false; isCircle = false; isLine = false; isArrow = false; isText = false; isNeon = false;
+    isRect = false; isCircle = false; isLine = false; isArrow = false; isNeon = false;
     document.querySelectorAll('.tool-btn').forEach(s => {
         if (!s.classList.contains('sym-tool')) s.classList.remove('active-swatch'); 
     }); 
 }
 
+// Умный выбор цвета: не сбрасывает инструмент (если это не ластик)
 function setColor(color, element) {
-    clearTools(); currentColor = color; ctx.globalCompositeOperation = 'source-over';
+    currentColor = color; ctx.globalCompositeOperation = 'source-over';
     document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active-swatch'));
     if(element) element.classList.add('active-swatch');
+    if (isErasing) setBrush(document.querySelector('.brush-tool'));
 }
+
+function setBrush(element) { clearTools(); ctx.globalCompositeOperation = 'source-over'; if(element) element.classList.add('active-swatch'); }
 function setEraser(element) { clearTools(); isErasing = true; ctx.globalCompositeOperation = 'destination-out'; element.classList.add('active-swatch'); }
 function setFill(element) { clearTools(); isFilling = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setEyedropper(element) { clearTools(); isEyedropper = true; element.classList.add('active-swatch'); }
@@ -483,7 +482,6 @@ function setRect(element) { clearTools(); isRect = true; ctx.globalCompositeOper
 function setCircle(element) { clearTools(); isCircle = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setLine(element) { clearTools(); isLine = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setArrow(element) { clearTools(); isArrow = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
-function setText(element) { clearTools(); isText = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setNeon(element) { clearTools(); isNeon = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 
 function toggleSymmetry(element) {
@@ -562,7 +560,7 @@ function startPosition(e) {
     if (isEyedropper) {
         const p = ctx.getImageData(pos.x, pos.y, 1, 1).data;
         const hex = "#" + ("000000" + ((p[0] << 16) | (p[1] << 8) | p[2]).toString(16)).slice(-6);
-        setColor(hex); return;
+        setColor(hex); setBrush(document.querySelector('.brush-tool')); return;
     }
 
     if (isFilling) {
@@ -585,36 +583,6 @@ function startPosition(e) {
 
     let opacity = parseFloat(document.getElementById('brush-opacity').value);
 
-    // ИНСТРУМЕНТ: ТЕКСТ
-    if (isText) {
-        let text = prompt("Введите текст для вставки на холст:");
-        if (text) {
-            let size = document.getElementById('brush-size').value * 3;
-            ctx.font = `bold ${size}px sans-serif`;
-            ctx.globalAlpha = opacity;
-            
-            if (isNeon) {
-                ctx.shadowBlur = Math.max(10, size * 0.5);
-                ctx.shadowColor = currentColor;
-                ctx.fillStyle = '#ffffff';
-            } else {
-                ctx.shadowBlur = 0;
-                ctx.shadowColor = 'transparent';
-                ctx.fillStyle = currentColor;
-            }
-
-            ctx.fillText(text, pos.x, pos.y);
-            if (isSymmetry) {
-                let metrics = ctx.measureText(text);
-                ctx.fillText(text, canvas.width - pos.x - metrics.width, pos.y);
-            }
-            
-            recordedStrokes.push({ type: 'text', c: currentColor, s: size, text: text, o: opacity, sym: isSymmetry?1:0, n: isNeon?1:0, p: [Math.round(pos.x), Math.round(pos.y)] });
-            saveState();
-        }
-        return;
-    }
-
     // ИНСТРУМЕНТЫ: ФИГУРЫ И ЛИНИИ
     if (isRect || isCircle || isLine || isArrow) {
         shapeStartX = Math.round(pos.x);
@@ -633,7 +601,28 @@ function startPosition(e) {
     };
     
     lastX = pos.x; lastY = pos.y;
-    draw(e); 
+    
+    // Рисуем первую точку (для обычного клика без движения)
+    if (mode !== 'blind') {
+        ctx.lineWidth = document.getElementById('brush-size').value;
+        ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
+        ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
+        ctx.globalAlpha = isErasing ? 1 : opacity;
+        ctx.filter = isBlur ? 'blur(5px)' : 'none';
+        ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
+
+        if (isNeon && !isErasing) {
+            ctx.shadowBlur = Math.max(10, document.getElementById('brush-size').value * 2);
+            ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff';
+        } else {
+            ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor;
+        }
+
+        ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+        if (isSymmetry) {
+            ctx.beginPath(); ctx.moveTo(canvas.width - pos.x, pos.y); ctx.lineTo(canvas.width - pos.x, pos.y); ctx.stroke();
+        }
+    }
 }
 
 function draw(e) {
@@ -658,9 +647,7 @@ function draw(e) {
       ctx.shadowColor = currentColor;
       ctx.strokeStyle = '#ffffff';
   } else {
-      ctx.shadowBlur = 0;
-      ctx.shadowColor = 'transparent';
-      ctx.strokeStyle = currentColor;
+      ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor;
   }
 
   // ФИГУРЫ (ПРЕВЬЮ В РЕАЛЬНОМ ВРЕМЕНИ)
@@ -676,41 +663,33 @@ function draw(e) {
           ctx.arc(shapeStartX, shapeStartY, r, 0, Math.PI*2); ctx.stroke();
           if (isSymmetry) { ctx.beginPath(); ctx.arc(canvas.width - shapeStartX, shapeStartY, r, 0, Math.PI*2); ctx.stroke(); }
       } else if (isLine) {
-          ctx.moveTo(shapeStartX, shapeStartY);
-          ctx.lineTo(pos.x, pos.y);
-          ctx.stroke();
-          if (isSymmetry) {
-              ctx.beginPath();
-              ctx.moveTo(canvas.width - shapeStartX, shapeStartY);
-              ctx.lineTo(canvas.width - pos.x, pos.y);
-              ctx.stroke();
-          }
+          ctx.moveTo(shapeStartX, shapeStartY); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+          if (isSymmetry) { ctx.beginPath(); ctx.moveTo(canvas.width - shapeStartX, shapeStartY); ctx.lineTo(canvas.width - pos.x, pos.y); ctx.stroke(); }
       } else if (isArrow) {
           drawArrow(ctx, shapeStartX, shapeStartY, pos.x, pos.y);
-          if (isSymmetry) {
-              ctx.beginPath();
-              drawArrow(ctx, canvas.width - shapeStartX, shapeStartY, canvas.width - pos.x, pos.y);
-          }
+          if (isSymmetry) { ctx.beginPath(); drawArrow(ctx, canvas.width - shapeStartX, shapeStartY, canvas.width - pos.x, pos.y); }
       }
       lastX = pos.x; lastY = pos.y;
       return;
   }
 
-  // ОБЫЧНАЯ КИСТЬ
+  // ИДЕАЛЬНАЯ НЕПРЕРЫВНАЯ КИСТЬ
   if(currentStroke) { currentStroke.p.push(Math.round(pos.x), Math.round(pos.y)); }
 
   if (mode !== 'blind') {
       ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
       ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
       
-      ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
       
       if (isSymmetry) {
           ctx.beginPath();
           ctx.moveTo(canvas.width - lastX, lastY);
           ctx.lineTo(canvas.width - pos.x, pos.y);
           ctx.stroke();
-          ctx.beginPath();
       }
   }
   
@@ -773,7 +752,7 @@ canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave'
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ (АНИМАЦИЯ С НОВЫМИ ИНСТРУМЕНТАМИ)
+// ЧАТ-ПРЕЗЕНТАЦИЯ (ИДЕАЛЬНАЯ АНИМАЦИЯ)
 // ==========================================
 let voices = [];
 window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
@@ -829,19 +808,12 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
 
             if (stroke.n && !stroke.e) {
-                actx.shadowBlur = Math.max(10, stroke.s * 2);
-                actx.shadowColor = stroke.c;
-                actx.strokeStyle = '#ffffff';
-            } else {
-                actx.shadowBlur = 0;
-                actx.shadowColor = 'transparent';
-                actx.strokeStyle = stroke.c;
-            }
+                actx.shadowBlur = Math.max(10, stroke.s * 2); actx.shadowColor = stroke.c; actx.strokeStyle = '#ffffff';
+            } else { actx.shadowBlur = 0; actx.shadowColor = 'transparent'; actx.strokeStyle = stroke.c; }
 
             if (stroke.type === 'clear') {
                 actx.globalAlpha = 1; actx.filter = 'none'; actx.shadowBlur = 0; actx.globalCompositeOperation = 'source-over'; 
-                actx.fillStyle = isDarkMode ? '#000000' : '#ffffff';
-                actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+                actx.fillStyle = isDarkMode ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
             if (stroke.type === 'fill') { strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
@@ -871,20 +843,7 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             if (stroke.type === 'arrow') {
                 actx.beginPath(); actx.lineWidth = stroke.s;
                 drawArrow(actx, stroke.p[0], stroke.p[1], stroke.p[2], stroke.p[3]);
-                if(stroke.sym) {
-                    actx.beginPath(); drawArrow(actx, canvasEl.width - stroke.p[0], stroke.p[1], canvasEl.width - stroke.p[2], stroke.p[3]);
-                }
-                strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
-            }
-            if (stroke.type === 'text') {
-                actx.font = `bold ${stroke.s}px sans-serif`; 
-                actx.fillStyle = stroke.n ? '#ffffff' : stroke.c;
-                if (stroke.n) { actx.shadowBlur = Math.max(10, stroke.s * 0.5); actx.shadowColor = stroke.c; }
-                actx.fillText(stroke.text, stroke.p[0], stroke.p[1]);
-                if(stroke.sym) {
-                    let metrics = actx.measureText(stroke.text);
-                    actx.fillText(stroke.text, canvasEl.width - stroke.p[0] - metrics.width, stroke.p[1]);
-                }
+                if(stroke.sym) { actx.beginPath(); drawArrow(actx, canvasEl.width - stroke.p[0], stroke.p[1], canvasEl.width - stroke.p[2], stroke.p[3]); }
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
             
@@ -897,15 +856,17 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             }
             
             if (pointIdx < pts.length) {
-                actx.lineTo(pts[pointIdx], pts[pointIdx+1]); actx.stroke();
-                actx.beginPath(); actx.moveTo(pts[pointIdx], pts[pointIdx+1]);
+                actx.beginPath();
+                actx.moveTo(pts[pointIdx-2], pts[pointIdx-1]);
+                actx.lineTo(pts[pointIdx], pts[pointIdx+1]);
+                actx.stroke();
                 
                 if (stroke.sym) {
-                    let prevX = canvasEl.width - pts[pointIdx-2]; let prevY = pts[pointIdx-1];
-                    let curX = canvasEl.width - pts[pointIdx]; let curY = pts[pointIdx+1];
-                    actx.beginPath(); actx.moveTo(prevX, prevY); actx.lineTo(curX, curY); actx.stroke(); actx.beginPath();
+                    actx.beginPath();
+                    actx.moveTo(canvasEl.width - pts[pointIdx-2], pts[pointIdx-1]);
+                    actx.lineTo(canvasEl.width - pts[pointIdx], pts[pointIdx+1]);
+                    actx.stroke();
                 }
-                
                 pointIdx += 2; pointsDrawn++;
             } else { strokeIdx++; pointIdx = 0; }
         }
