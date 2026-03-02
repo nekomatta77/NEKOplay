@@ -229,7 +229,6 @@ function handleStateChange() {
     return;
   }
 
-  // Адаптивный UI: Поднятие инструментов, если нет цвета
   const mode = globalState.settings?.mode;
   const noColorModes = ['nocolor', 'onecolor', 'chaos', 'darkmode'];
   
@@ -387,7 +386,24 @@ function submitDrawing(isManual = false) {
 }
 
 // ==========================================
-// ХОЛСТ: НОВЫЕ ИНСТРУМЕНТЫ (ФИГУРЫ, ТЕКСТ, СИММЕТРИЯ)
+// ГЛОБАЛЬНАЯ ФУНКЦИЯ ДЛЯ СТРЕЛКИ
+// ==========================================
+function drawArrow(actx, fromx, fromy, tox, toy) {
+    let headlen = actx.lineWidth * 3;
+    let angle = Math.atan2(toy - fromy, tox - fromx);
+    actx.moveTo(fromx, fromy);
+    actx.lineTo(tox, toy);
+    actx.stroke();
+    actx.beginPath();
+    actx.moveTo(tox, toy);
+    actx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+    actx.moveTo(tox, toy);
+    actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+    actx.stroke();
+}
+
+// ==========================================
+// ХОЛСТ: НОВЫЕ ИНСТРУМЕНТЫ 
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
@@ -401,8 +417,11 @@ let isEyedropper = false;
 let isBlur = false;
 let isRect = false;
 let isCircle = false;
+let isLine = false;
+let isArrow = false;
 let isText = false;
 let isSymmetry = false;
+let isNeon = false;
 
 let canvasTransform = { x: 0, y: 0, scale: 1 };
 let initialDistance = 0;
@@ -433,7 +452,7 @@ function saveState() {
 function restoreState(index) {
     let img = new Image(); img.src = drawHistory[index];
     img.onload = () => { 
-        ctx.globalAlpha=1; ctx.filter='none'; ctx.globalCompositeOperation = 'source-over'; 
+        ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowBlur=0; ctx.globalCompositeOperation = 'source-over'; 
         ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff'; 
         ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); 
     };
@@ -444,11 +463,13 @@ function undo() { if (historyIndex > 0) { historyIndex--; restoreState(historyIn
 function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; restoreState(historyIndex); } }
 
 function clearTools() { 
-    isErasing = false; isFilling = false; isEyedropper = false; isBlur = false; isRect = false; isCircle = false; isText = false;
+    isErasing = false; isFilling = false; isEyedropper = false; isBlur = false; 
+    isRect = false; isCircle = false; isLine = false; isArrow = false; isText = false; isNeon = false;
     document.querySelectorAll('.tool-btn').forEach(s => {
         if (!s.classList.contains('sym-tool')) s.classList.remove('active-swatch'); 
     }); 
 }
+
 function setColor(color, element) {
     clearTools(); currentColor = color; ctx.globalCompositeOperation = 'source-over';
     document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active-swatch'));
@@ -460,16 +481,18 @@ function setEyedropper(element) { clearTools(); isEyedropper = true; element.cla
 function setBlur(element) { clearTools(); isBlur = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setRect(element) { clearTools(); isRect = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setCircle(element) { clearTools(); isCircle = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
+function setLine(element) { clearTools(); isLine = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
+function setArrow(element) { clearTools(); isArrow = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setText(element) { clearTools(); isText = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
+function setNeon(element) { clearTools(); isNeon = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 
-// Симметрия не отключает другие инструменты!
 function toggleSymmetry(element) {
     isSymmetry = !isSymmetry;
     element.classList.toggle('active-swatch', isSymmetry);
 }
 
 function clearCanvas() {
-  ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.globalCompositeOperation = 'source-over'; 
+  ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; 
   const isDark = globalState.settings?.mode === 'darkmode';
   ctx.fillStyle = isDark ? '#000000' : '#ffffff'; 
   document.getElementById('canvas-wrapper').style.backgroundColor = isDark ? '#000000' : '#ffffff';
@@ -568,23 +591,32 @@ function startPosition(e) {
         if (text) {
             let size = document.getElementById('brush-size').value * 3;
             ctx.font = `bold ${size}px sans-serif`;
-            ctx.fillStyle = currentColor;
             ctx.globalAlpha = opacity;
-            ctx.fillText(text, pos.x, pos.y);
             
+            if (isNeon) {
+                ctx.shadowBlur = Math.max(10, size * 0.5);
+                ctx.shadowColor = currentColor;
+                ctx.fillStyle = '#ffffff';
+            } else {
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
+                ctx.fillStyle = currentColor;
+            }
+
+            ctx.fillText(text, pos.x, pos.y);
             if (isSymmetry) {
                 let metrics = ctx.measureText(text);
                 ctx.fillText(text, canvas.width - pos.x - metrics.width, pos.y);
             }
             
-            recordedStrokes.push({ type: 'text', c: currentColor, s: size, text: text, o: opacity, sym: isSymmetry?1:0, p: [Math.round(pos.x), Math.round(pos.y)] });
+            recordedStrokes.push({ type: 'text', c: currentColor, s: size, text: text, o: opacity, sym: isSymmetry?1:0, n: isNeon?1:0, p: [Math.round(pos.x), Math.round(pos.y)] });
             saveState();
         }
         return;
     }
 
-    // ИНСТРУМЕНТЫ: ФИГУРЫ
-    if (isRect || isCircle) {
+    // ИНСТРУМЕНТЫ: ФИГУРЫ И ЛИНИИ
+    if (isRect || isCircle || isLine || isArrow) {
         shapeStartX = Math.round(pos.x);
         shapeStartY = Math.round(pos.y);
         shapeImgData = ctx.getImageData(0,0,canvas.width, canvas.height);
@@ -596,7 +628,7 @@ function startPosition(e) {
     
     currentStroke = { 
         c: currentColor, s: document.getElementById('brush-size').value, 
-        e: isErasing?1:0, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0,
+        e: isErasing?1:0, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0,
         p: [Math.round(pos.x), Math.round(pos.y)] 
     };
     
@@ -617,10 +649,19 @@ function draw(e) {
 
   let opacity = parseFloat(document.getElementById('brush-opacity').value);
   ctx.lineWidth = document.getElementById('brush-size').value;
-  ctx.strokeStyle = currentColor;
   ctx.globalAlpha = isErasing ? 1 : opacity;
   ctx.filter = isBlur ? 'blur(5px)' : 'none';
   ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
+
+  if (isNeon && !isErasing) {
+      ctx.shadowBlur = Math.max(10, document.getElementById('brush-size').value * 2);
+      ctx.shadowColor = currentColor;
+      ctx.strokeStyle = '#ffffff';
+  } else {
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = currentColor;
+  }
 
   // ФИГУРЫ (ПРЕВЬЮ В РЕАЛЬНОМ ВРЕМЕНИ)
   if (isDrawingShape) {
@@ -634,6 +675,22 @@ function draw(e) {
           let r = Math.hypot(pos.x - shapeStartX, pos.y - shapeStartY);
           ctx.arc(shapeStartX, shapeStartY, r, 0, Math.PI*2); ctx.stroke();
           if (isSymmetry) { ctx.beginPath(); ctx.arc(canvas.width - shapeStartX, shapeStartY, r, 0, Math.PI*2); ctx.stroke(); }
+      } else if (isLine) {
+          ctx.moveTo(shapeStartX, shapeStartY);
+          ctx.lineTo(pos.x, pos.y);
+          ctx.stroke();
+          if (isSymmetry) {
+              ctx.beginPath();
+              ctx.moveTo(canvas.width - shapeStartX, shapeStartY);
+              ctx.lineTo(canvas.width - pos.x, pos.y);
+              ctx.stroke();
+          }
+      } else if (isArrow) {
+          drawArrow(ctx, shapeStartX, shapeStartY, pos.x, pos.y);
+          if (isSymmetry) {
+              ctx.beginPath();
+              drawArrow(ctx, canvas.width - shapeStartX, shapeStartY, canvas.width - pos.x, pos.y);
+          }
       }
       lastX = pos.x; lastY = pos.y;
       return;
@@ -661,15 +718,15 @@ function draw(e) {
 }
 
 function endPosition() { 
-    ctx.beginPath(); ctx.filter = 'none';
+    ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0;
 
     if (isDrawingShape) {
         isDrawingShape = false;
+        let t = isRect ? 'rect' : (isCircle ? 'circle' : (isLine ? 'line' : 'arrow'));
         recordedStrokes.push({
-            type: isRect ? 'rect' : 'circle',
-            c: currentColor, s: document.getElementById('brush-size').value,
+            type: t, c: currentColor, s: document.getElementById('brush-size').value,
             o: parseFloat(document.getElementById('brush-opacity').value),
-            b: isBlur?1:0, sym: isSymmetry?1:0,
+            b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0,
             p: [shapeStartX, shapeStartY, lastX, lastY]
         });
         saveState();
@@ -686,7 +743,7 @@ function endPosition() {
 
 function handlePinchZoom(e) {
     if (isDrawing || isDrawingShape) {
-        isDrawing = false; isDrawingShape = false; ctx.beginPath(); ctx.filter = 'none'; currentStroke = null;
+        isDrawing = false; isDrawingShape = false; ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0; currentStroke = null;
         if (preZoomState && globalState.settings?.mode !== 'blind') {
             let img = new Image(); img.src = preZoomState;
             img.onload = () => { ctx.globalAlpha=1; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0); }
@@ -739,7 +796,7 @@ let animationFrameId = null;
 
 function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
     const actx = canvasEl.getContext('2d');
-    actx.globalAlpha = 1; actx.filter = 'none'; actx.globalCompositeOperation = 'source-over';
+    actx.globalAlpha = 1; actx.filter = 'none'; actx.shadowBlur = 0; actx.globalCompositeOperation = 'source-over';
     actx.fillStyle = isDarkMode ? '#000000' : '#ffffff'; 
     actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     let strokeIdx = 0; let pointIdx = 0;
@@ -757,7 +814,7 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             let im = new Image(); 
             im.src = finalImg; 
             im.onload = () => { 
-                actx.globalAlpha=1; actx.filter='none'; actx.globalCompositeOperation = 'source-over'; 
+                actx.globalAlpha=1; actx.filter='none'; actx.shadowBlur=0; actx.globalCompositeOperation = 'source-over'; 
                 actx.drawImage(im, 0, 0); 
             };
             return; 
@@ -771,8 +828,18 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             actx.filter = stroke.b ? 'blur(5px)' : 'none';
             actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
 
+            if (stroke.n && !stroke.e) {
+                actx.shadowBlur = Math.max(10, stroke.s * 2);
+                actx.shadowColor = stroke.c;
+                actx.strokeStyle = '#ffffff';
+            } else {
+                actx.shadowBlur = 0;
+                actx.shadowColor = 'transparent';
+                actx.strokeStyle = stroke.c;
+            }
+
             if (stroke.type === 'clear') {
-                actx.globalAlpha = 1; actx.filter = 'none'; actx.globalCompositeOperation = 'source-over'; 
+                actx.globalAlpha = 1; actx.filter = 'none'; actx.shadowBlur = 0; actx.globalCompositeOperation = 'source-over'; 
                 actx.fillStyle = isDarkMode ? '#000000' : '#ffffff';
                 actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
@@ -780,20 +847,39 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             if (stroke.type === 'fill') { strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             
             if (stroke.type === 'rect') {
-                actx.beginPath(); actx.lineWidth = stroke.s; actx.strokeStyle = stroke.c;
+                actx.beginPath(); actx.lineWidth = stroke.s;
                 actx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]);
                 if(stroke.sym) actx.strokeRect(canvasEl.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]);
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
             if (stroke.type === 'circle') {
-                actx.beginPath(); actx.lineWidth = stroke.s; actx.strokeStyle = stroke.c;
+                actx.beginPath(); actx.lineWidth = stroke.s;
                 let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]);
                 actx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke();
                 if(stroke.sym) { actx.beginPath(); actx.arc(canvasEl.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke(); }
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
+            if (stroke.type === 'line') {
+                actx.beginPath(); actx.lineWidth = stroke.s;
+                actx.moveTo(stroke.p[0], stroke.p[1]); actx.lineTo(stroke.p[2], stroke.p[3]); actx.stroke();
+                if(stroke.sym) {
+                    actx.beginPath(); actx.moveTo(canvasEl.width - stroke.p[0], stroke.p[1]);
+                    actx.lineTo(canvasEl.width - stroke.p[2], stroke.p[3]); actx.stroke();
+                }
+                strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
+            }
+            if (stroke.type === 'arrow') {
+                actx.beginPath(); actx.lineWidth = stroke.s;
+                drawArrow(actx, stroke.p[0], stroke.p[1], stroke.p[2], stroke.p[3]);
+                if(stroke.sym) {
+                    actx.beginPath(); drawArrow(actx, canvasEl.width - stroke.p[0], stroke.p[1], canvasEl.width - stroke.p[2], stroke.p[3]);
+                }
+                strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
+            }
             if (stroke.type === 'text') {
-                actx.font = `bold ${stroke.s}px sans-serif`; actx.fillStyle = stroke.c;
+                actx.font = `bold ${stroke.s}px sans-serif`; 
+                actx.fillStyle = stroke.n ? '#ffffff' : stroke.c;
+                if (stroke.n) { actx.shadowBlur = Math.max(10, stroke.s * 0.5); actx.shadowColor = stroke.c; }
                 actx.fillText(stroke.text, stroke.p[0], stroke.p[1]);
                 if(stroke.sym) {
                     let metrics = actx.measureText(stroke.text);
@@ -807,7 +893,6 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
 
             if (pointIdx === 0) {
                 actx.beginPath(); actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round';
-                actx.strokeStyle = stroke.c; 
                 actx.moveTo(pts[0], pts[1]); pointIdx = 2;
             }
             
@@ -815,14 +900,10 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
                 actx.lineTo(pts[pointIdx], pts[pointIdx+1]); actx.stroke();
                 actx.beginPath(); actx.moveTo(pts[pointIdx], pts[pointIdx+1]);
                 
-                // Анимация симметрии
                 if (stroke.sym) {
-                    let prevX = canvasEl.width - pts[pointIdx-2];
-                    let prevY = pts[pointIdx-1];
-                    let curX = canvasEl.width - pts[pointIdx];
-                    let curY = pts[pointIdx+1];
-                    actx.beginPath(); actx.moveTo(prevX, prevY); actx.lineTo(curX, curY); actx.stroke();
-                    actx.beginPath();
+                    let prevX = canvasEl.width - pts[pointIdx-2]; let prevY = pts[pointIdx-1];
+                    let curX = canvasEl.width - pts[pointIdx]; let curY = pts[pointIdx+1];
+                    actx.beginPath(); actx.moveTo(prevX, prevY); actx.lineTo(curX, curY); actx.stroke(); actx.beginPath();
                 }
                 
                 pointIdx += 2; pointsDrawn++;
