@@ -46,21 +46,15 @@
               <h3 class="section-title">Режим игры</h3>
               <div class="modes-grid">
                 <div class="mode-card active" data-mode="classic" onclick="selectMode('classic')">
-                  <div class="mode-icon">
-                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
-                  </div>
+                  <div class="mode-icon"><svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></div>
                   <h4>Классика</h4>
                 </div>
                 <div class="mode-card" data-mode="speedrun" onclick="selectMode('speedrun')">
-                  <div class="mode-icon">
-                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  </div>
+                  <div class="mode-icon"><svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
                   <h4>Спидран</h4>
                 </div>
                 <div class="mode-card" data-mode="nocolor" onclick="selectMode('nocolor')">
-                  <div class="mode-icon">
-                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/></svg>
-                  </div>
+                  <div class="mode-icon"><svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" fill="none" stroke-width="2"><path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/></svg></div>
                   <h4>Секрет</h4>
                 </div>
               </div>
@@ -101,21 +95,31 @@
     </div>
 
     <div id="draw-phase" class="phase-container draw-layout">
+      
       <div class="sidebar-tools">
-        <div class="palette" id="color-palette">
+        <div class="palette grid-palette" id="color-palette">
           <div class="swatch active-swatch" style="background:#000000" onclick="setColor('#000000', this)"></div>
+          <div class="swatch" style="background:#ffffff; border: 1px solid #ccc;" onclick="setColor('#ffffff', this)"></div>
           <div class="swatch" style="background:#ef4444" onclick="setColor('#ef4444', this)"></div>
           <div class="swatch" style="background:#f97316" onclick="setColor('#f97316', this)"></div>
           <div class="swatch" style="background:#eab308" onclick="setColor('#eab308', this)"></div>
           <div class="swatch" style="background:#22c55e" onclick="setColor('#22c55e', this)"></div>
           <div class="swatch" style="background:#3b82f6" onclick="setColor('#3b82f6', this)"></div>
           <div class="swatch" style="background:#a855f7" onclick="setColor('#a855f7', this)"></div>
-          <div class="swatch" style="background:#ffffff; border: 1px solid #ccc;" onclick="setColor('#ffffff', this)"></div>
+          <div class="swatch rgb-wrapper">
+             <input type="color" id="rgb-picker" value="#ff0000" onchange="setColor(this.value, this.parentElement)">
+          </div>
         </div>
         
         <div class="tool-divider"></div>
         
-        <div class="tools-group">
+        <div class="tools-grid">
+          <div class="tool-btn" onclick="undo()" title="Назад">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 12l6-6M3 12l6 6"></path></svg>
+          </div>
+          <div class="tool-btn" onclick="redo()" title="Вперед">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12H3M21 12l-6-6M21 12l-6 6"></path></svg>
+          </div>
           <div class="tool-btn eraser" onclick="setEraser(this)" title="Ластик">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20"></path></svg>
           </div>
@@ -124,20 +128,23 @@
           </div>
         </div>
 
-        <div class="brush-slider-vertical">
-          <input type="range" id="brush-size" min="1" max="40" value="5" orient="vertical">
-        </div>
-
         <button class="btn-submit-draw" onclick="submitDrawing()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
         </button>
       </div>
 
       <div class="canvas-area">
-        <div class="draw-header">
-          <span>Ваша цель:</span>
-          <h2 id="word-to-draw" class="target-word">Слово</h2>
+        <div class="top-tool-bar">
+          <div class="draw-header">
+            <span>Цель:</span> <h2 id="word-to-draw" class="target-word">Слово</h2>
+          </div>
+          <div class="brush-slider-horizontal">
+            <div class="dot small-dot"></div>
+            <input type="range" id="brush-size" min="1" max="40" value="5">
+            <div class="dot large-dot"></div>
+          </div>
         </div>
+        
         <div class="canvas-wrapper-outer">
           <div class="canvas-wrapper" id="canvas-wrapper">
             <canvas id="drawing-board" width="800" height="600"></canvas>
@@ -157,8 +164,8 @@
 
   <div id="ready-to-present-phase" class="screen">
     <div class="glass-card text-center">
-      <h1 class="logo" style="font-size: 3rem;">ИГРА <span>ОКОНЧЕНА</span></h1>
-      <button class="btn-primary pulse-btn mt-4" onclick="startPresentation()">Смотреть результаты</button>
+      <h1 id="presentation-status-text" class="logo" style="font-size: 3rem;">ИГРА <span>ОКОНЧЕНА</span></h1>
+      <button id="btn-start-pres" class="btn-primary pulse-btn mt-4" onclick="startPresentation()">Смотреть результаты</button>
     </div>
   </div>
 
