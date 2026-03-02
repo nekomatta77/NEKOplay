@@ -39,12 +39,6 @@ function switchTab(tabId) {
     if(tab) tab.classList.add('active');
 }
 
-let gameWords = ["Слон", "Космонавт", "Пылесос", "Монстр", "Пицца", "Дракон"];
-let impostorPairs = [["Яблоко", "Груша"], ["Кот", "Собака"], ["Машина", "Трактор"]];
-
-fetch('words.json').then(r => r.json()).then(data => { if(Array.isArray(data) && data.length) gameWords = data; }).catch(e => console.log("words.json не найден."));
-fetch('words_imposter.json').then(r => r.json()).then(data => { if(Array.isArray(data) && data.length) impostorPairs = data; }).catch(e => console.log("words_imposter.json не найден."));
-
 function selectMode(mode) {
   if (!isHost) return;
   selectedMode = mode;
@@ -65,6 +59,7 @@ function showModeInfo(e, mode) {
 }
 
 function closeInfoModal() { setDisplay('info-modal', 'none'); }
+function hidePlagiarism() { setDisplay('plagiarism-overlay', 'none'); }
 
 function renderPlayersList(players) {
     const listEl = document.getElementById('lobby-players-list');
@@ -311,6 +306,9 @@ function startRound(round, players) {
   const notebookId = getCurrentNotebookId(round, players);
   let previousData = round > 1 ? globalState.submissions?.[`round_${round - 1}`]?.[notebookId] : null;
 
+  const bgRef = document.getElementById('bg-reference-img');
+  if (bgRef) { bgRef.style.display = 'none'; bgRef.src = ''; }
+
   if (isDrawingPhase) {
       const zContainer = document.getElementById('zoom-container');
       if(zContainer) zContainer.className = ''; 
@@ -321,7 +319,6 @@ function startRound(round, players) {
       setDisplay('lasso-stamps-container', 'none'); setDisplay('sidebar-tools', 'flex');
       
       const db = document.getElementById('drawing-board');
-      if (db) db.style.backgroundImage = 'none';
       
       if (mode === 'mirror' && zContainer) zContainer.classList.add('mode-mirror');
       if (mode === 'earthquake' && zContainer) zContainer.classList.add('mode-earthquake');
@@ -367,7 +364,8 @@ function startRound(round, players) {
           } else if (mode === 'finishit' || mode === 'tagteam') {
               setText('word-to-draw', mode === 'finishit' ? "Дорисуй-ка!" : "Продолжи рисунок!");
               finishitBaseImg.src = prevImg;
-              if (db) { db.style.backgroundImage = `url(${prevImg})`; db.style.backgroundSize = '100% 100%'; db.style.backgroundPosition = 'center'; db.style.backgroundRepeat = 'no-repeat'; }
+              // Ставим картинку как реальный HTML элемент под прозрачный холст для 100% работы на телефонах
+              if (bgRef) { bgRef.src = prevImg; bgRef.style.display = 'block'; bgRef.style.opacity = mode === 'finishit' ? '0.4' : '1'; }
           } else if (mode === 'copycat' && prevImg && prevImg.length > 50) {
               setHTML('word-to-draw', `<img src="${prevImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`);
           } else if (mode === 'lasso' && round > 2) {
@@ -499,29 +497,52 @@ function drawArrow(actx, fromx, fromy, tox, toy) {
     actx.moveTo(tox, toy); actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6)); actx.stroke();
 }
 
-// Заливка
+// УЛЬТРА-ОПТИМИЗИРОВАННАЯ ЗАЛИВКА SCANLINE
 function floodFillCore(startX, startY, fillColorHex) {
-    startX = Math.round(startX); 
-    startY = Math.round(startY);
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    startX = Math.round(startX); startY = Math.round(startY);
+    const w = canvas.width, h = canvas.height;
+    if (startX < 0 || startX >= w || startY < 0 || startY >= h) return;
+    
+    const imgData = ctx.getImageData(0, 0, w, h);
     const data = new Uint32Array(imgData.data.buffer); 
-    const startPos = startY * canvas.width + startX;
+    const startPos = startY * w + startX;
     const startColor = data[startPos];
+    
     const r = parseInt(fillColorHex.slice(1,3), 16);
     const g = parseInt(fillColorHex.slice(3,5), 16);
     const b = parseInt(fillColorHex.slice(5,7), 16);
     const fillColor = (255 << 24) | (b << 16) | (g << 8) | r;
+    
     if (startColor === fillColor) return;
-    const queue = [startPos];
-    while (queue.length > 0) {
-        let pos = queue.pop();
-        if (data[pos] === startColor) {
-            data[pos] = fillColor;
-            let x = pos % canvas.width; let y = Math.floor(pos / canvas.width);
-            if (x > 0) queue.push(pos - 1);
-            if (x < canvas.width - 1) queue.push(pos + 1);
-            if (y > 0) queue.push(pos - canvas.width);
-            if (y < canvas.height - 1) queue.push(pos + canvas.width);
+    
+    // Используем типизированный массив для невероятной скорости без фризов на телефоне
+    const stack = new Int32Array(w * h);
+    let stackPtr = 0;
+    stack[stackPtr++] = startPos;
+    
+    while (stackPtr > 0) {
+        let pos = stack[--stackPtr];
+        let y = Math.floor(pos / w);
+        let x = pos % w;
+        
+        let curPos = pos;
+        while (x > 0 && data[curPos - 1] === startColor) { curPos--; x--; }
+        
+        let spanAbove = false, spanBelow = false;
+        
+        while (x < w && data[curPos] === startColor) {
+            data[curPos] = fillColor;
+            if (y > 0) {
+                let above = curPos - w;
+                if (!spanAbove && data[above] === startColor) { stack[stackPtr++] = above; spanAbove = true; } 
+                else if (spanAbove && data[above] !== startColor) { spanAbove = false; }
+            }
+            if (y < h - 1) {
+                let below = curPos + w;
+                if (!spanBelow && data[below] === startColor) { stack[stackPtr++] = below; spanBelow = true; } 
+                else if (spanBelow && data[below] !== startColor) { spanBelow = false; }
+            }
+            curPos++; x++;
         }
     }
     ctx.putImageData(imgData, 0, 0);
@@ -536,7 +557,7 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
         
         if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { targetCtx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); continue; }
         if (stroke.type === 'clear') { targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
-        else if (stroke.type === 'fill') { /* Воспроизведение заливки при анимации опускаем для производительности */ }
+        else if (stroke.type === 'fill') { /* пропускаем при анимации для оптимизации */ }
         else if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
         else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
@@ -555,7 +576,21 @@ let recordedStrokes = []; let strokesHistory = []; let currentStroke = null; let
 
 function initHistory() { drawHistory = []; strokesHistory = []; recordedStrokes = []; historyIndex = -1; saveState(); }
 function saveState() { if (globalState.settings?.mode === 'hardcore' || globalState.settings?.mode === 'amnesia') return; if (historyIndex < drawHistory.length - 1) { drawHistory.length = historyIndex + 1; strokesHistory.length = historyIndex + 1; } drawHistory.push(canvas.toDataURL()); strokesHistory.push(JSON.parse(JSON.stringify(recordedStrokes))); historyIndex++; }
-function restoreState(index) { let img = new Image(); img.src = drawHistory[index]; img.onload = () => { ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowBlur=0; ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); }; recordedStrokes = JSON.parse(JSON.stringify(strokesHistory[index])); }
+function restoreState(index) { 
+    let img = new Image(); img.src = drawHistory[index]; 
+    img.onload = () => { 
+        ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowBlur=0; ctx.globalCompositeOperation = 'source-over'; 
+        const mode = globalState.settings?.mode;
+        if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Оставляем холст прозрачным!
+        } else {
+            ctx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height); 
+        }
+        ctx.drawImage(img, 0, 0); 
+    }; 
+    recordedStrokes = JSON.parse(JSON.stringify(strokesHistory[index])); 
+}
 function undo() { if (historyIndex > 0) { historyIndex--; restoreState(historyIndex); } }
 function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; restoreState(historyIndex); } }
 
@@ -579,7 +614,24 @@ function toggleSymmetry(element) { isSymmetry = !isSymmetry; element.classList.t
 function toggleNeon(element) { isNeon = !isNeon; element.classList.toggle('active-swatch', isNeon); }
 function toggleBlur(element) { isBlur = !isBlur; element.classList.toggle('active-swatch', isBlur); }
 
-function clearCanvas() { ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; const isDark = globalState.settings?.mode === 'darkmode'; ctx.fillStyle = isDark ? '#000000' : '#ffffff'; const cw = document.getElementById('canvas-wrapper'); if(cw) cw.style.backgroundColor = isDark ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); if(isErasing) ctx.globalCompositeOperation = 'destination-out'; recordedStrokes.push({ type: 'clear' }); saveState(); }
+function clearCanvas() { 
+    ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; 
+    const mode = globalState.settings?.mode;
+    const isDark = mode === 'darkmode'; 
+    
+    if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    } else {
+        ctx.fillStyle = isDark ? '#000000' : '#ffffff'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const cw = document.getElementById('canvas-wrapper'); 
+        if(cw) cw.style.backgroundColor = isDark ? '#000000' : '#ffffff'; 
+    }
+    
+    if(isErasing) ctx.globalCompositeOperation = 'destination-out'; 
+    recordedStrokes.push({ type: 'clear' }); saveState(); 
+}
+
 function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; updateTransform(); }
 function updateTransform() { if (!zoomContainer) return; if (canvasTransform.scale <= 1) { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; } zoomContainer.style.transformOrigin = `0 0`; zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
 function getCoordinates(e) { const rect = canvas.getBoundingClientRect(); const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY; return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height }; }
@@ -727,7 +779,7 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
             
             if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { actx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'clear') { actx.globalAlpha = 1; actx.globalCompositeOperation = 'source-over'; actx.fillStyle = isDarkMode ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
-            if (stroke.type === 'fill') { /* Опускаем для производительности анимации */ strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
+            if (stroke.type === 'fill') { strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'rect') { actx.beginPath(); actx.lineWidth = stroke.s; actx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) actx.strokeRect(canvasEl.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'circle') { actx.beginPath(); actx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); actx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke(); if(stroke.sym) { actx.beginPath(); actx.arc(canvasEl.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke(); } strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
             if (stroke.type === 'line') { actx.beginPath(); actx.lineWidth = stroke.s; actx.moveTo(stroke.p[0], stroke.p[1]); actx.lineTo(stroke.p[2], stroke.p[3]); actx.stroke(); if(stroke.sym) { actx.beginPath(); actx.moveTo(canvasEl.width - stroke.p[0], stroke.p[1]); actx.lineTo(canvasEl.width - stroke.p[2], stroke.p[3]); actx.stroke(); } strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
@@ -755,21 +807,23 @@ function syncPresentationView(players) {
     let rawData = globalState.submissions?.[`round_${pres.round}`]?.[bookOwnerId];
     let imgUrl = rawData; let strokesData = null;
 
+    // Умная система: вместо угадывания мы ТОЧНО проверяем, прислал ли игрок рисунок или текст!
+    let actuallyHasImage = false;
     if (typeof rawData === 'string' && rawData.startsWith('{')) {
-        try { let parsed = JSON.parse(rawData); if (parsed.img) { imgUrl = parsed.img; strokesData = parsed.strokes; } } catch(e) {}
+        try { let parsed = JSON.parse(rawData); if (parsed.img) { imgUrl = parsed.img; strokesData = parsed.strokes; actuallyHasImage = true; } } catch(e) {}
     }
+    if (rawData && rawData.length > 1000 && rawData.startsWith('data:image')) actuallyHasImage = true;
+
+    let isText = !actuallyHasImage;
+    if (globalState.settings?.mode === 'story') isText = true;
+
+    // Защита от потери слова
+    if (isText && (!rawData || rawData.length === 0)) { rawData = "(Слово отсутствует)"; }
 
     const authorId = players[(players.indexOf(bookOwnerId) + pres.round - 1 + players.length * 10) % players.length];
     const authorName = globalState.playerNames?.[authorId] || "Аноним";
     const authorAvatar = globalState.playerAvatars?.[authorId] || "https://picsum.photos/100";
     
-    const mode = globalState.settings?.mode;
-    let isText = (pres.round % 2 !== 0);
-    if (mode === 'icebreaker' || mode === 'tagteam') isText = (pres.round % 2 === 0);
-    if (mode === 'story') isText = true;
-    if (mode === 'copycat') isText = (pres.round === 1);
-    if (mode === 'plagiarism' || mode === 'finishit' || mode === 'tagteam') isText = false;
-
     const side = isText ? 'left' : 'right';
     let visualContent = '';
     
@@ -777,7 +831,7 @@ function syncPresentationView(players) {
 
     if (isText) { visualContent = `<div class="msg-text">${rawData}</div>`; } 
     else {
-        let auctionHtml = mode === 'auction' ? `<button class="btn-like" onclick="let v=parseInt(this.innerText); this.innerHTML='${heartSvg} '+(isNaN(v)?1:v+1)">${heartSvg} 0</button>` : '';
+        let auctionHtml = globalState.settings?.mode === 'auction' ? `<button class="btn-like" onclick="let v=parseInt(this.innerText); this.innerHTML='${heartSvg} '+(isNaN(v)?1:v+1)">${heartSvg} 0</button>` : '';
         visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas><div style="position:absolute; bottom:10px; right:10px;">${auctionHtml}</div></div>`;
     }
 
@@ -789,9 +843,19 @@ function syncPresentationView(players) {
     else {
         setTimeout(() => {
             const canvasAnim = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);
-            const isDark = globalState.settings?.mode === 'darkmode';
-            if (canvasAnim && strokesData && strokesData.length > 0) { playDrawingAnimation(canvasAnim, strokesData, imgUrl, isDark); } 
-            else if (canvasAnim) { const cctx = canvasAnim.getContext('2d'); let im = new Image(); im.src = imgUrl; im.onload = () => cctx.drawImage(im, 0, 0); }
+            const mode = globalState.settings?.mode;
+            const isDark = mode === 'darkmode';
+            if (canvasAnim) {
+                if ((mode === 'finishit' || mode === 'tagteam') && pres.round > 1) {
+                    const cctx = canvasAnim.getContext('2d');
+                    let im = new Image(); im.src = imgUrl; im.onload = () => cctx.drawImage(im, 0, 0);
+                } else if (strokesData && strokesData.length > 0) { 
+                    playDrawingAnimation(canvasAnim, strokesData, imgUrl, isDark); 
+                } else { 
+                    const cctx = canvasAnim.getContext('2d'); 
+                    let im = new Image(); im.src = imgUrl; im.onload = () => cctx.drawImage(im, 0, 0); 
+                }
+            }
         }, 100);
     }
 

@@ -11,10 +11,9 @@
 </head>
 <body>
   <div class="ambient-bg"></div>
-  <div id="rotate-prompt"><div class="rotate-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg></div><h2>Поверните телефон</h2></div>
   <button id="leave-btn" class="leave-btn" onclick="leaveGame()" title="Выйти"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button>
 
-  <div id="info-modal" class="modal-overlay" onclick="closeInfoModal()"><div class="glass-card text-center info-modal-content" onclick="event.stopPropagation()"><h2 id="info-modal-title" class="task-title" style="color: #d946ef;">Режим</h2><p id="info-modal-desc" class="text-muted" style="font-size: 1.15rem; line-height: 1.5; margin-bottom: 25px;"></p><button class="btn-primary" onclick="closeInfoModal()">Понятно</button></div></div>
+  <div id="info-modal" class="modal-overlay" onclick="closeInfoModal()" ontouchstart="closeInfoModal()"><div class="glass-card text-center info-modal-content" onclick="event.stopPropagation()"><h2 id="info-modal-title" class="task-title" style="color: #d946ef;">Режим</h2><p id="info-modal-desc" class="text-muted" style="font-size: 1.15rem; line-height: 1.5; margin-bottom: 25px;"></p><button class="btn-primary" onclick="closeInfoModal()">Понятно</button></div></div>
 
   <div id="lobby-screen" class="screen active">
     <div class="glass-card main-lobby">
@@ -161,9 +160,12 @@
           <div id="zoom-container" style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; transition: transform 0.1s ease-out; will-change: transform;">
             <div class="canvas-wrapper-outer">
                <div class="canvas-wrapper" id="canvas-wrapper">
-                  <div id="plagiarism-overlay" class="plagiarism-overlay"><h3>Запомни рисунок!</h3><img id="plagiarism-img" src=""><button class="btn-primary" onclick="hidePlagiarism()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:8px;"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg> Рисовать</button></div>
+                  <div id="plagiarism-overlay" class="plagiarism-overlay"><h3>Запомни рисунок!</h3><img id="plagiarism-img" src=""><button class="btn-primary" onclick="hidePlagiarism()" ontouchstart="hidePlagiarism()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:8px;"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg> Рисовать</button></div>
                   <div id="coop-divider" style="display:none; position:absolute; left:50%; top:0; bottom:0; width:4px; background:#d946ef; box-shadow: 0 0 15px #d946ef; z-index: 10; pointer-events: none;"></div>
+                  
+                  <img id="bg-reference-img" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; display:none;">
                   <canvas id="drawing-board" width="800" height="600"></canvas>
+                  
                   <div id="gyro-cursor" style="display:none; position:absolute; width:15px; height:15px; border-radius:50%; border:2px solid #ef4444; pointer-events:none; z-index: 20; transform: translate(-50%, -50%);"></div>
                   <button id="btn-gyro-start" class="btn-primary" style="display:none; position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 30; width: auto;" onclick="startGyro()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-right:5px;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/></svg>Начать гироскоп</button>
                </div>
