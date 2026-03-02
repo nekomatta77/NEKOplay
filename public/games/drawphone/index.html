@@ -7,51 +7,72 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>NEKO Phone</title>
   <link rel="stylesheet" href="style.css">
-  <script src="modes.js"></script>
 </head>
 <body>
   <div class="ambient-bg"></div>
-  <div id="rotate-prompt"><div class="rotate-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg></div><h2>Поверните телефон</h2><p>Для игры нужен горизонтальный экран</p></div>
+
+  <div id="rotate-prompt"><div class="rotate-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg></div><h2>Поверните телефон</h2></div>
+
   <button id="leave-btn" class="leave-btn" onclick="leaveGame()" title="Выйти"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></button>
 
-  <div id="info-modal" class="modal-overlay" onclick="closeInfoModal()"><div class="glass-card text-center info-modal-content" onclick="event.stopPropagation()"><h2 id="info-modal-title" class="task-title" style="color: #d946ef;">Режим</h2><p id="info-modal-desc" class="text-muted" style="font-size: 1.15rem; line-height: 1.5; margin-bottom: 25px;"></p><button class="btn-primary" onclick="closeInfoModal()">Всё понятно!</button></div></div>
+  <div id="info-modal" class="modal-overlay" onclick="closeInfoModal()"><div class="glass-card text-center info-modal-content" onclick="event.stopPropagation()"><h2 id="info-modal-title" class="task-title" style="color: #d946ef;">Режим</h2><p id="info-modal-desc" class="text-muted" style="font-size: 1.15rem; line-height: 1.5; margin-bottom: 25px;"></p><button class="btn-primary" onclick="closeInfoModal()">Понятно</button></div></div>
 
   <div id="lobby-screen" class="screen active">
     <div class="glass-card main-lobby">
       <div class="lobby-header text-center">
         <h1 class="logo">NEKO<span>Phone</span></h1>
         <div class="lobby-players-container"><div id="lobby-players-list" class="players-row"></div></div>
-        <div class="stats-row">
-          <div class="stat-pill"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span id="players-count-display">0</span> игроков</div>
-          <div class="stat-pill"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg><span id="player-name-display">Аноним</span></div>
-        </div>
       </div>
       <div class="lobby-content">
         <div id="host-controls" style="display: none; width: 100%;">
-          <div class="tabs-header"><button id="tab-btn-modes" class="tab-btn active" onclick="switchTab('modes')">Режимы</button><button id="tab-btn-settings" class="tab-btn" onclick="switchTab('settings')">Настройки</button></div>
+          <div class="tabs-header">
+            <button id="tab-btn-modes" class="tab-btn active" onclick="switchTab('modes')">Режимы</button>
+            <button id="tab-btn-settings" class="tab-btn" onclick="switchTab('settings')">Настройки</button>
+          </div>
+
           <div id="tab-modes" class="tab-content active">
             <div class="modes-grid-large">
-              <div class="mode-card active" data-mode="classic" onclick="selectMode('classic')"><div class="mode-info-btn" onclick="showModeInfo(event, 'classic')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div><h4>Классика</h4></div>
-              <div class="mode-card" data-mode="tagteam" onclick="selectMode('tagteam')"><div class="mode-info-btn" onclick="showModeInfo(event, 'tagteam')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3v18"></path><path d="M3 15h14"></path><path d="M3 9h14"></path></svg></div><h4>Эстафета</h4></div>
-              <div class="mode-card" data-mode="timebomb" onclick="selectMode('timebomb')"><div class="mode-info-btn" onclick="showModeInfo(event, 'timebomb')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div><h4>Таймер-убийца</h4></div>
-              <div class="mode-card" data-mode="impostor" onclick="selectMode('impostor')"><div class="mode-info-btn" onclick="showModeInfo(event, 'impostor')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><path d="M12 15L12 22"></path></svg></div><h4>Предатель</h4></div>
-              <div class="mode-card" data-mode="coop" onclick="selectMode('coop')"><div class="mode-info-btn" onclick="showModeInfo(event, 'coop')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div><h4>Командная работа</h4></div>
-              <div class="mode-card" data-mode="babel" onclick="selectMode('babel')"><div class="mode-info-btn" onclick="showModeInfo(event, 'babel')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></div><h4>Переводчик</h4></div>
-              <div class="mode-card" data-mode="duotone" onclick="selectMode('duotone')"><div class="mode-info-btn" onclick="showModeInfo(event, 'duotone')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path></svg></div><h4>Два цвета</h4></div>
-              <div class="mode-card" data-mode="inkmeter" onclick="selectMode('inkmeter')"><div class="mode-info-btn" onclick="showModeInfo(event, 'inkmeter')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg></div><h4>Чернила</h4></div>
-              <div class="mode-card" data-mode="connectdots" onclick="selectMode('connectdots')"><div class="mode-info-btn" onclick="showModeInfo(event, 'connectdots')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="10.51" x2="15.42" y2="6.53"></line></svg></div><h4>Коннектор</h4></div>
-              <div class="mode-card" data-mode="lasso" onclick="selectMode('lasso')"><div class="mode-info-btn" onclick="showModeInfo(event, 'lasso')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M22 12A10 10 0 0 0 12 2v0"></path></svg></div><h4>Лассо-арт</h4></div>
-              <div class="mode-card" data-mode="triplethreat" onclick="selectMode('triplethreat')"><div class="mode-info-btn" onclick="showModeInfo(event, 'triplethreat')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><line x1="22" y1="8.5" x2="12" y2="15.5"></line><line x1="2" y1="8.5" x2="12" y2="15.5"></line></svg></div><h4>Три слова</h4></div>
-              <div class="mode-card" data-mode="nohands" onclick="selectMode('nohands')"><div class="mode-info-btn" onclick="showModeInfo(event, 'nohands')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg></div><h4>Без рук</h4></div>
-              <div class="mode-card" data-mode="plagiarism" onclick="selectMode('plagiarism')"><div class="mode-info-btn" onclick="showModeInfo(event, 'plagiarism')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></div><h4>Плагиат</h4></div>
-              <div class="mode-card" data-mode="finishit" onclick="selectMode('finishit')"><div class="mode-info-btn" onclick="showModeInfo(event, 'finishit')">?</div><div class="mode-icon"><svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" fill="none" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path></svg></div><h4>Дорисуй-ка</h4></div>
+              <div class="mode-card active" data-mode="classic" onclick="selectMode('classic')"><div class="mode-info-btn" onclick="showModeInfo(event, 'classic')">?</div><div class="mode-icon">🌟</div><h4>Классика</h4></div>
+              <div class="mode-card" data-mode="icebreaker" onclick="selectMode('icebreaker')"><div class="mode-info-btn" onclick="showModeInfo(event, 'icebreaker')">?</div><div class="mode-icon">🧊</div><h4>Ледокол</h4></div>
+              <div class="mode-card" data-mode="speedrun" onclick="selectMode('speedrun')"><div class="mode-info-btn" onclick="showModeInfo(event, 'speedrun')">?</div><div class="mode-icon">⚡</div><h4>Спидран</h4></div>
+              <div class="mode-card" data-mode="story" onclick="selectMode('story')"><div class="mode-info-btn" onclick="showModeInfo(event, 'story')">?</div><div class="mode-icon">📖</div><h4>История</h4></div>
+              <div class="mode-card" data-mode="plagiarism" onclick="selectMode('plagiarism')"><div class="mode-info-btn" onclick="showModeInfo(event, 'plagiarism')">?</div><div class="mode-icon">📠</div><h4>Плагиат</h4></div>
+              <div class="mode-card" data-mode="finishit" onclick="selectMode('finishit')"><div class="mode-info-btn" onclick="showModeInfo(event, 'finishit')">?</div><div class="mode-icon">✏️</div><h4>Дорисуй</h4></div>
+              <div class="mode-card" data-mode="tagteam" onclick="selectMode('tagteam')"><div class="mode-info-btn" onclick="showModeInfo(event, 'tagteam')">?</div><div class="mode-icon">🏃</div><h4>Эстафета</h4></div>
+              <div class="mode-card" data-mode="timebomb" onclick="selectMode('timebomb')"><div class="mode-info-btn" onclick="showModeInfo(event, 'timebomb')">?</div><div class="mode-icon">💣</div><h4>Бомба</h4></div>
+              <div class="mode-card" data-mode="impostor" onclick="selectMode('impostor')"><div class="mode-info-btn" onclick="showModeInfo(event, 'impostor')">?</div><div class="mode-icon">🕵️</div><h4>Предатель</h4></div>
+              <div class="mode-card" data-mode="coop" onclick="selectMode('coop')"><div class="mode-info-btn" onclick="showModeInfo(event, 'coop')">?</div><div class="mode-icon">🤝</div><h4>Кооп</h4></div>
+              <div class="mode-card" data-mode="babel" onclick="selectMode('babel')"><div class="mode-info-btn" onclick="showModeInfo(event, 'babel')">?</div><div class="mode-icon">🔤</div><h4>Перевод</h4></div>
+              <div class="mode-card" data-mode="duotone" onclick="selectMode('duotone')"><div class="mode-info-btn" onclick="showModeInfo(event, 'duotone')">?</div><div class="mode-icon">☯️</div><h4>2 Цвета</h4></div>
+              <div class="mode-card" data-mode="inkmeter" onclick="selectMode('inkmeter')"><div class="mode-info-btn" onclick="showModeInfo(event, 'inkmeter')">?</div><div class="mode-icon">🖋️</div><h4>Чернила</h4></div>
+              <div class="mode-card" data-mode="connectdots" onclick="selectMode('connectdots')"><div class="mode-info-btn" onclick="showModeInfo(event, 'connectdots')">?</div><div class="mode-icon">📌</div><h4>Точки</h4></div>
+              <div class="mode-card" data-mode="lasso" onclick="selectMode('lasso')"><div class="mode-info-btn" onclick="showModeInfo(event, 'lasso')">?</div><div class="mode-icon">🧩</div><h4>Лассо</h4></div>
+              <div class="mode-card" data-mode="triplethreat" onclick="selectMode('triplethreat')"><div class="mode-info-btn" onclick="showModeInfo(event, 'triplethreat')">?</div><div class="mode-icon">3️⃣</div><h4>Три слова</h4></div>
+              <div class="mode-card" data-mode="nohands" onclick="selectMode('nohands')"><div class="mode-info-btn" onclick="showModeInfo(event, 'nohands')">?</div><div class="mode-icon">📱</div><h4>Без рук</h4></div>
+              <div class="mode-card" data-mode="amnesia" onclick="selectMode('amnesia')"><div class="mode-info-btn" onclick="showModeInfo(event, 'amnesia')">?</div><div class="mode-icon">💨</div><h4>Амнезия</h4></div>
+              <div class="mode-card" data-mode="constellation" onclick="selectMode('constellation')"><div class="mode-info-btn" onclick="showModeInfo(event, 'constellation')">?</div><div class="mode-icon">✨</div><h4>Созвездие</h4></div>
+              <div class="mode-card" data-mode="nocolor" onclick="selectMode('nocolor')"><div class="mode-info-btn" onclick="showModeInfo(event, 'nocolor')">?</div><div class="mode-icon">🖤</div><h4>Секрет</h4></div>
+              <div class="mode-card" data-mode="onecolor" onclick="selectMode('onecolor')"><div class="mode-info-btn" onclick="showModeInfo(event, 'onecolor')">?</div><div class="mode-icon">🎨</div><h4>Один Цвет</h4></div>
+              <div class="mode-card" data-mode="darkmode" onclick="selectMode('darkmode')"><div class="mode-info-btn" onclick="showModeInfo(event, 'darkmode')">?</div><div class="mode-icon">🌑</div><h4>Ночь</h4></div>
+              <div class="mode-card" data-mode="hardcore" onclick="selectMode('hardcore')"><div class="mode-info-btn" onclick="showModeInfo(event, 'hardcore')">?</div><div class="mode-icon">🔥</div><h4>Хардкор</h4></div>
+              <div class="mode-card" data-mode="masterpiece" onclick="selectMode('masterpiece')"><div class="mode-info-btn" onclick="showModeInfo(event, 'masterpiece')">?</div><div class="mode-icon">🖼️</div><h4>Шедевр</h4></div>
+              <div class="mode-card" data-mode="mirror" onclick="selectMode('mirror')"><div class="mode-info-btn" onclick="showModeInfo(event, 'mirror')">?</div><div class="mode-icon">🪞</div><h4>Зеркало</h4></div>
+              <div class="mode-card" data-mode="earthquake" onclick="selectMode('earthquake')"><div class="mode-info-btn" onclick="showModeInfo(event, 'earthquake')">?</div><div class="mode-icon">🫨</div><h4>Тряска</h4></div>
+              <div class="mode-card" data-mode="drunk" onclick="selectMode('drunk')"><div class="mode-info-btn" onclick="showModeInfo(event, 'drunk')">?</div><div class="mode-icon">🥴</div><h4>Пьяный</h4></div>
+              <div class="mode-card" data-mode="pixelart" onclick="selectMode('pixelart')"><div class="mode-info-btn" onclick="showModeInfo(event, 'pixelart')">?</div><div class="mode-icon">🧊</div><h4>Пиксель</h4></div>
+              <div class="mode-card" data-mode="oneline" onclick="selectMode('oneline')"><div class="mode-info-btn" onclick="showModeInfo(event, 'oneline')">?</div><div class="mode-icon">📏</div><h4>1 Штрих</h4></div>
+              <div class="mode-card" data-mode="tiny" onclick="selectMode('tiny')"><div class="mode-info-btn" onclick="showModeInfo(event, 'tiny')">?</div><div class="mode-icon">🐜</div><h4>Лилипут</h4></div>
+              <div class="mode-card" data-mode="giant" onclick="selectMode('giant')"><div class="mode-info-btn" onclick="showModeInfo(event, 'giant')">?</div><div class="mode-icon">🐘</div><h4>Великан</h4></div>
+              <div class="mode-card" data-mode="fading" onclick="selectMode('fading')"><div class="mode-info-btn" onclick="showModeInfo(event, 'fading')">?</div><div class="mode-icon">👻</div><h4>Призрак</h4></div>
+              <div class="mode-card" data-mode="chaos" onclick="selectMode('chaos')"><div class="mode-info-btn" onclick="showModeInfo(event, 'chaos')">?</div><div class="mode-icon">🌀</div><h4>Хаос</h4></div>
             </div>
             <button class="btn-primary mt-4" onclick="startGame()">ЗАПУСТИТЬ ИГРУ</button>
           </div>
+
           <div id="tab-settings" class="tab-content">
             <div class="settings-row"><label>Базовое время:</label><select id="setting-time" class="glass-select"><option value="45">45 сек</option><option value="60">60 сек</option><option value="90" selected>90 сек</option><option value="120">120 сек</option></select></div>
             <div class="settings-row"><label>Количество этапов:</label><select id="setting-rounds" class="glass-select"><option value="1" selected>Обычное</option><option value="2">В 2 раза больше (x2)</option><option value="3">В 3 раза больше (x3)</option></select></div>
-            <button class="btn-primary mt-auto" onclick="startGame()">СОХРАНИТЬ И ЗАПУСТИТЬ</button>
+            <button class="btn-primary mt-auto" onclick="startGame()">СОХРАНИТЬ</button>
           </div>
         </div>
         <div id="guest-waiting" class="waiting-state" style="display: none;"><div class="spinner"></div><p>Ожидание хоста...</p></div>
@@ -72,7 +93,8 @@
         <h2 id="text-instruction" class="task-title" style="margin-top: 20px;">Придумайте фразу</h2>
         <div class="image-showcase">
           <img id="image-to-guess" src="" style="display:none;">
-          <div id="babel-translation" style="display:none; font-size:1rem; color:#fbbf24; font-weight:bold; margin-bottom:10px; animation: pulseRing 1s infinite;"></div>
+          <div id="text-to-continue" style="display:none; font-size:1.2rem; font-style:italic; padding:15px; background:rgba(0,0,0,0.3); border-radius:12px; margin-bottom:15px;"></div>
+          <div id="babel-translation" style="display:none; font-size:1rem; color:#fbbf24; font-weight:bold; margin-bottom:10px;"></div>
         </div>
         <input type="text" id="word-input" class="glass-input" placeholder="Введите текст..." autocomplete="off">
         <button class="btn-primary mt-4" onclick="submitWord(true)">Готово</button>
@@ -82,11 +104,10 @@
     <div id="draw-phase" class="phase-container draw-layout">
       <div class="sidebar-tools" id="sidebar-tools">
         <div class="tools-group-row" id="action-tools">
-          <div class="tool-btn w-100" onclick="undo()" title="Назад"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 12l6-6M3 12l6 6"></path></svg></div>
-          <div class="tool-btn w-100" onclick="redo()" title="Вперед"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12H3M21 12l-6-6M21 12l-6 6"></path></svg></div>
+          <div class="tool-btn w-100" onclick="undo()" title="Назад">↩️</div>
+          <div class="tool-btn w-100" onclick="redo()" title="Вперед">↪️</div>
         </div>
         <div class="tool-divider" id="tool-divider-1"></div>
-        
         <div class="palette grid-palette-4" id="color-palette">
           <div class="swatch active-swatch" style="background:#000000" onclick="setColor('#000000', this)"></div>
           <div class="swatch" style="background:#ffffff; border: 1px solid #ccc;" onclick="setColor('#ffffff', this)"></div>
@@ -98,55 +119,43 @@
           <div class="swatch" style="background:#a855f7" onclick="setColor('#a855f7', this)"></div>
           <div class="swatch rgb-wrapper" style="grid-column: span 4; width: 100%; border-radius: 8px; height: 18px;"><input type="color" id="rgb-picker" value="#ff0000" onchange="setColor(this.value, this.parentElement)"></div>
         </div>
-        
         <div class="tool-divider" id="tool-divider-2"></div>
         <div class="tools-label">Инструменты</div>
         <div class="tools-grid-2">
-          <div class="tool-btn active-swatch brush-tool" onclick="setBrush(this)" title="Кисть"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg></div>
-          <div class="tool-btn eraser-tool" onclick="setEraser(this)" title="Ластик"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16C2.5 15.5 2.5 14.5 3 14L13 4C13.5 3.5 14.5 3.5 15 4L20 9C20.5 9.5 20.5 10.5 20 11L11 20"></path></svg></div>
-          <div class="tool-btn fill-tool" onclick="setFill(this)" title="Заливка"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11l-8-8-8 8h16z"></path><path d="M3 11v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8"></path><path d="M12 3v8"></path></svg></div>
-          <div class="tool-btn eyedropper-tool" onclick="setEyedropper(this)" title="Пипетка"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg></div>
+          <div class="tool-btn active-swatch brush-tool" onclick="setBrush(this)" title="Кисть">🖌️</div>
+          <div class="tool-btn eraser-tool" onclick="setEraser(this)" title="Ластик">🧽</div>
+          <div class="tool-btn fill-tool" onclick="setFill(this)" title="Заливка">🪣</div>
+          <div class="tool-btn eyedropper-tool" onclick="setEyedropper(this)" title="Пипетка">💧</div>
         </div>
         <div class="tools-label mt-2">Фигуры</div>
         <div class="tools-grid-2">
-          <div class="tool-btn shape-tool" onclick="setLine(this)" title="Линия"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"></line></svg></div>
-          <div class="tool-btn shape-tool" onclick="setRect(this)" title="Квадрат"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg></div>
-          <div class="tool-btn clear w-100" style="grid-column: span 2;" onclick="clearCanvas()" title="Очистить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></div>
+          <div class="tool-btn shape-tool" onclick="setLine(this)" title="Линия">📏</div>
+          <div class="tool-btn shape-tool" onclick="setRect(this)" title="Квадрат">⬛</div>
+          <div class="tool-btn clear w-100" style="grid-column: span 2;" onclick="clearCanvas()" title="Очистить">🗑️</div>
         </div>
-        <button class="btn-submit-draw" onclick="submitDrawing(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
+        <button class="btn-submit-draw" onclick="submitDrawing(true)">✅</button>
       </div>
 
       <div class="canvas-area">
         <div class="top-tool-bar" style="flex-wrap: wrap; position: relative;">
-          <div id="ink-meter-container" style="display:none; position: absolute; bottom: -8px; left: 20px; right: 20px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden;">
-             <div id="ink-meter-bar" style="width: 100%; height: 100%; background: #3b82f6; transition: width 0.1s linear;"></div>
-          </div>
-          
-          <div class="draw-header">
-             <div class="round-badge" id="draw-round-badge">Этап 1/3</div>
-             <h2 id="word-to-draw" class="target-word">Слово</h2>
-          </div>
+          <div id="ink-meter-container" style="display:none; position: absolute; bottom: -8px; left: 20px; right: 20px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden;"><div id="ink-meter-bar" style="width: 100%; height: 100%; background: #3b82f6; transition: width 0.1s linear;"></div></div>
+          <div class="draw-header"><div class="round-badge" id="draw-round-badge">Этап 1/3</div><h2 id="word-to-draw" class="target-word">Слово</h2></div>
           <div class="timer-container" id="draw-timer-container">
             <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path class="timer-path" id="draw-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>
             <div class="timer-text" id="draw-timer-text">60</div>
           </div>
-          <div class="brush-settings" id="brush-settings">
-            <div class="brush-slider-horizontal"><span style="font-size:10px; opacity:0.7;">Размер</span><input type="range" id="brush-size" min="1" max="40" value="5"></div>
-          </div>
+          <div class="brush-settings" id="brush-settings"><div class="brush-slider-horizontal"><span style="font-size:10px; opacity:0.7;">Размер</span><input type="range" id="brush-size" min="1" max="40" value="5"></div></div>
         </div>
         
         <div id="zoom-container-wrapper" style="flex-grow: 1; width: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative;">
           <div id="zoom-container" style="width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; transition: transform 0.1s ease-out; will-change: transform;">
             <div class="canvas-wrapper-outer">
                <div class="canvas-wrapper" id="canvas-wrapper">
-                  <div id="plagiarism-overlay" class="plagiarism-overlay">
-                      <h3>Запомни рисунок!</h3><img id="plagiarism-img" src=""><button class="btn-primary" onclick="hidePlagiarism()">Спрятать и рисовать</button>
-                  </div>
+                  <div id="plagiarism-overlay" class="plagiarism-overlay"><h3>Запомни рисунок!</h3><img id="plagiarism-img" src=""><button class="btn-primary" onclick="hidePlagiarism()">Рисовать</button></div>
                   <div id="coop-divider" style="display:none; position:absolute; left:50%; top:0; bottom:0; width:4px; background:#d946ef; box-shadow: 0 0 15px #d946ef; z-index: 10; pointer-events: none;"></div>
                   <canvas id="drawing-board" width="800" height="600"></canvas>
-                  
                   <div id="gyro-cursor" style="display:none; position:absolute; width:15px; height:15px; border-radius:50%; border:2px solid #ef4444; pointer-events:none; z-index: 20; transform: translate(-50%, -50%);"></div>
-                  <button id="btn-gyro-start" class="btn-primary" style="display:none; position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 30; width: auto;" onclick="startGyro()">Начать рисовать гироскопом</button>
+                  <button id="btn-gyro-start" class="btn-primary" style="display:none; position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 30; width: auto;" onclick="startGyro()">Начать гироскоп</button>
                </div>
             </div>
           </div>
