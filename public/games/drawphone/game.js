@@ -1,3 +1,5 @@
+let animationFrameId = null; // Глобальное объявление для предотвращения ошибки сброса
+
 function setDisplay(id, display) { const el = document.getElementById(id); if (el) el.style.display = display; }
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
 function setHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
@@ -58,17 +60,12 @@ function showModeInfo(e, mode) {
 }
 
 function closeInfoModal() { setDisplay('info-modal', 'none'); }
-
-function hidePlagiarism(e) { 
-    if(e) e.preventDefault();
-    setDisplay('plagiarism-overlay', 'none'); 
-}
+function hidePlagiarism(e) { if(e) e.preventDefault(); setDisplay('plagiarism-overlay', 'none'); }
 
 function toggleMobileTools(e) {
     if (e) e.stopPropagation();
     document.getElementById('tools-popup').classList.toggle('show');
 }
-
 document.addEventListener('pointerdown', (e) => {
     const popup = document.getElementById('tools-popup');
     const trigger = document.querySelector('.mobile-tool-trigger');
@@ -125,7 +122,6 @@ function updateTimerUI(remaining, limit) {
         if (remaining <= 10 && remaining > 0) {
             if (timerContainer) timerContainer.classList.add('timer-warning');
             if (!currentPhaseSubmitted) {
-                // Более нагнетающий таймер звуков
                 let isWholeSecond = Math.floor(remaining) !== Math.floor(remaining + (0.1 * timeMultiplier));
                 if (isWholeSecond) {
                     let sec = Math.floor(remaining);
@@ -155,10 +151,7 @@ function startPhaseTimer(isDrawing) {
         timeRemaining -= (0.1 * timeMultiplier);
         if (timeRemaining <= 0) {
             clearInterval(phaseTimerInterval);
-            if (!currentPhaseSubmitted) { 
-                // АВТО-ОТПРАВКА, если игрок не успел нажать Готово
-                try { if (isDrawing) submitDrawing(false); else submitWord(false); } catch(e){}
-            }
+            if (!currentPhaseSubmitted) { try { if (isDrawing) submitDrawing(false); else submitWord(false); } catch(e){} }
         } else { updateTimerUI(timeRemaining, timeLimit); }
     }, 100);
 }
@@ -208,11 +201,12 @@ function startGame() {
   }, '*');
 }
 
+// Принудительный тотальный сброс для стабильной новой игры
 function playAgain() {
   if (!isHost) return;
   let resetSubs = {};
   for(let i=1; i<=30; i++) resetSubs[`round_${i}`] = {};
-  window.parent.postMessage({ type: 'update_state', updates: { submissions: resetSubs, presentation: null, voting: null, round: 0 } }, '*');
+  window.parent.postMessage({ type: 'update_state', updates: { submissions: resetSubs, presentation: null, voting: null, round: 0, status: 'waiting' } }, '*');
   window.parent.postMessage({ type: 'play_again' }, '*');
 }
 
@@ -247,7 +241,6 @@ function resetLocalGameData() {
     
     const brushBtn = document.querySelector('.brush-tool');
     if (brushBtn) brushBtn.classList.add('active-swatch');
-    
     const defaultColor = Array.from(document.querySelectorAll('.swatch')).find(el => el.style.background.includes('000000') || el.style.backgroundColor === 'rgb(0, 0, 0)');
     if (defaultColor) defaultColor.classList.add('active-swatch');
     
@@ -267,8 +260,6 @@ window.addEventListener('message', (event) => {
 });
 
 let lassoStampsCache = {};
-let activeLassoStampRef = null;
-
 function preloadLassoStamps() {
     lassoStampsCache = {};
     const r1 = globalState.submissions?.round_1;
@@ -292,13 +283,13 @@ function handleStateChange() {
     return;
   }
 
-  // Снято ограничение в 2 раунда. Плагиат и Дорисуй-ка идут по всей цепочке игроков!
+  // Расчет кругов (Для Коопа всегда 2 этапа)
   calculatedTotalRounds = players.length * (globalState.settings?.roundsMultiplier || 1);
+  if (globalState.settings?.mode === 'coop') calculatedTotalRounds = 2;
 
   if (globalState.status === 'finished') {
     currentLocalRound = -1; clearInterval(phaseTimerInterval);
     
-    // ЛОГИКА ГОЛОСОВАНИЯ ПРЕДАТЕЛЯ
     if (globalState.voting?.active) {
         if (globalState.voting?.showResults) {
             showPhase('voting-results-phase');
@@ -309,9 +300,7 @@ function handleStateChange() {
             renderVotingGrid();
             if (isHost) {
                 const votesCount = Object.keys(globalState.voting.results || {}).length;
-                if (votesCount >= players.length) {
-                    window.parent.postMessage({ type: 'update_state', updates: { 'voting/showResults': true } }, '*');
-                }
+                if (votesCount >= players.length) window.parent.postMessage({ type: 'update_state', updates: { 'voting/showResults': true } }, '*');
             }
         }
         return;
@@ -367,18 +356,14 @@ function handleStateChange() {
   }
 }
 
-function showPhase(phaseId) {
-  document.querySelectorAll('.screen, .phase-container').forEach(el => el.classList.remove('active'));
-  const target = document.getElementById(phaseId);
-  if (target) {
-      if (target.classList.contains('screen')) target.classList.add('active');
-      else { const gs = document.getElementById('game-screen'); if(gs) gs.classList.add('active'); target.classList.add('active'); }
-  }
-  setDisplay('leave-btn', (phaseId === 'lobby-screen' || phaseId === 'ready-to-present-phase' || phaseId === 'presentation-phase' || phaseId.includes('voting')) ? 'flex' : 'none');
-}
-
+// Логика тетрадей для Коопа (разбивка на пары)
 function getCurrentNotebookId(round, players) {
+    if (globalState.settings?.mode === 'tagteam') return players[0]; 
     const myIndex = players.indexOf(myUserId);
+    if (globalState.settings?.mode === 'coop') {
+        const primaryIndex = myIndex % 2 === 0 ? myIndex : myIndex - 1;
+        return players[primaryIndex];
+    }
     if (myIndex === -1) return myUserId; 
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
 }
@@ -393,7 +378,8 @@ function startRound(round, players) {
   if (mode === 'story') isDrawingPhase = false;
   if (mode === 'plagiarism' || mode === 'finishit' || mode === 'tagteam') isDrawingPhase = true;
   if (mode === 'copycat') isDrawingPhase = (round > 1);
-  
+  if (mode === 'coop') isDrawingPhase = (round === 2);
+
   if (mode === 'onecolor' && isDrawingPhase) currentColor = getRandomHex();
 
   const badgeText = `Этап ${round}/${calculatedTotalRounds}`;
@@ -451,9 +437,14 @@ function startRound(round, players) {
           else setHTML('word-to-draw', "Что угодно!");
       } else {
           let prevImg = null;
-          if (typeof previousData === 'string' && previousData.startsWith('{')) { try { prevImg = JSON.parse(previousData).img; } catch(e){} } 
-          else { prevImg = previousData; } 
-
+          if (typeof previousData === 'string') {
+              if (previousData.startsWith('{')) {
+                  try { let pd = JSON.parse(previousData); prevImg = pd.img; 
+                        if(mode === 'coop' && pd.original) { setText('word-to-draw', pd.original); } // Coop word text backup
+                  } catch(e){}
+              } else { prevImg = previousData; }
+          }
+          
           if (mode === 'plagiarism') {
               setText('word-to-draw', "Перерисуй по памяти!"); setDisplay('plagiarism-overlay', 'flex');
               const pi = document.getElementById('plagiarism-img'); if(pi) pi.src = prevImg;
@@ -472,7 +463,14 @@ function startRound(round, players) {
                   im.onclick = () => { document.querySelectorAll('.lasso-stamp-img').forEach(i=>i.classList.remove('active')); im.classList.add('active'); activeLassoStampRef = k; };
                   if(sc) sc.appendChild(im);
               });
-          } else { setText('word-to-draw', previousData || "..."); }
+          } else { 
+              // Babel mode translation extraction
+              let displayWord = previousData || "...";
+              if (typeof previousData === 'string' && previousData.startsWith('{')) {
+                  try { let p = JSON.parse(previousData); if(p.translated) displayWord = p.translated; } catch(e){}
+              }
+              setText('word-to-draw', displayWord); 
+          }
       }
       showPhase('draw-phase');
   } else {
@@ -485,8 +483,11 @@ function startRound(round, players) {
           if (mode === 'impostor') {
               let p = ["Слово", "Слово"];
               if (typeof getImpostorPair === 'function') p = getImpostorPair();
-              let isImpostor = players.indexOf(myUserId) === 0;
-              if(wi) { wi.value = isImpostor ? p[1] : p[0]; wi.disabled = true; }
+              let isImpostor = players.indexOf(myUserId) === 0; // Host is impostor technically, but it's assigned randomly by arrays
+              // Actually impostor should be random. Let's use seed
+              let impIndex = Math.floor(seededRandom(globalState.settings?.seed || 1) * players.length);
+              let isImpostorMatch = players.indexOf(myUserId) === impIndex;
+              if(wi) { wi.value = isImpostorMatch ? p[1] : p[0]; wi.disabled = true; }
               setText('text-instruction', "Ваше слово:");
           } else { if(wi) wi.disabled = false; }
 
@@ -521,17 +522,25 @@ function submitWord(isManual = false) {
   const wi = document.getElementById('word-input');
   if (wi && wi.value.trim()) word = wi.value.trim();
 
-  if (globalState.settings?.mode === 'babel' && currentLocalRound > 1) {
-      setDisplay('babel-translation', 'block'); setText('babel-translation', "Переводим...");
+  // Логика перевода в режиме Babel
+  if (globalState.settings?.mode === 'babel' && !isCurrentPhaseDrawing) {
+      setDisplay('babel-translation', 'block'); setText('babel-translation', "Сломанный переводчик...");
       setTimeout(() => {
-          let trans = word;
-          if (typeof getBabelTranslation === 'function') trans = getBabelTranslation(word);
+          let trans = typeof getBabelTranslation === 'function' ? getBabelTranslation(word) : word;
+          let dataToSave = JSON.stringify({ type: 'babel', original: word, translated: trans });
           const updates = {};
-          updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = trans;
+          updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = dataToSave;
           window.parent.postMessage({ type: 'update_state', updates }, '*');
           showPhase('waiting-phase'); updateWaitingScreen();
-      }, 1500); return;
+      }, 1500); 
+      return;
   }
+  
+  // Для Коопа сохраняем слово как JSON чтобы не потерялось
+  if (globalState.settings?.mode === 'coop') {
+      word = JSON.stringify({ type: 'coop', original: word });
+  }
+
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = word;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -553,6 +562,15 @@ function submitDrawing(isManual = false) {
       tCtx.drawImage(finishitBaseImg, 0, 0, tc.width, tc.height);
       tCtx.drawImage(canvas, 0, 0);
       finalDataUrl = tc.toDataURL('image/png');
+  } else if (mode === 'coop') {
+      const players = globalState.players || [];
+      const isLeft = players.indexOf(myUserId) % 2 === 0;
+      // Очищаем в прозрачность чужую половину
+      ctx.globalCompositeOperation = 'destination-out';
+      if (isLeft) ctx.fillRect(canvas.width / 2, 0, canvas.width / 2, canvas.height);
+      else ctx.fillRect(0, 0, canvas.width / 2, canvas.height);
+      ctx.globalCompositeOperation = 'source-over';
+      finalDataUrl = canvas.toDataURL('image/png');
   } else {
       const tempCtx = canvas.getContext('2d'); tempCtx.globalCompositeOperation = 'destination-over'; tempCtx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff';
       tempCtx.fillRect(0, 0, canvas.width, canvas.height); finalDataUrl = canvas.toDataURL('image/png');
@@ -560,7 +578,11 @@ function submitDrawing(isManual = false) {
   
   const finalData = JSON.stringify({ img: finalDataUrl, strokes: recordedStrokes });
   const updates = {};
-  updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = finalData;
+  
+  let targetId = getCurrentNotebookId(currentLocalRound, globalState.players || []);
+  if (mode === 'coop') targetId = myUserId; // В Коопе каждый грузит свою половину в СВОЙ ID (чтобы не перезаписывать друг друга)
+
+  updates[`submissions/round_${currentLocalRound}/${targetId}`] = finalData;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
   resetCanvasTransform(); showPhase('waiting-phase'); updateWaitingScreen();
 }
@@ -593,7 +615,6 @@ function drawArrow(actx, fromx, fromy, tox, toy) {
     actx.moveTo(tox, toy); actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6)); actx.stroke();
 }
 
-// Заливка с виртуальным слиянием слоев (решает баг Дорисуй-ки)
 function floodFillCore(startX, startY, fillColorHex) {
     startX = Math.round(startX); startY = Math.round(startY);
     const w = canvas.width, h = canvas.height;
@@ -647,7 +668,23 @@ function floodFillCore(startX, startY, fillColorHex) {
     ctx.putImageData(imgData, 0, 0);
 }
 
-// 90 FPS + Аппаратное Ускорение + PointerEvents (Мультитач Зум)
+function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
+    targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over';
+    targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    for (let stroke of strokes) {
+        targetCtx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
+        targetCtx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
+        
+        if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { targetCtx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); continue; }
+        if (stroke.type === 'clear') { targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
+        else if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
+        else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
+        else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
+        else if (stroke.type === 'arrow') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; drawArrow(targetCtx, stroke.p[0], stroke.p[1], stroke.p[2], stroke.p[3]); if(stroke.sym) { targetCtx.beginPath(); drawArrow(targetCtx, targetCanvas.width - stroke.p[0], stroke.p[1], targetCanvas.width - stroke.p[2], stroke.p[3]); } }
+        else { let pts = stroke.p; if (!pts || pts.length < 2) continue; targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round'; targetCtx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i+=2) { targetCtx.lineTo(pts[i], pts[i+1]); } targetCtx.stroke(); if (stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - pts[0], pts[1]); for (let i = 2; i < pts.length; i+=2) { targetCtx.lineTo(targetCanvas.width - pts[i], pts[i+1]); } targetCtx.stroke(); } }
+    }
+}
+
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
 const ctx = canvas.getContext('2d', { desynchronized: true, willReadFrequently: false });
@@ -665,6 +702,7 @@ function restoreState(index) {
         ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowBlur=0; ctx.globalCompositeOperation = 'source-over'; 
         const mode = globalState.settings?.mode;
         if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); } 
+        else if (mode === 'coop') { ctx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
         else { ctx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
         ctx.drawImage(img, 0, 0); 
     }; 
@@ -705,17 +743,14 @@ function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; up
 function updateTransform() { if (!zoomContainer) return; if (canvasTransform.scale <= 1) { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; } zoomContainer.style.transformOrigin = `0 0`; zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
 function getCoordinates(clientX, clientY) { const rect = canvas.getBoundingClientRect(); return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height }; }
 
-// НОВЫЙ ПРОДВИНУТЫЙ ОБРАБОТЧИК КАСАНИЙ
 function startPosition(e) {
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    
-    // Если 2 пальца - ЗУМ! Отключаем кисть
     if (activePointers.size === 2) {
         isDrawing = false; isDrawingShape = false;
         const pts = Array.from(activePointers.values());
         initialDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         lastZoomCenter = { x: (pts[0].x + pts[1].x)/2, y: (pts[0].y + pts[1].y)/2 };
-        if (preZoomState) { // Стираем начатую перым пальцем линию
+        if (preZoomState) { 
             let img = new Image(); img.src = preZoomState;
             img.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0,0); }
         }
@@ -723,7 +758,6 @@ function startPosition(e) {
     }
     if (activePointers.size > 2) return;
 
-    // Иначе - рисуем!
     try { canvas.setPointerCapture(e.pointerId); } catch(err){}
     let pos = getCoordinates(e.clientX, e.clientY); const mode = globalState.settings?.mode;
     
@@ -760,17 +794,14 @@ function draw(e) {
   if (!activePointers.has(e.pointerId)) return;
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  // Логика Зума (2 пальца)
   if (activePointers.size === 2) {
       if (e.pointerType === 'touch') e.preventDefault();
       const pts = Array.from(activePointers.values());
       const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       const cx = (pts[0].x + pts[1].x)/2; const cy = (pts[0].y + pts[1].y)/2;
-      
       if (initialDistance === 0) { initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; }
       let newScale = canvasTransform.scale * (currentDist / initialDistance);
       if (newScale < 1) newScale = 1; if (newScale > 5) newScale = 5;
-      
       const wrapperRect = zoomContainer.parentElement.getBoundingClientRect();
       canvasTransform.x -= (cx - wrapperRect.left - canvasTransform.x) * (newScale / canvasTransform.scale - 1);
       canvasTransform.y -= (cy - wrapperRect.top - canvasTransform.y) * (newScale / canvasTransform.scale - 1);
@@ -838,7 +869,6 @@ canvas.addEventListener('pointermove', draw, {passive: false});
 canvas.addEventListener('pointercancel', endPosition);
 canvas.addEventListener('pointerout', endPosition);
 
-
 // ==========================================
 // ГОЛОСОВАНИЕ ПРЕДАТЕЛЯ И ЧАТ-ПРЕЗЕНТАЦИЯ
 // ==========================================
@@ -851,7 +881,6 @@ function speakText(text) {
 
 function startPresentation() { if (!isHost) return; initAudio(); window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: true, bookIndex: 0, round: 1 } }}, '*'); }
 
-// Система Голосования
 function startImpostorVoting() {
     if (!isHost) return;
     window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: false }, voting: { active: true, results: {} } }}, '*');
@@ -884,7 +913,9 @@ function submitVote(targetId) {
 
 function renderVotingResults() {
     const players = globalState.players || [];
-    const impostorId = players[0]; 
+    // Предатель случайно выбирается на основе seed (тот же что и при старте)
+    const impIndex = Math.floor(seededRandom(globalState.settings?.seed || 1) * players.length);
+    const impostorId = players[impIndex]; 
     const impostorName = globalState.playerNames?.[impostorId] || "Аноним";
     
     const votes = globalState.voting?.results || {};
@@ -916,7 +947,12 @@ function syncPresentationView(players) {
     if (renderedPresentationState === currentStateId) return;
 
     const bookOwnerId = players[pres.bookIndex];
-    setText('chat-book-title', `История: ${globalState.playerNames?.[bookOwnerId] || "Аноним"}`);
+    const mode = globalState.settings?.mode;
+    
+    // В Коопе название тетради - общая
+    let bookTitle = `История: ${globalState.playerNames?.[bookOwnerId] || "Аноним"}`;
+    if (mode === 'coop') bookTitle = "Общий Шедевр";
+    setText('chat-book-title', bookTitle);
     
     const avatarsContainer = document.getElementById('presentation-avatars');
     if (pres.round === 1) { 
@@ -924,7 +960,9 @@ function syncPresentationView(players) {
         if (avatarsContainer) {
             avatarsContainer.innerHTML = '';
             for (let i = 0; i < calculatedTotalRounds; i++) {
-                const stepAuthorId = players[(players.indexOf(bookOwnerId) + i + players.length * 10) % players.length];
+                let stepAuthorId = players[(players.indexOf(bookOwnerId) + i + players.length * 10) % players.length];
+                if (mode === 'coop' && i === 1) stepAuthorId = players[(players.indexOf(bookOwnerId) + 1) % players.length]; // Партнер
+                
                 const avatar = globalState.playerAvatars?.[stepAuthorId] || "https://picsum.photos/100";
                 const wrap = document.createElement('div'); wrap.className = 'pres-avatar-node';
                 const img = document.createElement('img'); img.src = avatar; img.className = `pres-avatar-img`; img.id = `pres-av-${i + 1}`;
@@ -950,36 +988,64 @@ function syncPresentationView(players) {
         }
     }
 
-    let rawData = globalState.submissions?.[`round_${pres.round}`]?.[bookOwnerId];
-    let imgUrl = rawData; let strokesData = null;
-
-    let isText = true;
-    if (typeof rawData === 'string') {
-        if (rawData.startsWith('{')) { try { let parsed = JSON.parse(rawData); if (parsed.img) { imgUrl = parsed.img; strokesData = parsed.strokes; isText = false; } } catch(e) {}
-        } else if (rawData.length > 1000 && rawData.startsWith('data:image')) { isText = false; }
+    // Извлечение данных с поддержкой JSON (Кооп и Переводчик)
+    function extractData(rawData) {
+        let textData = rawData, imgUrl = rawData, strokes = null, isText = true, babelData = null;
+        if (typeof rawData === 'string') {
+            if (rawData.startsWith('{')) {
+                try { 
+                    let parsed = JSON.parse(rawData); 
+                    if (parsed.img) { imgUrl = parsed.img; strokes = parsed.strokes; isText = false; }
+                    else if (parsed.type === 'babel') { isText = true; babelData = parsed; textData = parsed.translated; }
+                    else if (parsed.type === 'coop') { isText = true; textData = parsed.original; }
+                } catch(e) {}
+            } else if (rawData.length > 1000 && rawData.startsWith('data:image')) { isText = false; }
+        }
+        if (mode === 'story') isText = true;
+        if (isText && (!textData || textData.length === 0)) { textData = "(Слово не сохранилось)"; }
+        return { isText, textData, imgUrl, strokes, babelData };
     }
-    const mode = globalState.settings?.mode;
-    if (mode === 'story') isText = true;
-    if (isText && (!rawData || rawData.length === 0)) { rawData = "(Слово не сохранилось)"; }
 
-    // Логика Предателя (пропуск текста)
-    if (mode === 'impostor' && isText) {
-        if (isHost) setTimeout(nextSlide, 800); 
+    let pData = extractData(globalState.submissions?.[`round_${pres.round}`]?.[bookOwnerId]);
+
+    // Пропуск текста для Предателя
+    if (mode === 'impostor' && pData.isText) {
+        if (isHost) setTimeout(nextSlide, 500); 
         renderedPresentationState = currentStateId; return;
     }
 
-    const authorId = players[(players.indexOf(bookOwnerId) + pres.round - 1 + players.length * 10) % players.length];
-    const authorName = globalState.playerNames?.[authorId] || "Аноним";
-    const authorAvatar = globalState.playerAvatars?.[authorId] || "https://picsum.photos/100";
-    const side = isText ? 'left' : 'right'; let visualContent = '';
+    let authorId = players[(players.indexOf(bookOwnerId) + pres.round - 1 + players.length * 10) % players.length];
+    let authorName = globalState.playerNames?.[authorId] || "Аноним";
+    let authorAvatar = globalState.playerAvatars?.[authorId] || "https://picsum.photos/100";
+    
+    const side = pData.isText ? 'left' : 'right'; let visualContent = '';
 
-    if (isText) { 
-        visualContent = `<div class="msg-text">${rawData}</div>`; 
-    } else {
-        if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism') {
-            visualContent = `<div style="position:relative; width:100%;"><img src="${imgUrl}" class="msg-img"></div>`;
+    if (pData.isText) { 
+        if (pData.babelData) {
+            visualContent = `<div class="msg-text"><div style="font-size:0.9rem; opacity:0.7; margin-bottom:5px;">Оригинал: ${pData.babelData.original}</div><div style="color:#fbbf24; font-weight:bold;">${pData.babelData.translated}</div></div>`;
         } else {
-            visualContent = `<div style="position:relative; width:100%;"><img src="${imgUrl}" class="msg-img"></div>`;
+            visualContent = `<div class="msg-text">${pData.textData}</div>`; 
+        }
+    } else {
+        if (mode === 'coop' && pres.round === 2) {
+            const p1 = bookOwnerId;
+            const p2 = players[(players.indexOf(bookOwnerId) + 1) % players.length];
+            const p1Data = extractData(globalState.submissions?.[`round_2`]?.[p1]);
+            const p2Data = extractData(globalState.submissions?.[`round_2`]?.[p2]);
+            const author1 = globalState.playerNames?.[p1] || "Игрок 1";
+            const author2 = globalState.playerNames?.[p2] || "Игрок 2";
+            
+            authorName = `${author1} & ${author2}`;
+            visualContent = `
+            <div style="position:relative; width:100%; max-height: 40vh; aspect-ratio: 4/3; background: white; border-radius:12px; border: 2px solid rgba(255,255,255,0.9); overflow: hidden;">
+               <img src="${p1Data.imgUrl}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain;">
+               <img src="${p2Data.imgUrl}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain;">
+               <div style="position:absolute; left:50%; top:0; bottom:0; width:4px; background:#d946ef; opacity:0.8; box-shadow: 0 0 10px #d946ef;"></div>
+            </div>`;
+        } else if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism') {
+            visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img"></div>`;
+        } else {
+            visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas></div>`;
         }
     }
 
@@ -987,11 +1053,14 @@ function syncPresentationView(players) {
     const chatContainer = document.getElementById('chat-messages');
     if (chatContainer) { chatContainer.insertAdjacentHTML('beforeend', msgHTML); setTimeout(() => { chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' }); }, 50); }
 
-    if (isText) speakText(rawData); 
+    if (pData.isText) speakText(pData.textData); 
 
     if (isHost) {
         if (pres.round === calculatedTotalRounds) {
-            if (pres.bookIndex === players.length - 1) {
+            let isLast = pres.bookIndex === players.length - 1;
+            if (mode === 'coop') isLast = pres.bookIndex >= players.length - 2;
+
+            if (isLast) {
                 if (mode === 'impostor') {
                     setDisplay('next-slide-btn', 'none'); setDisplay('play-again-btn', 'none');
                     const chatFooter = document.querySelector('.chat-footer');
@@ -1009,6 +1078,10 @@ function nextSlide() {
     if (!isHost) return;
     const pres = globalState.presentation; const players = globalState.players || [];
     let nextR = pres.round + 1; let nextB = pres.bookIndex;
-    if (nextR > calculatedTotalRounds) { nextB++; nextR = 1; }
+    if (nextR > calculatedTotalRounds) { 
+        if (globalState.settings?.mode === 'coop') nextB += 2; // Пропускаем тетрадь партнера
+        else nextB++; 
+        nextR = 1; 
+    }
     window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: true, bookIndex: nextB, round: nextR } }}, '*');
 }
