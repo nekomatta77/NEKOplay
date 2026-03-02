@@ -1,6 +1,5 @@
 let animationFrameId = null; 
 
-// Загрузка слов для Лассо из russian.txt
 let russianWords = ["Слон", "Космос", "Любовь", "Монстр", "Машина", "Кот"]; 
 fetch('/russian.txt').then(r => r.text()).then(text => {
     let parsed = text.split('\n').map(w => w.trim()).filter(w => w.length > 0);
@@ -206,7 +205,6 @@ function startGame() {
   if (selectedMode === 'coop' && (playersCountParam % 2 !== 0)) { alert("Для Коопа нужно четное число игроков!"); return; }
   const seed = Math.floor(Math.random() * 1000000);
   
-  // Очистка кэша старой игры
   window.parent.postMessage({ 
       type: 'update_state', 
       updates: { submissions: null, presentation: { active: false, bookIndex: 0, round: 1 }, voting: null, round: 1 } 
@@ -220,7 +218,6 @@ function startGame() {
 
 function playAgain() {
   if (!isHost) return;
-  // Очистка кэша старой игры
   window.parent.postMessage({ 
       type: 'update_state', 
       updates: { submissions: null, presentation: null, voting: null, round: 0, status: 'waiting' } 
@@ -373,12 +370,11 @@ function handleStateChange() {
   }
 }
 
+// ИСПРАВЛЕНИЕ ЗАВИСАНИЯ КООП РЕЖИМА: 
+// Теперь каждый игрок в коопе пишет в СВОЮ тетрадь, а не перезаписывает тетрадь напарника.
 function getCurrentNotebookId(round, players) {
     const myIndex = players.indexOf(myUserId);
-    if (globalState.settings?.mode === 'coop') {
-        const primaryIndex = myIndex % 2 === 0 ? myIndex : myIndex - 1;
-        return players[primaryIndex];
-    }
+    if (globalState.settings?.mode === 'coop') return myUserId; // <--- Решает баг!
     if (myIndex === -1) return myUserId; 
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
 }
@@ -403,7 +399,7 @@ function startRound(round, players) {
   if (mode === 'plagiarism' || mode === 'finishit' || mode === 'tagteam') isDrawingPhase = true;
   if (mode === 'copycat') isDrawingPhase = (round > 1);
   if (mode === 'coop') isDrawingPhase = (round === 2);
-  if (mode === 'lasso') isDrawingPhase = (round % 2 !== 0); // Раунд 1: Рисуем слово, Раунд 2: Текст тема, Раунд 3: Рисуем из штампов
+  if (mode === 'lasso') isDrawingPhase = (round % 2 !== 0);
 
   if (mode === 'onecolor' && isDrawingPhase) currentColor = getRandomHex();
 
@@ -437,7 +433,6 @@ function startRound(round, players) {
       if (mode === 'inkmeter') { setDisplay('ink-meter-container', 'block'); currentInk = maxInk; const im = document.getElementById('ink-meter-bar'); if(im) im.style.width = '100%'; }
       if (mode === 'nohands') setDisplay('btn-gyro-start', 'block');
 
-      // КРАСНЫЙ ФОН ДЛЯ КООПА
       if (mode === 'coop') {
           setDisplay('coop-divider', 'block');
           const isLeft = players.indexOf(myUserId) % 2 === 0;
@@ -467,7 +462,6 @@ function startRound(round, players) {
           dotsArray.forEach(d => { ctx.beginPath(); ctx.arc(d.x, d.y, 5, 0, Math.PI*2); ctx.fill(); });
       }
 
-      // Добавление ползунков настроек для Лассо Раунд 3
       let lsSettings = document.getElementById('lasso-settings');
       if (mode === 'lasso' && round >= 3) {
           if (!lsSettings) {
@@ -579,7 +573,6 @@ function startRound(round, players) {
   }
 }
 
-// НАСТОЯЩИЙ СЛОМАННЫЙ ПЕРЕВОДЧИК (ДИКОЕ ИСКАЖЕНИЕ СМЫСЛА)
 async function getRealBabelTranslation(text) {
     const chain = ['zh-CN', 'sw', 'haw', 'is', 'ar', 'ru'];
     let currentText = text;
@@ -635,7 +628,6 @@ function submitDrawing(isManual = false) {
   const mode = globalState.settings?.mode; let finalDataUrl = '';
 
   if (mode === 'lasso' && currentLocalRound === 1) {
-      // ИСПРАВЛЕНИЕ: Лассо раунд 1 сохраняется БЕЗ ФОНА!
       finalDataUrl = canvas.toDataURL('image/png');
   } else if (mode === 'amnesia') {
       redrawFromStrokesSync(recordedStrokes, ctx, canvas, mode === 'darkmode');
@@ -752,7 +744,7 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
         else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
         else if (stroke.type === 'arrow') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; drawArrow(targetCtx, stroke.p[0], stroke.p[1], stroke.p[2], stroke.p[3]); if(stroke.sym) { targetCtx.beginPath(); drawArrow(targetCtx, targetCanvas.width - stroke.p[0], stroke.p[1], targetCanvas.width - stroke.p[2], stroke.p[3]); } }
-        else if (stroke.type === 'fill') { } // floodFillCore calls need original imageData, skipped in basic redraw for now
+        else if (stroke.type === 'fill') { } 
         else { 
             let pts = stroke.p; if (!pts || pts.length < 2) continue; 
             targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round'; 
@@ -764,7 +756,6 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
     }
 }
 
-// ИСПРАВЛЕНИЕ: Восстановлены анимации рисования!
 function animateStrokes(strokes, canvasEl, isDark) {
     const actx = canvasEl.getContext('2d');
     const mode = globalState.settings?.mode;
@@ -798,7 +789,7 @@ function animateStrokes(strokes, canvasEl, isDark) {
             
             let pts = stroke.p;
             if (pointIndex < pts.length) {
-                for(let k=0; k<5; k++) { // рисуем по 5 точек за кадр для скорости
+                for(let k=0; k<5; k++) { 
                     if (pointIndex < pts.length) {
                         actx.beginPath(); actx.moveTo(pts[pointIndex-2], pts[pointIndex-1]); actx.lineTo(pts[pointIndex], pts[pointIndex+1]); actx.stroke();
                         if (stroke.sym) { actx.beginPath(); actx.moveTo(canvasEl.width - pts[pointIndex-2], pts[pointIndex-1]); actx.lineTo(canvasEl.width - pts[pointIndex], pts[pointIndex+1]); actx.stroke(); }
@@ -876,7 +867,6 @@ function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; up
 function updateTransform() { if (!zoomContainer) return; if (canvasTransform.scale <= 1) { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; } zoomContainer.style.transformOrigin = `0 0`; zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
 function getCoordinates(clientX, clientY) { const rect = canvas.getBoundingClientRect(); return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height }; }
 
-// ИСПРАВЛЕНИЕ: Многопальцевый зум отменяет случайные штрихи
 function startPosition(e) {
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -1173,7 +1163,6 @@ function syncPresentationView(players) {
         renderedPresentationState = currentStateId; return;
     }
 
-    // ЛОГИКА РЕНДЕРИНГА
     if (mode === 'coop') {
         const p1 = bookOwnerId;
         const p2 = players[(players.indexOf(bookOwnerId) + 1) % players.length];
@@ -1208,7 +1197,6 @@ function syncPresentationView(players) {
         if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism' || mode === 'impostor') {
             visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img"></div>`;
         } else {
-            // ДЛЯ ОБЫЧНЫХ РЕЖИМОВ ВОЗВРАЩЕНА АНИМАЦИЯ НА CANVAS!
             visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}" style="width:100%; border-radius:12px; border:2px solid rgba(255,255,255,0.1); background:${mode==='darkmode'?'#000':'#fff'}"></canvas></div>`;
         }
     }
@@ -1220,7 +1208,6 @@ function syncPresentationView(players) {
         setTimeout(() => { chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' }); }, 50); 
     }
 
-    // Запуск анимации рисования, если сгенерирован холст
     if (visualContent.includes('anim-canvas')) {
         setTimeout(() => {
             const c = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);

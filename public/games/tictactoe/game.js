@@ -12,9 +12,17 @@ else if (playersCount >= 5) { BOARD_SIZE = 8; WIN_STREAK = 4; }
 
 document.documentElement.style.setProperty('--board-size', BOARD_SIZE);
 
-if (typeof applyRulesText === 'function') {
-  applyRulesText(playersCount, BOARD_SIZE, WIN_STREAK);
+// БЕЗОПАСНАЯ загрузка правил (чтобы не было ошибки null)
+function tryApplyRules() {
+    if (typeof applyRulesText === 'function') {
+        if (document.getElementById('rulesDescription')) {
+            applyRulesText(playersCount, BOARD_SIZE, WIN_STREAK);
+        } else {
+            setTimeout(tryApplyRules, 50); // Ждем 50мс и пробуем снова
+        }
+    }
 }
+tryApplyRules();
 
 let boardState = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
 let isOnCooldown = false;
@@ -29,6 +37,7 @@ const boardEl = document.getElementById('board');
 const cooldownEl = document.getElementById('cooldown');
 
 function initBoard() {
+  if (!boardEl) return;
   boardEl.innerHTML = ''; 
   for (let y = 0; y < BOARD_SIZE; y++) {
     for (let x = 0; x < BOARD_SIZE; x++) {
@@ -53,8 +62,9 @@ function startCountdown() {
   
   const overlay = document.getElementById('countdownOverlay');
   const textEl = document.getElementById('countdownText');
-  overlay.classList.add('active');
+  if (!overlay || !textEl) return;
   
+  overlay.classList.add('active');
   let count = 3;
   textEl.innerText = count;
   textEl.classList.add('pop');
@@ -177,13 +187,12 @@ function showWinner(color, winnerName) {
   isGameOver = true;
   const overlay = document.getElementById('winnerOverlay');
   const text = document.getElementById('winnerText');
-  const restartBtn = document.getElementById('restartBtn');
+  const restartBtn = document.querySelector('#winnerOverlay .restart-btn');
   
   overlay.classList.add('active');
   text.style.color = color;
   text.innerText = `ПОБЕДИЛ ${winnerName.toUpperCase()}!`;
 
-  // Логика кнопки рестарта
   if (isHost) {
       restartBtn.innerText = "ИГРАТЬ ЕЩЕ РАЗ";
       restartBtn.disabled = false;
@@ -195,5 +204,13 @@ function showWinner(color, winnerName) {
   }
 }
 
-initBoard();
-startCountdown();
+// Запуск при готовности
+window.addEventListener('DOMContentLoaded', () => {
+    initBoard();
+    startCountdown();
+});
+// Если DOM уже загружен
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    initBoard();
+    startCountdown();
+}
