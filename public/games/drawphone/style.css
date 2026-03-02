@@ -35,7 +35,7 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 .player-avatar-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 60px; position: relative; animation: slideUp 0.3s ease; }
 .player-avatar-wrap img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); background: #1e293b; }
 .player-name-mini { font-size: 0.75rem; color: white; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65px; text-align: center; }
-.host-crown { position: absolute; top: -10px; right: -5px; font-size: 1.2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); z-index: 2; }
+.host-crown { position: absolute; top: -10px; right: -5px; z-index: 2; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 
 .main-lobby { max-width: 750px; }
 .stats-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
@@ -48,11 +48,15 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 .tab-content.active { display: flex; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-.modes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-@media (max-width: 500px) { .modes-grid { grid-template-columns: repeat(2, 1fr); } }
-.mode-card { background: rgba(0,0,0,0.4); border: 2px solid transparent; border-radius: 16px; padding: 10px; text-align: center; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; align-items: center; position: relative; }
-.mode-card h4 { font-size: 0.8rem; margin-top: 8px; font-weight: 600; }
-.mode-icon { font-size: 1.5rem; }
+/* Сетка режимов (большая) */
+.modes-grid-large { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-height: 40vh; overflow-y: auto; padding-right: 5px; }
+@media (min-width: 600px) { .modes-grid-large { grid-template-columns: repeat(4, 1fr); max-height: 50vh; } }
+.modes-grid-large::-webkit-scrollbar { width: 6px; }
+.modes-grid-large::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+.mode-card { background: rgba(0,0,0,0.4); border: 2px solid transparent; border-radius: 16px; padding: 12px 5px; text-align: center; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; align-items: center; position: relative; }
+.mode-card h4 { font-size: 0.75rem; margin-top: 8px; font-weight: 600; }
+.mode-icon { color: white; display: flex; justify-content: center; }
 .mode-card.active { border-color: var(--primary); background: rgba(139, 92, 246, 0.2); box-shadow: 0 0 20px var(--primary-glow); transform: translateY(-2px); }
 .mode-info-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.1); color: var(--text-muted); font-size: 0.75rem; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: 0.2s; z-index: 2; }
 .mode-info-btn:hover { background: var(--primary); color: white; }
@@ -95,7 +99,7 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 
 /* РИСОВАНИЕ */
 .draw-layout { flex-direction: row; align-items: stretch; justify-content: flex-start; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); gap: 15px; width: 100vw; height: 100dvh; background: var(--bg-color); }
-.sidebar-tools { display: flex; flex-direction: column; align-items: center; gap: 15px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 15px; width: 130px; min-width: 130px; height: 100%; box-shadow: 5px 0 20px rgba(0,0,0,0.5); overflow-y: auto; z-index: 10; }
+.sidebar-tools { display: flex; flex-direction: column; align-items: center; gap: 15px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 15px; width: 130px; min-width: 130px; height: 100%; box-shadow: 5px 0 20px rgba(0,0,0,0.5); overflow-y: auto; z-index: 10; transition: 0.3s; }
 .sidebar-tools::-webkit-scrollbar { display: none; }
 .grid-palette { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%; place-items: center; }
 .swatch { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; transition: 0.1s; border: 2px solid transparent; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
@@ -105,7 +109,6 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 .rgb-wrapper input[type="color"] { position: absolute; opacity: 0; width: 150%; height: 150%; cursor: pointer; }
 .tool-divider { width: 80%; height: 2px; background: rgba(255,255,255,0.1); border-radius: 2px; }
 
-/* Инструменты 3 колонки */
 .tools-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100%; }
 .tool-btn { width: 100%; aspect-ratio: 1; border-radius: 10px; display: flex; justify-content: center; align-items: center; cursor: pointer; background: rgba(255,255,255,0.05); transition: 0.2s; border: 1px solid rgba(255,255,255,0.1); }
 .tool-btn.active-swatch { background: var(--primary); color: white; border-color: var(--primary); }
@@ -123,9 +126,18 @@ body { background-color: var(--bg-color); color: var(--text); height: 100dvh; ov
 input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; border-radius: 3px; cursor: pointer; }
 
 /* ДЕРЕВО И ФИКС ХОЛСТА */
-.canvas-wrapper-outer { width: 100%; max-width: 1000px; max-height: calc(100dvh - 90px); aspect-ratio: 4 / 3; padding: 12px; background-color: #8b5a2b; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px), repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(0,0,0,0.1) 15px, rgba(0,0,0,0.1) 30px), linear-gradient(to right, #6b4226, #8b5a2b, #5c3a21); background-size: 20px 20px, 20px 20px, auto, auto; border-radius: 6px; position: relative; overflow: hidden; border: 4px solid #4a2a12; border-bottom-width: 8px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 15px 35px rgba(0,0,0,0.6); margin: 0 auto; }
-.canvas-wrapper { width: 100%; height: 100%; position: relative; background: transparent; }
+.canvas-wrapper-outer { width: 100%; max-width: 1000px; max-height: calc(100dvh - 90px); aspect-ratio: 4 / 3; padding: 12px; background-color: #8b5a2b; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px), repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(0,0,0,0.1) 15px, rgba(0,0,0,0.1) 30px), linear-gradient(to right, #6b4226, #8b5a2b, #5c3a21); background-size: 20px 20px, 20px 20px, auto, auto; border-radius: 6px; position: relative; overflow: hidden; border: 4px solid #4a2a12; border-bottom-width: 8px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 15px 35px rgba(0,0,0,0.6); margin: 0 auto; transition: 0.3s; }
+.canvas-wrapper { width: 100%; height: 100%; position: relative; background: transparent; transition: 0.3s; }
 #drawing-board { width: 100%; height: 100%; position: absolute; top: 0; left: 0; touch-action: none; cursor: crosshair; display: block; background: #ffffff; border-radius: 2px; box-shadow: 0 0 15px rgba(0,0,0,0.6); }
+
+/* РЕЖИМ: ВСЛЕПУЮ */
+.blindfold { display: none; position: absolute; inset: 0; background: #ffffff; z-index: 20; pointer-events: none; border-radius: 2px; }
+
+/* ЭФФЕКТЫ РЕЖИМОВ */
+.mode-mirror { transform: scaleX(-1) !important; }
+.mode-earthquake { animation: earthquakeShake 0.4s infinite; }
+@keyframes earthquakeShake { 0% { transform: translate(1px, 1px) rotate(0deg); } 25% { transform: translate(-2px, -1px) rotate(-1deg); } 50% { transform: translate(2px, -2px) rotate(1deg); } 75% { transform: translate(-1px, 2px) rotate(0deg); } 100% { transform: translate(1px, 1px) rotate(0deg); } }
+.mode-tiny { transform: scale(0.4) !important; }
 
 /* ЧАТ ПРЕЗЕНТАЦИИ */
 .chat-layout { padding: 0; background: #0f172a; height: 100dvh; }

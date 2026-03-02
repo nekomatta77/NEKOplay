@@ -37,17 +37,26 @@ function switchTab(tabId) {
 }
 
 const modeDescriptions = {
-    'classic': 'Обычная игра. Рисуй, отгадывай и веселись без жестких ограничений!',
-    'icebreaker': 'Ледокол! Игра начинается не с текста, а с рисунка. Нарисуйте на первом этапе что угодно, а следующий игрок попытается это угадать!',
-    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза. Придется думать и рисовать очень быстро!',
-    'nocolor': 'Секретный режим! Палитра заблокирована. Рисуем только черным цветом, как настоящие графики.',
-    'hardcore': 'Без права на ошибку! Ластик, отмена действий и очистка холста отключены. Рисуй с первого раза!',
+    'classic': 'Обычная игра. Рисуй, отгадывай и веселись!',
+    'icebreaker': 'Ледокол! Игра начинается не с текста, а с рисунка. Нарисуйте на первом этапе что угодно.',
+    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза.',
+    'nocolor': 'Секретный режим! Палитра заблокирована. Рисуем только черным.',
+    'hardcore': 'Без права на ошибку! Ластик, отмена и очистка отключены.',
     'story': 'История! Рисования нет вообще. Только текст. Вы пишете продолжение предыдущей фразы, создавая смешной рассказ.',
     'copycat': 'Подделка! Первый пишет фразу, второй рисует, а все остальные пытаются скопировать (перерисовать) предыдущий рисунок.',
     'blind': 'Вслепую! Во время рисования ваши штрихи невидимы на холсте. Рисуйте по памяти!',
     'onecolor': 'Один цвет! На раунд выдается один случайный цвет на всех. Палитра спрятана.',
     'chaos': 'Хаос! При каждом касании экрана цвет и размер кисти меняются случайным образом.',
-    'masterpiece': 'Шедевр! Времени на рисование дается в 2 раза больше. Создайте картины великих художников!'
+    'masterpiece': 'Шедевр! Времени на рисование дается в 2 раза больше.',
+    'mirror': 'Зазеркалье! Холст аппаратно отзеркален. Попробуйте нарисовать хоть что-то ровно!',
+    'earthquake': 'Землетрясение! Во время рисования мольберт постоянно трясется.',
+    'drunk': 'Пьяный мастер! Ваши координаты немного смещаются. Кисть живет своей жизнью!',
+    'pixelart': 'Пиксель-арт! Кисть становится квадратной, а настройки размера заблокированы.',
+    'oneline': 'Один штрих! Как только вы отрываете палец от экрана, ваше рисование окончено.',
+    'tiny': 'Лилипут! Холст отдалился в 2 раза. Придется щуриться.',
+    'giant': 'Великан! Размер кисти заблокирован на абсолютном максимуме.',
+    'fading': 'Призрак! Прозрачность заблокирована на 5%. Придется сильно постараться, чтобы линии было видно.',
+    'darkmode': 'Ночь! Темная тема. Холст становится черным, а рисуем мы белым.'
 };
 
 function selectMode(mode) {
@@ -60,7 +69,7 @@ function showModeInfo(e, mode) {
     e.stopPropagation(); 
     let title = document.querySelector(`.mode-card[data-mode="${mode}"] h4`).innerText;
     document.getElementById('info-modal-title').innerText = title;
-    document.getElementById('info-modal-desc').innerText = modeDescriptions[mode];
+    document.getElementById('info-modal-desc').innerText = modeDescriptions[mode] || "Описание отсутствует";
     document.getElementById('info-modal').style.display = 'flex';
 }
 function closeInfoModal() { document.getElementById('info-modal').style.display = 'none'; }
@@ -68,9 +77,7 @@ function closeInfoModal() { document.getElementById('info-modal').style.display 
 function renderPlayersList(players) {
     const listEl = document.getElementById('lobby-players-list');
     if (!listEl) return;
-    
     const hostSvg = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="#fbbf24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="2 16 4 4 10 9 12 2 14 9 20 4 22 16 2 16"></polygon><line x1="2" y1="20" x2="22" y2="20"></line></svg>`;
-
     listEl.innerHTML = players.map(id => {
         const name = globalState.playerNames?.[id] || "Аноним";
         const avatar = globalState.playerAvatars?.[id] || "https://picsum.photos/100";
@@ -130,7 +137,6 @@ function startPhaseTimer(isDrawing) {
     clearInterval(phaseTimerInterval);
     currentPhaseSubmitted = false;
     isCurrentPhaseDrawing = isDrawing;
-    
     let timeLimit = globalState.settings?.time || 90;
     let timeRemaining = timeLimit;
     updateTimerUI(timeRemaining, timeLimit);
@@ -153,7 +159,6 @@ function updateWaitingScreen() {
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
     const listEl = document.getElementById('waiting-players-list');
     if (!listEl) return;
-    
     const iconReady = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#22c55e" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
     const iconWaiting = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#eab308" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
 
@@ -192,6 +197,8 @@ window.addEventListener('message', (event) => {
   }
 });
 
+let hasDrawnStrokeOneline = false;
+
 function handleStateChange() {
   const players = globalState.players || [];
   if (players.length > 0) renderPlayersList(players);
@@ -221,10 +228,18 @@ function handleStateChange() {
     return;
   }
 
+  // Адаптивный UI: Поднятие инструментов, если нет цвета
   const mode = globalState.settings?.mode;
-  if (mode === 'nocolor' || mode === 'onecolor' || mode === 'chaos') {
-      document.getElementById('color-palette').style.visibility = 'hidden'; currentColor = '#000000';
-  } else { document.getElementById('color-palette').style.visibility = 'visible'; }
+  const noColorModes = ['nocolor', 'onecolor', 'chaos', 'darkmode'];
+  
+  if (noColorModes.includes(mode)) {
+      document.getElementById('color-palette').style.display = 'none'; 
+      document.getElementById('tool-divider').style.display = 'none';
+      currentColor = mode === 'darkmode' ? '#ffffff' : '#000000';
+  } else { 
+      document.getElementById('color-palette').style.display = 'grid'; 
+      document.getElementById('tool-divider').style.display = 'block';
+  }
 
   if (mode === 'hardcore') { document.getElementById('action-tools').style.display = 'none'; } 
   else { document.getElementById('action-tools').style.display = 'grid'; }
@@ -265,6 +280,7 @@ function getRandomHex() {
 function startRound(round, players) {
   currentLocalRound = round;
   const mode = globalState.settings?.mode;
+  hasDrawnStrokeOneline = false;
   
   let isDrawingPhase = (round % 2 === 0);
   if (mode === 'icebreaker') isDrawingPhase = (round % 2 !== 0);
@@ -283,7 +299,23 @@ function startRound(round, players) {
   let previousData = round > 1 ? globalState.submissions?.[`round_${round - 1}`]?.[notebookId] : null;
 
   if (isDrawingPhase) {
+      // Сброс классов эффектов
+      const zContainer = document.getElementById('zoom-container');
+      zContainer.className = ''; 
+      document.getElementById('blindfold').style.display = 'none';
+      document.getElementById('brush-settings').style.display = 'flex';
+      
+      // Инициализация визуальных режимов
+      if (mode === 'mirror') zContainer.classList.add('mode-mirror');
+      if (mode === 'earthquake') zContainer.classList.add('mode-earthquake');
+      if (mode === 'tiny') zContainer.classList.add('mode-tiny');
+      if (mode === 'blind') document.getElementById('blindfold').style.display = 'block';
+      if (mode === 'giant') { document.getElementById('brush-settings').style.display = 'none'; document.getElementById('brush-size').value = 40; }
+      if (mode === 'fading') { document.getElementById('brush-settings').style.display = 'none'; document.getElementById('brush-opacity').value = 0.05; }
+      if (mode === 'pixelart') { document.getElementById('brush-settings').style.display = 'none'; document.getElementById('brush-size').value = 15; }
+      
       resetCanvasTransform(); clearCanvas(); initHistory();
+      
       if (round === 1) { 
           document.getElementById('word-to-draw').innerHTML = "Что угодно!";
       } else {
@@ -343,7 +375,8 @@ function submitDrawing(isManual = false) {
   
   const tempCtx = canvas.getContext('2d');
   tempCtx.globalCompositeOperation = 'destination-over';
-  tempCtx.fillStyle = '#ffffff'; tempCtx.fillRect(0, 0, canvas.width, canvas.height);
+  tempCtx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff';
+  tempCtx.fillRect(0, 0, canvas.width, canvas.height);
   
   const finalData = JSON.stringify({ img: canvas.toDataURL('image/png'), strokes: recordedStrokes });
 
@@ -355,7 +388,7 @@ function submitDrawing(isManual = false) {
 }
 
 // ==========================================
-// ХОЛСТ: ЗАЛИВКА, ПИПЕТКА И АНИМАЦИЯ
+// ХОЛСТ: ИНСТРУМЕНТЫ И ЛОГИКА
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
@@ -366,6 +399,7 @@ let currentColor = '#000000';
 let isErasing = false;
 let isFilling = false;
 let isEyedropper = false;
+let isBlur = false;
 
 let canvasTransform = { x: 0, y: 0, scale: 1 };
 let initialDistance = 0;
@@ -380,22 +414,30 @@ let drawHistory = [];
 let historyIndex = -1;
 
 function initHistory() { drawHistory = []; strokesHistory = []; recordedStrokes = []; historyIndex = -1; saveState(); }
+
 function saveState() {
     if (globalState.settings?.mode === 'hardcore') return;
     if (historyIndex < drawHistory.length - 1) { drawHistory.length = historyIndex + 1; strokesHistory.length = historyIndex + 1; }
     drawHistory.push(canvas.toDataURL()); strokesHistory.push(JSON.parse(JSON.stringify(recordedStrokes))); historyIndex++;
 }
+
 function restoreState(index) {
     let img = new Image(); img.src = drawHistory[index];
-    img.onload = () => { ctx.globalAlpha=1; ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); };
+    img.onload = () => { 
+        ctx.globalAlpha=1; ctx.filter='none'; ctx.globalCompositeOperation = 'source-over'; 
+        ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0); 
+    };
     recordedStrokes = JSON.parse(JSON.stringify(strokesHistory[index]));
 }
+
 function undo() { if (historyIndex > 0) { historyIndex--; restoreState(historyIndex); } }
 function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; restoreState(historyIndex); } }
 
-ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-function clearTools() { isErasing = false; isFilling = false; isEyedropper = false; document.querySelectorAll('.tool-btn').forEach(s => s.classList.remove('active-swatch')); }
+function clearTools() { 
+    isErasing = false; isFilling = false; isEyedropper = false; isBlur = false; 
+    document.querySelectorAll('.tool-btn').forEach(s => s.classList.remove('active-swatch')); 
+}
 function setColor(color, element) {
     clearTools(); currentColor = color; ctx.globalCompositeOperation = 'source-over';
     document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active-swatch'));
@@ -404,9 +446,14 @@ function setColor(color, element) {
 function setEraser(element) { clearTools(); isErasing = true; ctx.globalCompositeOperation = 'destination-out'; element.classList.add('active-swatch'); }
 function setFill(element) { clearTools(); isFilling = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setEyedropper(element) { clearTools(); isEyedropper = true; element.classList.add('active-swatch'); }
+function setBlur(element) { clearTools(); isBlur = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 
 function clearCanvas() {
-  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.globalCompositeOperation = 'source-over'; 
+  const isDark = globalState.settings?.mode === 'darkmode';
+  ctx.fillStyle = isDark ? '#000000' : '#ffffff'; 
+  document.getElementById('canvas-wrapper').style.backgroundColor = isDark ? '#000000' : '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   if(isErasing) ctx.globalCompositeOperation = 'destination-out';
   recordedStrokes.push({ type: 'clear' }); saveState();
 }
@@ -465,6 +512,9 @@ function floodFillCore(startX, startY, fillHex) {
 function startPosition(e) { 
     if (e.touches && e.touches.length >= 2) return; 
     let pos = getCoordinates(e);
+    const mode = globalState.settings?.mode;
+
+    if (mode === 'oneline' && hasDrawnStrokeOneline) return;
 
     if (isEyedropper) {
         const p = ctx.getImageData(pos.x, pos.y, 1, 1).data;
@@ -478,43 +528,65 @@ function startPosition(e) {
         saveState(); return;
     }
 
-    if (globalState.settings?.mode === 'chaos') {
+    if (mode === 'chaos') {
         currentColor = getRandomHex();
         document.getElementById('brush-size').value = Math.floor(Math.random() * 35) + 5;
     }
 
+    if (mode === 'pixelart') {
+        pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15;
+    }
+    if (mode === 'drunk') {
+        pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40;
+    }
+
     preZoomState = canvas.toDataURL(); isDrawing = true; 
-    
     let opacity = parseFloat(document.getElementById('brush-opacity').value);
-    ctx.globalAlpha = isErasing ? 1 : opacity;
     
-    currentStroke = { c: currentColor, s: document.getElementById('brush-size').value, e: isErasing?1:0, o: opacity, p: [Math.round(pos.x), Math.round(pos.y)] };
+    currentStroke = { 
+        c: currentColor, s: document.getElementById('brush-size').value, 
+        e: isErasing?1:0, o: opacity, b: isBlur?1:0, 
+        p: [Math.round(pos.x), Math.round(pos.y)] 
+    };
     draw(e); 
 }
 
 function draw(e) {
   if (e.touches && e.touches.length >= 2) { e.preventDefault(); return handlePinchZoom(e); }
   if (!isDrawing) return; e.preventDefault(); 
-  const pos = getCoordinates(e);
+  let pos = getCoordinates(e);
+  const mode = globalState.settings?.mode;
+
+  if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
+  if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
+
   if(currentStroke) { currentStroke.p.push(Math.round(pos.x), Math.round(pos.y)); }
 
-  if (globalState.settings?.mode !== 'blind') {
-      ctx.lineWidth = document.getElementById('brush-size').value;
-      ctx.lineCap = 'round'; ctx.strokeStyle = currentColor; ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
-  }
+  ctx.lineWidth = document.getElementById('brush-size').value;
+  ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
+  ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
+  ctx.strokeStyle = currentColor;
+  
+  let opacity = parseFloat(document.getElementById('brush-opacity').value);
+  ctx.globalAlpha = isErasing ? 1 : opacity;
+  ctx.filter = isBlur ? 'blur(5px)' : 'none';
+  ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
+
+  ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
 }
 
 function endPosition() { 
     if (!isDrawing) return; 
-    isDrawing = false; ctx.beginPath(); 
+    isDrawing = false; ctx.beginPath(); ctx.filter = 'none';
+    if (globalState.settings?.mode === 'oneline') hasDrawnStrokeOneline = true;
     if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; }
     saveState(); 
 }
 
 function handlePinchZoom(e) {
     if (isDrawing) {
-        isDrawing = false; ctx.beginPath(); currentStroke = null;
-        if (preZoomState && globalState.settings?.mode !== 'blind') {
+        isDrawing = false; ctx.beginPath(); ctx.filter = 'none'; currentStroke = null;
+        if (preZoomState) {
             let img = new Image(); img.src = preZoomState;
             img.onload = () => { ctx.globalAlpha=1; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0); }
         }
@@ -543,7 +615,7 @@ canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave'
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ (УМНАЯ АНИМАЦИЯ Х1.5)
+// ЧАТ-ПРЕЗЕНТАЦИЯ (УМНАЯ АНИМАЦИЯ Х1.5 И ФИКС ОТРИСОВКИ)
 // ==========================================
 let voices = [];
 window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
@@ -562,26 +634,33 @@ function startPresentation() {
     initAudio(); window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: true, bookIndex: 0, round: 1 } }}, '*');
 }
 
-// Умный рендер анимации
-function playDrawingAnimation(canvasEl, strokes, finalImg) {
+let animationFrameId = null;
+
+function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
     const actx = canvasEl.getContext('2d');
-    actx.globalAlpha = 1; actx.fillStyle = '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+    actx.globalAlpha = 1; actx.filter = 'none'; actx.globalCompositeOperation = 'source-over';
+    actx.fillStyle = isDarkMode ? '#000000' : '#ffffff'; 
+    actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     let strokeIdx = 0; let pointIdx = 0;
     
-    // Считаем сложность рисунка, чтобы анимация всегда занимала ~2 секунды
     let totalPoints = 0;
     for (let s of strokes) {
         if (s.p) totalPoints += Math.max(1, Math.floor(s.p.length / 2));
         else totalPoints += 1;
     }
-    // Скорость 1.5х: вычисляем сколько точек рисовать за каждый кадр (min: 3 точки)
-    let pointsPerFrame = Math.max(3, Math.ceil(totalPoints / 100)); 
+    
+    // Калькулятор кадров (Анимация всегда плавная и идет ~2 секунды)
+    let pointsPerFrame = Math.max(2, Math.ceil(totalPoints / 120)); 
     
     function drawStep() {
         if (strokeIdx >= strokes.length) {
-            let im = new Image(); im.src = finalImg; 
-            im.onload = () => { actx.globalAlpha=1; actx.globalCompositeOperation = 'source-over'; actx.drawImage(im, 0, 0); };
-            return;
+            let im = new Image(); 
+            im.src = finalImg; 
+            im.onload = () => { 
+                actx.globalAlpha=1; actx.filter='none'; actx.globalCompositeOperation = 'source-over'; 
+                actx.drawImage(im, 0, 0); 
+            };
+            return; // Конец
         }
         
         let pointsDrawn = 0;
@@ -589,7 +668,8 @@ function playDrawingAnimation(canvasEl, strokes, finalImg) {
             let stroke = strokes[strokeIdx];
             
             if (stroke.type === 'clear') {
-                actx.globalAlpha = 1; actx.globalCompositeOperation = 'source-over'; actx.fillStyle = '#ffffff';
+                actx.globalAlpha = 1; actx.filter = 'none'; actx.globalCompositeOperation = 'source-over'; 
+                actx.fillStyle = isDarkMode ? '#000000' : '#ffffff';
                 actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
@@ -604,6 +684,7 @@ function playDrawingAnimation(canvasEl, strokes, finalImg) {
                 actx.beginPath(); actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round';
                 actx.strokeStyle = stroke.c; actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
                 actx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
+                actx.filter = stroke.b ? 'blur(5px)' : 'none';
                 actx.moveTo(pts[0], pts[1]); pointIdx = 2;
             }
             
@@ -613,9 +694,10 @@ function playDrawingAnimation(canvasEl, strokes, finalImg) {
                 pointIdx += 2; pointsDrawn++;
             } else { strokeIdx++; pointIdx = 0; }
         }
-        requestAnimationFrame(drawStep);
+        animationFrameId = requestAnimationFrame(drawStep);
     }
-    requestAnimationFrame(drawStep);
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    animationFrameId = requestAnimationFrame(drawStep);
 }
 
 let renderedPresentationState = '';
@@ -663,8 +745,15 @@ function syncPresentationView(players) {
     else {
         setTimeout(() => {
             const canvasAnim = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);
-            if (canvasAnim && strokesData && strokesData.length > 0) { playDrawingAnimation(canvasAnim, strokesData, imgUrl); } 
-            else if (canvasAnim) { const cctx = canvasAnim.getContext('2d'); let im = new Image(); im.src = imgUrl; im.onload = () => cctx.drawImage(im, 0, 0); }
+            const isDark = globalState.settings?.mode === 'darkmode';
+            
+            if (canvasAnim && strokesData && strokesData.length > 0) { 
+                playDrawingAnimation(canvasAnim, strokesData, imgUrl, isDark); 
+            } else if (canvasAnim) { 
+                const cctx = canvasAnim.getContext('2d'); 
+                let im = new Image(); im.src = imgUrl; 
+                im.onload = () => cctx.drawImage(im, 0, 0); 
+            }
         }, 100);
     }
 
