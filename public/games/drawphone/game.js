@@ -59,12 +59,10 @@ function showModeInfo(e, mode) {
 
 function closeInfoModal() { setDisplay('info-modal', 'none'); }
 
-// Безопасное закрытие полноэкранного плагиата (ошибка консоли устранена)
 function hidePlagiarism(e) { 
     setDisplay('plagiarism-overlay', 'none'); 
 }
 
-// Закрываем выезжающее меню инструментов на мобилках при клике мимо
 function toggleMobileTools(e) {
     if (e) e.stopPropagation();
     document.getElementById('tools-popup').classList.toggle('show');
@@ -140,7 +138,6 @@ function startPhaseTimer(isDrawing) {
     let timeLimit = globalState.settings?.time || 90;
     
     if (globalState.settings?.mode === 'tagteam') timeLimit = 5;
-    // Время действительно уменьшается с каждым этапом плагиата
     if (globalState.settings?.mode === 'plagiarism' && currentLocalRound > 1) timeLimit = Math.max(15, timeLimit - (currentLocalRound - 1) * 15);
     if (globalState.settings?.mode === 'finishit' && currentLocalRound === 1) timeLimit = 10;
 
@@ -193,6 +190,56 @@ function playAgain() {
   window.parent.postMessage({ type: 'play_again' }, '*');
 }
 
+// -----------------------------------------------------
+// ГЛОБАЛЬНЫЙ СБРОС ЛОКАЛЬНЫХ ДАННЫХ ПРИ НОВОЙ ИГРЕ
+// -----------------------------------------------------
+function resetLocalGameData() {
+    currentLocalRound = 0;
+    clearInterval(phaseTimerInterval);
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    
+    setDisplay('play-again-btn', 'none'); 
+    setHTML('chat-messages', ''); 
+    const avatarsContainer = document.getElementById('presentation-avatars');
+    if (avatarsContainer) avatarsContainer.innerHTML = '';
+    
+    renderedPresentationState = '';
+    lassoStampsCache = {};
+    activeLassoStampRef = null;
+    dotsArray = [];
+    hasDrawnStrokeOneline = false;
+    isGyroEnabled = false;
+    finishitBaseImg = new Image();
+    
+    // Сбрасываем все эффекты и цвета в дефолт
+    currentColor = '#000000';
+    isErasing = false; isFilling = false; isEyedropper = false; 
+    isBlur = false; isRect = false; isCircle = false; 
+    isLine = false; isArrow = false; isSymmetry = false; isNeon = false;
+    
+    const bs = document.getElementById('brush-size'); if(bs) bs.value = 5;
+    const bo = document.getElementById('brush-opacity'); if(bo) bo.value = 1;
+    
+    // Снимаем выделение со всех кнопок
+    document.querySelectorAll('.tool-btn').forEach(el => el.classList.remove('active-swatch'));
+    document.querySelectorAll('.swatch').forEach(el => el.classList.remove('active-swatch'));
+    
+    // Активируем черную кисть
+    const brushBtn = document.querySelector('.brush-tool');
+    if (brushBtn) brushBtn.classList.add('active-swatch');
+    
+    const defaultColor = Array.from(document.querySelectorAll('.swatch')).find(el => el.style.background.includes('000000') || el.style.backgroundColor === 'rgb(0, 0, 0)');
+    if (defaultColor) defaultColor.classList.add('active-swatch');
+    
+    // Очищаем физический холст и его историю
+    if (ctx && canvas) {
+        ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; 
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    initHistory();
+}
+
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'sync_state') {
     globalState = event.data.state || {}; 
@@ -225,14 +272,13 @@ function handleStateChange() {
   const players = globalState.players || [];
   if (players.length > 0) renderPlayersList(players);
 
+  // ЕСЛИ СТАТУС ОЖИДАНИЯ (ЛОББИ) - ЖЕСТКО СБРАСЫВАЕМ ВСЕ!
   if (!globalState.status || globalState.status === 'waiting') {
-    currentLocalRound = 0; clearInterval(phaseTimerInterval);
-    if (animationFrameId) cancelAnimationFrame(animationFrameId); 
-    setDisplay('play-again-btn', 'none'); setHTML('chat-messages', ''); 
-    renderedPresentationState = ''; showPhase('lobby-screen'); return;
+    resetLocalGameData();
+    showPhase('lobby-screen'); 
+    return;
   }
 
-  // Ограничение снято - игра идет по всем игрокам, чтобы в результатах показать все этапы!
   calculatedTotalRounds = players.length * (globalState.settings?.roundsMultiplier || 1);
 
   if (globalState.status === 'finished') {
@@ -515,7 +561,6 @@ function drawArrow(actx, fromx, fromy, tox, toy) {
     actx.moveTo(tox, toy); actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6)); actx.stroke();
 }
 
-// ОПТИМИЗИРОВАННЫЙ АЛГОРИТМ SCANLINE ЗАЛИВКИ (Без зависаний)
 function floodFillCore(startX, startY, fillColorHex) {
     startX = Math.round(startX); startY = Math.round(startY);
     const w = canvas.width, h = canvas.height;
@@ -582,7 +627,6 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
     }
 }
 
-// 90 FPS + Ускорение холста
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
 const ctx = canvas.getContext('2d', { desynchronized: true, willReadFrequently: false });
@@ -599,7 +643,7 @@ function restoreState(index) {
         ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowBlur=0; ctx.globalCompositeOperation = 'source-over'; 
         const mode = globalState.settings?.mode;
         if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Оставляем холст прозрачным!
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
         } else {
             ctx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height); 
@@ -654,10 +698,10 @@ function updateTransform() { if (!zoomContainer) return; if (canvasTransform.sca
 function getCoordinates(e) { const rect = canvas.getBoundingClientRect(); return { x: ((e.clientX - rect.left) / rect.width) * canvas.width, y: ((e.clientY - rect.top) / rect.height) * canvas.height }; }
 
 function startPosition(e) { 
-    if (e.pointerType === 'touch' && !e.isPrimary) return; // Игнорируем мультитач
+    if (e.pointerType === 'touch' && !e.isPrimary) return; 
     let pos = getCoordinates(e); const mode = globalState.settings?.mode;
     
-    canvas.setPointerCapture(e.pointerId);
+    if(e.pointerId) canvas.setPointerCapture(e.pointerId);
 
     if (mode === 'lasso' && currentLocalRound > 2) {
         if (!activeLassoStampRef) return alert("Выберите фрагмент сверху!");
@@ -700,7 +744,7 @@ function startPosition(e) {
 
 function draw(e) {
   if (!isDrawing && !isDrawingShape) return; 
-  if (e.pointerType === 'touch') e.preventDefault(); // Предотвращаем скролл во время рисования
+  if (e.pointerType === 'touch') e.preventDefault(); 
   let pos = getCoordinates(e); const mode = globalState.settings?.mode;
   if (mode === 'coop') { const players = globalState.players || []; const isLeft = players.indexOf(myUserId) % 2 === 0; if (isLeft && pos.x > 400) pos.x = 400; if (!isLeft && pos.x < 400) pos.x = 400; }
   if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
@@ -733,7 +777,7 @@ function draw(e) {
 }
 
 function endPosition(e) { 
-    if(e) canvas.releasePointerCapture(e.pointerId);
+    if(e && e.pointerId) canvas.releasePointerCapture(e.pointerId);
     ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0;
     let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
     let opacity = 1; const bo = document.getElementById('brush-opacity'); if (bo) opacity = parseFloat(bo.value);
@@ -749,13 +793,25 @@ function endPosition(e) {
     saveState(); 
 }
 
-// Заменили mouse/touch на PointerEvents для 90+ FPS без лагов
+function handlePinchZoom(e) {
+    if (isDrawing || isDrawingShape) {
+        isDrawing = false; isDrawingShape = false; ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0; currentStroke = null;
+        if (preZoomState) { let img = new Image(); img.src = preZoomState; img.onload = () => { ctx.globalAlpha=1; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0); } }
+    }
+    const t1 = e.touches[0]; const t2 = e.touches[1]; const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); const cx = (t1.clientX + t2.clientX) / 2; const cy = (t1.clientY + t2.clientY) / 2;
+    if (initialDistance === 0) { initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; }
+    let newScale = canvasTransform.scale * (currentDist / initialDistance); if (newScale < 1) newScale = 1; if (newScale > 5) newScale = 5;
+    const wrapperRect = zoomContainer.parentElement.getBoundingClientRect();
+    canvasTransform.x -= (cx - wrapperRect.left - canvasTransform.x) * (newScale / canvasTransform.scale - 1); canvasTransform.y -= (cy - wrapperRect.top - canvasTransform.y) * (newScale / canvasTransform.scale - 1);
+    canvasTransform.x += (cx - lastZoomCenter.x); canvasTransform.y += (cy - lastZoomCenter.y);
+    canvasTransform.scale = newScale; initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; updateTransform();
+}
+canvas.addEventListener('touchend', (e) => { if (e.touches && e.touches.length < 2) { initialDistance = 0; if (canvasTransform.scale <= 1) resetCanvasTransform(); } endPosition(); });
 canvas.addEventListener('pointerdown', startPosition); 
 canvas.addEventListener('pointerup', endPosition);
 canvas.addEventListener('pointermove', draw, {passive: false}); 
 canvas.addEventListener('pointercancel', endPosition);
 canvas.addEventListener('pointerout', endPosition);
-
 
 // ==========================================
 // ЧАТ-ПРЕЗЕНТАЦИЯ (Аватарки и Хронология)
@@ -808,14 +864,14 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
 let renderedPresentationState = '';
 function syncPresentationView(players) {
     const pres = globalState.presentation; if (!pres) return;
-    const currentStateId = `${pres.bookIndex}-${pres.round}`; if (renderedPresentationState === currentStateId) return;
+    const currentStateId = `${pres.bookIndex}-${pres.round}-${globalState.settings?.seed || Math.random()}`; 
+    if (renderedPresentationState === currentStateId) return;
 
     const bookOwnerId = players[pres.bookIndex];
     setText('chat-book-title', `История: ${globalState.playerNames?.[bookOwnerId] || "Аноним"}`);
     
     const avatarsContainer = document.getElementById('presentation-avatars');
     
-    // СТРОИМ КРАСИВУЮ ЛИНИЮ АВАТАРОК В НАЧАЛЕ ИСТОРИИ
     if (pres.round === 1) { 
         setHTML('chat-messages', ''); 
         if (avatarsContainer) {
@@ -844,7 +900,6 @@ function syncPresentationView(players) {
         }
     }
 
-    // ОБНОВЛЯЕМ СВЕЧЕНИЕ (АНИМАЦИЯ ХОДА)
     if (avatarsContainer) {
         for (let i = 1; i <= calculatedTotalRounds; i++) {
             const av = document.getElementById(`pres-av-${i}`);
@@ -864,7 +919,6 @@ function syncPresentationView(players) {
     let rawData = globalState.submissions?.[`round_${pres.round}`]?.[bookOwnerId];
     let imgUrl = rawData; let strokesData = null;
 
-    // СТРОГАЯ логика распознавания (Рисунок или Текст)
     let isText = true;
     if (typeof rawData === 'string') {
         if (rawData.startsWith('{')) {
@@ -889,7 +943,6 @@ function syncPresentationView(players) {
         visualContent = `<div class="msg-text">${rawData}</div>`; 
     } else {
         let auctionHtml = mode === 'auction' ? `<button class="btn-like" onclick="let v=parseInt(this.innerText); this.innerHTML='${heartSvg} '+(isNaN(v)?1:v+1)">${heartSvg} 0</button>` : '';
-        // Плагиат и дорисуй-ка выводим чистой картинкой (без анимации), чтобы избежать багов с наложениями слоев
         if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism') {
             visualContent = `<div style="position:relative; width:100%;"><img src="${imgUrl}" class="msg-img"><div style="position:absolute; bottom:10px; right:10px;">${auctionHtml}</div></div>`;
         } else {
