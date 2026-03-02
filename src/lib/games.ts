@@ -14,7 +14,7 @@ export const GAMES: Game[] = [
     name: 'Испорченный телефон',
     description: 'Рисуй и угадывай! Безумная цепочка слов и рисунков.',
     image: 'https://picsum.photos/seed/drawphone/400/300?blur=2',
-    minPlayers: 3,
+    minPlayers: 2, 
     maxPlayers: 12,
   }
 ];

@@ -27,7 +27,7 @@ function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 function requestFullscreen() { window.parent.postMessage({ type: 'request_fullscreen' }, '*'); }
 
 // ==========================================
-// ЛОББИ И РЕЖИМЫ (НОВЫЕ 6 РЕЖИМОВ)
+// ЛОББИ: ВКЛАДКИ, ИГРОКИ И РЕЖИМЫ
 // ==========================================
 function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -37,11 +37,11 @@ function switchTab(tabId) {
 }
 
 const modeDescriptions = {
-    'classic': 'Обычная игра. Рисуй, отгадывай и веселись!',
-    'icebreaker': 'Ледокол! Игра начинается не с текста, а с рисунка. Нарисуйте на первом этапе что угодно.',
-    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза.',
-    'nocolor': 'Секретный режим! Палитра заблокирована. Рисуем только черным.',
-    'hardcore': 'Без права на ошибку! Ластик, отмена и очистка отключены.',
+    'classic': 'Обычная игра. Рисуй, отгадывай и веселись без жестких ограничений!',
+    'icebreaker': 'Ледокол! Игра начинается не с текста, а с рисунка. Нарисуйте на первом этапе что угодно, а следующий игрок попытается это угадать!',
+    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза. Придется думать и рисовать очень быстро!',
+    'nocolor': 'Секретный режим! Палитра заблокирована. Рисуем только черным цветом, как настоящие графики.',
+    'hardcore': 'Без права на ошибку! Ластик, отмена действий и очистка холста отключены. Рисуй с первого раза!',
     'story': 'История! Рисования нет вообще. Только текст. Вы пишете продолжение предыдущей фразы, создавая смешной рассказ.',
     'copycat': 'Подделка! Первый пишет фразу, второй рисует, а все остальные пытаются скопировать (перерисовать) предыдущий рисунок.',
     'blind': 'Вслепую! Во время рисования ваши штрихи невидимы на холсте. Рисуйте по памяти!',
@@ -68,10 +68,13 @@ function closeInfoModal() { document.getElementById('info-modal').style.display 
 function renderPlayersList(players) {
     const listEl = document.getElementById('lobby-players-list');
     if (!listEl) return;
+    
+    const hostSvg = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="#fbbf24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="2 16 4 4 10 9 12 2 14 9 20 4 22 16 2 16"></polygon><line x1="2" y1="20" x2="22" y2="20"></line></svg>`;
+
     listEl.innerHTML = players.map(id => {
         const name = globalState.playerNames?.[id] || "Аноним";
         const avatar = globalState.playerAvatars?.[id] || "https://picsum.photos/100";
-        const isHostIcon = id === players[0] ? '<div class="host-crown">👑</div>' : ''; 
+        const isHostIcon = id === players[0] ? `<div class="host-crown">${hostSvg}</div>` : ''; 
         return `<div class="player-avatar-wrap">${isHostIcon}<img src="${avatar}" alt="${name}"><span class="player-name-mini" title="${name}">${name}</span></div>`;
     }).join('');
 }
@@ -150,10 +153,14 @@ function updateWaitingScreen() {
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
     const listEl = document.getElementById('waiting-players-list');
     if (!listEl) return;
+    
+    const iconReady = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#22c55e" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    const iconWaiting = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#eab308" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+
     listEl.innerHTML = players.map(id => {
         const name = globalState.playerNames?.[id] || "Аноним";
         const isReady = currentSubs[id] !== undefined;
-        return `<div class="waiting-player-item ${isReady ? 'ready' : 'not-ready'}"><span>${name}</span><span>${isReady ? '✅' : '⏳'}</span></div>`;
+        return `<div class="waiting-player-item ${isReady ? 'ready' : 'not-ready'}"><span>${name}</span><span>${isReady ? iconReady : iconWaiting}</span></div>`;
     }).join('');
 }
 
@@ -165,7 +172,6 @@ function startGame() {
   initAudio(); requestFullscreen();
   let baseTime = parseInt(document.getElementById('setting-time').value);
   
-  // Модификаторы времени для режимов
   let finalTime = baseTime;
   if (selectedMode === 'speedrun') finalTime = Math.max(30, Math.floor(baseTime / 2));
   if (selectedMode === 'masterpiece') finalTime = baseTime * 2;
@@ -217,8 +223,7 @@ function handleStateChange() {
 
   const mode = globalState.settings?.mode;
   if (mode === 'nocolor' || mode === 'onecolor' || mode === 'chaos') {
-      document.getElementById('color-palette').style.visibility = 'hidden'; 
-      currentColor = '#000000';
+      document.getElementById('color-palette').style.visibility = 'hidden'; currentColor = '#000000';
   } else { document.getElementById('color-palette').style.visibility = 'visible'; }
 
   if (mode === 'hardcore') { document.getElementById('action-tools').style.display = 'none'; } 
@@ -253,7 +258,6 @@ function getCurrentNotebookId(round, players) {
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
 }
 
-// Рандомный цвет для режима Один цвет / Хаос
 function getRandomHex() {
     return "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
 }
@@ -262,11 +266,10 @@ function startRound(round, players) {
   currentLocalRound = round;
   const mode = globalState.settings?.mode;
   
-  // Логика фаз для разных режимов
   let isDrawingPhase = (round % 2 === 0);
   if (mode === 'icebreaker') isDrawingPhase = (round % 2 !== 0);
-  if (mode === 'story') isDrawingPhase = false; // Только текст
-  if (mode === 'copycat') isDrawingPhase = (round > 1); // 1-й текст, остальное рисунки
+  if (mode === 'story') isDrawingPhase = false;
+  if (mode === 'copycat') isDrawingPhase = (round > 1);
   
   if (mode === 'onecolor' && isDrawingPhase) currentColor = getRandomHex();
 
@@ -281,17 +284,15 @@ function startRound(round, players) {
 
   if (isDrawingPhase) {
       resetCanvasTransform(); clearCanvas(); initHistory();
-      if (round === 1) { // Icebreaker
+      if (round === 1) { 
           document.getElementById('word-to-draw').innerHTML = "Что угодно!";
       } else {
-          // Если режим подделки (copycat) и предыдущие данные это картинка
           if (mode === 'copycat' && typeof previousData === 'string' && previousData.startsWith('{')) {
              try { 
                  const pdImg = JSON.parse(previousData).img;
                  document.getElementById('word-to-draw').innerHTML = `<img src="${pdImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`;
              } catch(e) {}
           } else {
-             // Иначе просто текст
              document.getElementById('word-to-draw').innerText = previousData || "...";
           }
       }
@@ -424,7 +425,6 @@ function getCoordinates(e) {
   return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height };
 }
 
-// ALGORITHM: Flood Fill
 function hexToRgba(hex) {
     let r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16);
     return [r, g, b, 255];
@@ -498,7 +498,6 @@ function draw(e) {
   const pos = getCoordinates(e);
   if(currentStroke) { currentStroke.p.push(Math.round(pos.x), Math.round(pos.y)); }
 
-  // Для режима "Вслепую" мы не рисуем на ctx во время движения (штрих пишется в массив, но не на экран)
   if (globalState.settings?.mode !== 'blind') {
       ctx.lineWidth = document.getElementById('brush-size').value;
       ctx.lineCap = 'round'; ctx.strokeStyle = currentColor; ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
@@ -509,9 +508,6 @@ function endPosition() {
     if (!isDrawing) return; 
     isDrawing = false; ctx.beginPath(); 
     if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; }
-    
-    // Если режим вслепую - восстанавливаем canvas полностью, но цвета заменяем на белые (или ничего не делаем)
-    // Самое простое в Blind: штрихи не рисуются, но сохраняются.
     saveState(); 
 }
 
@@ -547,7 +543,7 @@ canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave'
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ (СКОРОСТЬ 1.5Х = 25 ТОЧЕК/КАДР)
+// ЧАТ-ПРЕЗЕНТАЦИЯ (УМНАЯ АНИМАЦИЯ Х1.5)
 // ==========================================
 let voices = [];
 window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
@@ -566,11 +562,20 @@ function startPresentation() {
     initAudio(); window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: true, bookIndex: 0, round: 1 } }}, '*');
 }
 
-// Воспроизведение анимации с заливками и прозрачностью
+// Умный рендер анимации
 function playDrawingAnimation(canvasEl, strokes, finalImg) {
     const actx = canvasEl.getContext('2d');
     actx.globalAlpha = 1; actx.fillStyle = '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     let strokeIdx = 0; let pointIdx = 0;
+    
+    // Считаем сложность рисунка, чтобы анимация всегда занимала ~2 секунды
+    let totalPoints = 0;
+    for (let s of strokes) {
+        if (s.p) totalPoints += Math.max(1, Math.floor(s.p.length / 2));
+        else totalPoints += 1;
+    }
+    // Скорость 1.5х: вычисляем сколько точек рисовать за каждый кадр (min: 3 точки)
+    let pointsPerFrame = Math.max(3, Math.ceil(totalPoints / 100)); 
     
     function drawStep() {
         if (strokeIdx >= strokes.length) {
@@ -579,9 +584,8 @@ function playDrawingAnimation(canvasEl, strokes, finalImg) {
             return;
         }
         
-        // СКОРОСТЬ 1.5х (25 точек за кадр)
         let pointsDrawn = 0;
-        while (pointsDrawn < 25 && strokeIdx < strokes.length) {
+        while (pointsDrawn < pointsPerFrame && strokeIdx < strokes.length) {
             let stroke = strokes[strokeIdx];
             
             if (stroke.type === 'clear') {
@@ -590,10 +594,6 @@ function playDrawingAnimation(canvasEl, strokes, finalImg) {
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
             if (stroke.type === 'fill') {
-                // Чтобы не вешать браузер сложным Flood Fill на анимации, просто отрисуем финал или пропустим, если это тяжело.
-                // Идеально: мы просто используем floodFillCore, если это анимация
-                // Внимание: для анимации вызов floodFillCore потребует передать actx. Но для простоты:
-                // Заливка слишком дорогая для анимации (может дергаться). Пропустим ее для красоты, финал нарисуется в конце.
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
             
