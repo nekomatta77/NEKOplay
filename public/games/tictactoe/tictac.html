@@ -15,14 +15,12 @@
       <polyline points="16 17 21 12 16 7"></polyline>
       <line x1="21" y1="12" x2="9" y2="12"></line>
     </svg>
-    Выйти
+    ВЫЙТИ
   </button>
 
-  <button class="help-btn" onclick="toggleHelp()">?</button>
-
   <div class="header">
-    <h1>NEKO<span style="color: var(--my-color)">TicTac</span></h1>
-    <div class="status" id="status">Жми на поле!</div>
+    <h1>Крестики-Нолики</h1>
+    <div class="status" id="status">Матч смерти</div>
   </div>
 
   <div class="board-container">
@@ -33,25 +31,13 @@
     <div class="cooldown-fill" id="cooldown"></div>
   </div>
 
-  <div class="overlay active" id="countdownOverlay" style="z-index: 200;">
-    <div class="countdown-text" id="countdownText">ОЖИДАНИЕ...</div>
-  </div>
-
-  <div class="overlay" id="helpOverlay">
-    <div class="modal">
-      <h2>Как играть?</h2>
-      <p id="rulesDescription"></p>
-      <h3 style="color: white; margin-top: 15px; margin-bottom: 5px; font-size: 1rem;">Правила комнаты:</h3>
-      <ul id="dynamicRules"></ul>
-      <button class="close-btn" onclick="toggleHelp()">Понятно, в бой!</button>
-    </div>
+  <div class="overlay" id="countdownOverlay">
+    <div class="countdown-text" id="countdownText">3</div>
   </div>
 
   <div class="overlay" id="winnerOverlay">
-    <div class="modal" style="text-align: center; border-color: var(--my-color); box-shadow: 0 0 40px rgba(0,0,0,0.8);">
-      <div class="winner-text" id="winnerText" style="font-size: 2rem; margin-bottom: 20px;">ИГРА ОКОНЧЕНА</div>
-      <button class="restart-btn" onclick="requestRestart()">Играть еще раз</button>
-    </div>
+    <div class="winner-text" id="winnerText">ПОБЕДА!</div>
+    <button class="restart-btn" id="restartBtn">ИГРАТЬ ЕЩЕ РАЗ</button>
   </div>
 
   <script src="rules.js"></script>

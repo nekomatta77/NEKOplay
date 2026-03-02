@@ -1,5 +1,14 @@
 let animationFrameId = null; 
 
+// Загрузка слов для Лассо из russian.txt
+let russianWords = ["Слон", "Космос", "Любовь", "Монстр", "Машина", "Кот"]; 
+fetch('/russian.txt').then(r => r.text()).then(text => {
+    let parsed = text.split('\n').map(w => w.trim()).filter(w => w.length > 0);
+    if(parsed.length > 0) russianWords = parsed;
+}).catch(e => console.log("Файл russian.txt не найден"));
+
+function getRandomRussianWord() { return russianWords[Math.floor(Math.random() * russianWords.length)]; }
+
 function setDisplay(id, display) { const el = document.getElementById(id); if (el) el.style.display = display; }
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
 function setHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
@@ -197,12 +206,10 @@ function startGame() {
   if (selectedMode === 'coop' && (playersCountParam % 2 !== 0)) { alert("Для Коопа нужно четное число игроков!"); return; }
   const seed = Math.floor(Math.random() * 1000000);
   
-  let resetSubs = {};
-  for(let i=1; i<=30; i++) resetSubs[`round_${i}`] = {};
-
+  // Очистка кэша старой игры
   window.parent.postMessage({ 
       type: 'update_state', 
-      updates: { submissions: resetSubs, presentation: { active: false, bookIndex: 0, round: 1 }, voting: null } 
+      updates: { submissions: null, presentation: { active: false, bookIndex: 0, round: 1 }, voting: null, round: 1 } 
   }, '*');
 
   window.parent.postMessage({ 
@@ -213,9 +220,11 @@ function startGame() {
 
 function playAgain() {
   if (!isHost) return;
-  let resetSubs = {};
-  for(let i=1; i<=30; i++) resetSubs[`round_${i}`] = {};
-  window.parent.postMessage({ type: 'update_state', updates: { submissions: resetSubs, presentation: null, voting: null, round: 0, status: 'waiting' } }, '*');
+  // Очистка кэша старой игры
+  window.parent.postMessage({ 
+      type: 'update_state', 
+      updates: { submissions: null, presentation: null, voting: null, round: 0, status: 'waiting' } 
+  }, '*');
   window.parent.postMessage({ type: 'play_again' }, '*');
 }
 
@@ -364,9 +373,12 @@ function handleStateChange() {
   }
 }
 
-// ИСПРАВЛЕНИЕ: Убран баг Кооп режима. Теперь все игроки отправляют слова от своего имени в свои блокноты.
 function getCurrentNotebookId(round, players) {
     const myIndex = players.indexOf(myUserId);
+    if (globalState.settings?.mode === 'coop') {
+        const primaryIndex = myIndex % 2 === 0 ? myIndex : myIndex - 1;
+        return players[primaryIndex];
+    }
     if (myIndex === -1) return myUserId; 
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
 }
@@ -391,6 +403,7 @@ function startRound(round, players) {
   if (mode === 'plagiarism' || mode === 'finishit' || mode === 'tagteam') isDrawingPhase = true;
   if (mode === 'copycat') isDrawingPhase = (round > 1);
   if (mode === 'coop') isDrawingPhase = (round === 2);
+  if (mode === 'lasso') isDrawingPhase = (round % 2 !== 0); // Раунд 1: Рисуем слово, Раунд 2: Текст тема, Раунд 3: Рисуем из штампов
 
   if (mode === 'onecolor' && isDrawingPhase) currentColor = getRandomHex();
 
@@ -422,8 +435,28 @@ function startRound(round, players) {
       if (mode === 'pixelart') { setDisplay('brush-settings', 'none'); const bs = document.getElementById('brush-size'); if(bs) bs.value = 15; }
       
       if (mode === 'inkmeter') { setDisplay('ink-meter-container', 'block'); currentInk = maxInk; const im = document.getElementById('ink-meter-bar'); if(im) im.style.width = '100%'; }
-      if (mode === 'coop') setDisplay('coop-divider', 'block');
       if (mode === 'nohands') setDisplay('btn-gyro-start', 'block');
+
+      // КРАСНЫЙ ФОН ДЛЯ КООПА
+      if (mode === 'coop') {
+          setDisplay('coop-divider', 'block');
+          const isLeft = players.indexOf(myUserId) % 2 === 0;
+          const cw = document.getElementById('canvas-wrapper');
+          let overlay = document.getElementById('coop-red-overlay');
+          if (!overlay) {
+              overlay = document.createElement('div');
+              overlay.id = 'coop-red-overlay';
+              overlay.style.position = 'absolute'; overlay.style.top = '0'; overlay.style.bottom = '0';
+              overlay.style.backgroundColor = 'rgba(239, 68, 68, 0.25)'; overlay.style.pointerEvents = 'none'; overlay.style.zIndex = '10';
+              cw.appendChild(overlay);
+          }
+          overlay.style.display = 'block';
+          if (isLeft) { overlay.style.left = '50%'; overlay.style.right = '0'; } 
+          else { overlay.style.left = '0'; overlay.style.right = '50%'; }
+      } else {
+          let overlay = document.getElementById('coop-red-overlay');
+          if (overlay) overlay.style.display = 'none';
+      }
 
       resetCanvasTransform(); clearCanvas(); initHistory(); setBrush(document.querySelector('.brush-tool'));
       
@@ -434,13 +467,27 @@ function startRound(round, players) {
           dotsArray.forEach(d => { ctx.beginPath(); ctx.arc(d.x, d.y, 5, 0, Math.PI*2); ctx.fill(); });
       }
 
+      // Добавление ползунков настроек для Лассо Раунд 3
+      let lsSettings = document.getElementById('lasso-settings');
+      if (mode === 'lasso' && round >= 3) {
+          if (!lsSettings) {
+              lsSettings = document.createElement('div');
+              lsSettings.id = 'lasso-settings';
+              lsSettings.innerHTML = `
+                  <div style="display:flex; justify-content:center; gap:10px; padding:10px; background:rgba(0,0,0,0.5); border-radius:10px; margin-top:10px; flex-wrap:wrap;">
+                      <label style="font-size:0.8rem; color:#fff;">Ширина: <input type="range" id="stamp-w" min="20" max="600" value="150" style="width:70px;"></label>
+                      <label style="font-size:0.8rem; color:#fff;">Высота: <input type="range" id="stamp-h" min="20" max="600" value="150" style="width:70px;"></label>
+                      <label style="font-size:0.8rem; color:#fff;">Поворот: <input type="range" id="stamp-r" min="0" max="360" value="0" style="width:70px;"></label>
+                  </div>`;
+              document.getElementById('lasso-stamps-container').parentElement.appendChild(lsSettings);
+          }
+          lsSettings.style.display = 'block';
+      } else { if (lsSettings) lsSettings.style.display = 'none'; }
+
+
       if (round === 1) { 
           if (mode === 'finishit') setHTML('word-to-draw', "Нарисуйте заготовку!");
-          else if (mode === 'lasso') {
-              let p = "Фрагмент";
-              if (typeof getRandomLassoPart === 'function') p = getRandomLassoPart();
-              setHTML('word-to-draw', "Нарисуй: " + p);
-          }
+          else if (mode === 'lasso') setHTML('word-to-draw', "Нарисуй: " + getRandomRussianWord());
           else if (mode === 'triplethreat') {
               let w = "Три случайных слова";
               if (typeof getRandomTriple === 'function') w = getRandomTriple();
@@ -451,9 +498,7 @@ function startRound(round, players) {
           let prevImg = null;
           if (typeof previousData === 'string') {
               if (previousData.startsWith('{')) {
-                  try { let pd = JSON.parse(previousData); prevImg = pd.img; 
-                        if(mode === 'coop' && pd.original) { setText('word-to-draw', pd.original); } 
-                  } catch(e){}
+                  try { let pd = JSON.parse(previousData); prevImg = pd.img; } catch(e){}
               } else { prevImg = previousData; }
           }
           
@@ -466,8 +511,8 @@ function startRound(round, players) {
               if (bgRef) { bgRef.src = prevImg; bgRef.style.display = 'block'; bgRef.style.opacity = '1'; }
           } else if (mode === 'copycat' && prevImg && prevImg.length > 50) {
               setHTML('word-to-draw', `<img src="${prevImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`);
-          } else if (mode === 'lasso' && round > 2) {
-              setText('word-to-draw', "Собери: " + previousData);
+          } else if (mode === 'lasso' && round >= 3) {
+              setText('word-to-draw', "Собери из фрагментов: " + previousData);
               setDisplay('sidebar-tools', 'none'); setDisplay('lasso-stamps-container', 'flex');
               const sc = document.getElementById('lasso-stamps-container'); if(sc) sc.innerHTML = '';
               Object.keys(lassoStampsCache).forEach(k => {
@@ -475,6 +520,14 @@ function startRound(round, players) {
                   im.onclick = () => { document.querySelectorAll('.lasso-stamp-img').forEach(i=>i.classList.remove('active')); im.classList.add('active'); activeLassoStampRef = k; };
                   if(sc) sc.appendChild(im);
               });
+          } else if (mode === 'coop' && round === 2) {
+              const myIndex = players.indexOf(myUserId);
+              const p1Index = myIndex % 2 === 0 ? myIndex : myIndex - 1;
+              const p2Index = p1Index + 1 < players.length ? p1Index + 1 : p1Index;
+              const sub1 = globalState.submissions?.round_1?.[players[p1Index]];
+              const sub2 = globalState.submissions?.round_1?.[players[p2Index]];
+              const getWord = (s) => { if (!s) return "..."; if (s.startsWith('{')) { try { return JSON.parse(s).original || "..."; } catch(e){} } return s; };
+              setText('word-to-draw', `${getWord(sub1)} + ${getWord(sub2)}`);
           } else { 
               let displayWord = previousData || "...";
               if (typeof previousData === 'string' && previousData.startsWith('{')) {
@@ -488,7 +541,7 @@ function startRound(round, players) {
       const wi = document.getElementById('word-input'); if(wi) wi.value = '';
       if (round === 1) {
           setDisplay('babel-translation', 'none');
-          setText('text-instruction', mode==='story'?'Начните историю...':'Придумайте фразу');
+          setText('text-instruction', mode==='story'?'Начните историю...':'Придумайте слово');
           setDisplay('image-to-guess', 'none'); setDisplay('text-to-continue', 'none');
           
           if (mode === 'impostor') {
@@ -509,8 +562,11 @@ function startRound(round, players) {
               setDisplay('image-to-guess', 'none'); setDisplay('text-to-continue', 'block');
               setText('text-to-continue', `"...${previousData}"`);
           } else if (mode === 'lasso') {
-              setText('text-instruction', 'Придумайте безумную тему (что соберем?):');
-              setDisplay('image-to-guess', 'none'); setDisplay('text-to-continue', 'none');
+              setText('text-instruction', 'Какую безумную тему из этого можно собрать?');
+              const imgEl = document.getElementById('image-to-guess');
+              if (typeof previousData === 'string' && previousData.startsWith('{')) { try { previousData = JSON.parse(previousData).img; } catch(e){} }
+              if (imgEl) imgEl.src = previousData || ""; 
+              setDisplay('image-to-guess', 'inline-block'); setDisplay('text-to-continue', 'none');
           } else {
               setText('text-instruction', 'Что здесь нарисовано?');
               const imgEl = document.getElementById('image-to-guess');
@@ -523,33 +579,19 @@ function startRound(round, players) {
   }
 }
 
-// ИСПРАВЛЕНИЕ: Безумная цепочка перевода для интересного эффекта
+// НАСТОЯЩИЙ СЛОМАННЫЙ ПЕРЕВОДЧИК (ДИКОЕ ИСКАЖЕНИЕ СМЫСЛА)
 async function getRealBabelTranslation(text) {
-    // Цепочка: Русский -> Японский -> Арабский -> Зулусский -> Французский -> Русский
-    const chain = [
-        { id: 'ja', name: 'Яп' },
-        { id: 'ar', name: 'Ар' },
-        { id: 'zu', name: 'Зулу' },
-        { id: 'fr', name: 'Фр' },
-        { id: 'ru', name: 'Рус' }
-    ];
-    
+    const chain = ['zh-CN', 'sw', 'haw', 'is', 'ar', 'ru'];
     let currentText = text;
-    
     try {
         for (let i = 0; i < chain.length; i++) {
-            const sl = i === 0 ? 'ru' : chain[i-1].id;
-            const tl = chain[i].id;
+            const sl = i === 0 ? 'ru' : chain[i-1];
+            const tl = chain[i];
             const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(currentText)}`);
             const data = await res.json();
             currentText = data[0].map(x => x[0]).join('');
         }
-        
-        // Добавляем рандомный смешной эмодзи для эффекта
-        const emojis = ['🤔', '🤯', '💀', '🤡', '👽', '🍝', '✨', '🥴'];
-        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-        
-        return `[Яп ➔ Ар ➔ Зулу ➔ Фр] ${randomEmoji}\n${currentText}`;
+        return currentText;
     } catch(e) {
         console.error("Translate API error:", e);
         return `[Сбой авто-перевода] ${text}`;
@@ -592,7 +634,10 @@ function submitDrawing(isManual = false) {
   currentPhaseSubmitted = true; clearInterval(phaseTimerInterval);
   const mode = globalState.settings?.mode; let finalDataUrl = '';
 
-  if (mode === 'amnesia') {
+  if (mode === 'lasso' && currentLocalRound === 1) {
+      // ИСПРАВЛЕНИЕ: Лассо раунд 1 сохраняется БЕЗ ФОНА!
+      finalDataUrl = canvas.toDataURL('image/png');
+  } else if (mode === 'amnesia') {
       redrawFromStrokesSync(recordedStrokes, ctx, canvas, mode === 'darkmode');
       finalDataUrl = canvas.toDataURL('image/png');
   } else if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) {
@@ -617,41 +662,12 @@ function submitDrawing(isManual = false) {
   const finalData = JSON.stringify({ img: finalDataUrl, strokes: recordedStrokes });
   const updates = {};
   
-  // В Коопе и Эстафете логика ID тетради зависит от фазы
   let targetId = getCurrentNotebookId(currentLocalRound, globalState.players || []);
   if (mode === 'coop') targetId = myUserId; 
 
   updates[`submissions/round_${currentLocalRound}/${targetId}`] = finalData;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
   resetCanvasTransform(); showPhase('waiting-phase'); updateWaitingScreen();
-}
-
-function startGyro() {
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().then(res => { if (res === 'granted') enableGyro(); });
-    } else enableGyro();
-}
-function enableGyro() {
-    isGyroEnabled = true; setDisplay('btn-gyro-start', 'none'); setDisplay('gyro-cursor', 'block');
-    gyroX = 400; gyroY = 300; ctx.beginPath(); ctx.moveTo(gyroX, gyroY);
-    preZoomState = canvas.toDataURL(); isDrawing = true;
-    currentStroke = { c: currentColor, s: document.getElementById('brush-size').value, e: 0, p: [gyroX, gyroY] };
-    window.addEventListener('deviceorientation', (e) => {
-        if (!isDrawing || !isGyroEnabled) return;
-        gyroX += e.gamma * 0.5; gyroY += e.beta * 0.5;
-        gyroX = Math.max(0, Math.min(800, gyroX)); gyroY = Math.max(0, Math.min(600, gyroY));
-        const gc = document.getElementById('gyro-cursor');
-        if(gc) { gc.style.left = `${(gyroX/800)*100}%`; gc.style.top = `${(gyroY/600)*100}%`; }
-        currentStroke.p.push(Math.round(gyroX), Math.round(gyroY));
-        ctx.lineTo(gyroX, gyroY); ctx.stroke();
-    });
-}
-
-function drawArrow(actx, fromx, fromy, tox, toy) {
-    let headlen = actx.lineWidth * 3; let angle = Math.atan2(toy - fromy, tox - fromx);
-    actx.moveTo(fromx, fromy); actx.lineTo(tox, toy); actx.stroke(); actx.beginPath();
-    actx.moveTo(tox, toy); actx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-    actx.moveTo(tox, toy); actx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6)); actx.stroke();
 }
 
 function floodFillCore(startX, startY, fillColorHex) {
@@ -709,19 +725,94 @@ function floodFillCore(startX, startY, fillColorHex) {
 
 function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
     targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over';
-    targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    const mode = globalState.settings?.mode;
+    
+    if (mode === 'lasso' && globalState.presentation?.round === 1) {
+        targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+    } else {
+        targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    }
+    
     for (let stroke of strokes) {
         targetCtx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
         targetCtx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
         
-        if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { targetCtx.drawImage(lassoStampsCache[stroke.ref], stroke.p[0] - stroke.s/2, stroke.p[1] - stroke.s/2, stroke.s, stroke.s); continue; }
-        if (stroke.type === 'clear') { targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
+        if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { 
+            let w = stroke.w || stroke.s || 100; let h = stroke.h || stroke.s || 100; let rot = stroke.rot || 0;
+            targetCtx.save(); targetCtx.translate(stroke.p[0], stroke.p[1]); targetCtx.rotate(rot * Math.PI / 180);
+            targetCtx.drawImage(lassoStampsCache[stroke.ref], -w/2, -h/2, w, h); targetCtx.restore();
+            continue; 
+        }
+        if (stroke.type === 'clear') { 
+            targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; 
+            if (mode === 'lasso' && globalState.presentation?.round === 1) targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+            else { targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
+        }
         else if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
         else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
         else if (stroke.type === 'arrow') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; drawArrow(targetCtx, stroke.p[0], stroke.p[1], stroke.p[2], stroke.p[3]); if(stroke.sym) { targetCtx.beginPath(); drawArrow(targetCtx, targetCanvas.width - stroke.p[0], stroke.p[1], targetCanvas.width - stroke.p[2], stroke.p[3]); } }
-        else { let pts = stroke.p; if (!pts || pts.length < 2) continue; targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round'; targetCtx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i+=2) { targetCtx.lineTo(pts[i], pts[i+1]); } targetCtx.stroke(); if (stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - pts[0], pts[1]); for (let i = 2; i < pts.length; i+=2) { targetCtx.lineTo(targetCanvas.width - pts[i], pts[i+1]); } targetCtx.stroke(); } }
+        else if (stroke.type === 'fill') { } // floodFillCore calls need original imageData, skipped in basic redraw for now
+        else { 
+            let pts = stroke.p; if (!pts || pts.length < 2) continue; 
+            targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round'; 
+            if (stroke.n && !stroke.e) { targetCtx.shadowBlur = Math.max(10, stroke.s * 2); targetCtx.shadowColor = stroke.c; targetCtx.strokeStyle = '#ffffff'; } 
+            else { targetCtx.shadowBlur = 0; targetCtx.shadowColor = 'transparent'; targetCtx.strokeStyle = stroke.c; }
+            targetCtx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i+=2) { targetCtx.lineTo(pts[i], pts[i+1]); } targetCtx.stroke(); 
+            if (stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - pts[0], pts[1]); for (let i = 2; i < pts.length; i+=2) { targetCtx.lineTo(targetCanvas.width - pts[i], pts[i+1]); } targetCtx.stroke(); } 
+        }
     }
+}
+
+// ИСПРАВЛЕНИЕ: Восстановлены анимации рисования!
+function animateStrokes(strokes, canvasEl, isDark) {
+    const actx = canvasEl.getContext('2d');
+    const mode = globalState.settings?.mode;
+    
+    if (mode === 'lasso' && globalState.presentation?.round === 1) {
+        actx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    } else {
+        actx.fillStyle = isDark ? '#000000' : '#ffffff';
+        actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+    }
+    
+    let strokeIndex = 0;
+    let pointIndex = 2; 
+    
+    function drawNext() {
+        if (strokeIndex >= strokes.length) return;
+        let stroke = strokes[strokeIndex];
+        
+        if (stroke.type === 'clear') {
+            if (mode === 'lasso' && globalState.presentation?.round === 1) actx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+            else { actx.fillStyle = isDark ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height); }
+            strokeIndex++; pointIndex = 2; requestAnimationFrame(drawNext); return;
+        }
+        
+        if ((!stroke.type || stroke.type === 'line') && stroke.p) {
+            actx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
+            actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
+            actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round';
+            if (stroke.n && !stroke.e) { actx.shadowBlur = Math.max(10, stroke.s * 2); actx.shadowColor = stroke.c; actx.strokeStyle = '#ffffff'; } 
+            else { actx.shadowBlur = 0; actx.shadowColor = 'transparent'; actx.strokeStyle = stroke.c; }
+            
+            let pts = stroke.p;
+            if (pointIndex < pts.length) {
+                for(let k=0; k<5; k++) { // рисуем по 5 точек за кадр для скорости
+                    if (pointIndex < pts.length) {
+                        actx.beginPath(); actx.moveTo(pts[pointIndex-2], pts[pointIndex-1]); actx.lineTo(pts[pointIndex], pts[pointIndex+1]); actx.stroke();
+                        if (stroke.sym) { actx.beginPath(); actx.moveTo(canvasEl.width - pts[pointIndex-2], pts[pointIndex-1]); actx.lineTo(canvasEl.width - pts[pointIndex], pts[pointIndex+1]); actx.stroke(); }
+                        pointIndex += 2;
+                    }
+                }
+                requestAnimationFrame(drawNext);
+            } else { strokeIndex++; pointIndex = 2; drawNext(); }
+        } else {
+            redrawFromStrokesSync([stroke], actx, canvasEl, isDark);
+            strokeIndex++; pointIndex = 2; drawNext();
+        }
+    }
+    drawNext();
 }
 
 const canvas = document.getElementById('drawing-board');
@@ -732,6 +823,7 @@ let canvasTransform = { x: 0, y: 0, scale: 1 }; let initialDistance = 0; let las
 let shapeStartX = 0, shapeStartY = 0; let shapeImgData = null; let isDrawingShape = false; let lastX = 0, lastY = 0;
 let recordedStrokes = []; let strokesHistory = []; let currentStroke = null; let drawHistory = []; let historyIndex = -1;
 let activePointers = new Map();
+let zoomPanActive = false;
 
 function initHistory() { drawHistory = []; strokesHistory = []; recordedStrokes = []; historyIndex = -1; saveState(); }
 function saveState() { if (globalState.settings?.mode === 'hardcore' || globalState.settings?.mode === 'amnesia') return; if (historyIndex < drawHistory.length - 1) { drawHistory.length = historyIndex + 1; strokesHistory.length = historyIndex + 1; } drawHistory.push(canvas.toDataURL()); strokesHistory.push(JSON.parse(JSON.stringify(recordedStrokes))); historyIndex++; }
@@ -741,6 +833,7 @@ function restoreState(index) {
         ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowBlur=0; ctx.globalCompositeOperation = 'source-over'; 
         const mode = globalState.settings?.mode;
         if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); } 
+        else if (mode === 'lasso' && currentLocalRound === 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); }
         else if (mode === 'coop') { ctx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
         else { ctx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
         ctx.drawImage(img, 0, 0); 
@@ -773,6 +866,7 @@ function clearCanvas() {
     ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; 
     const mode = globalState.settings?.mode; const isDark = mode === 'darkmode'; 
     if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); } 
+    else if (mode === 'lasso' && currentLocalRound === 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); }
     else { ctx.fillStyle = isDark ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); const cw = document.getElementById('canvas-wrapper'); if(cw) cw.style.backgroundColor = isDark ? '#000000' : '#ffffff'; }
     if(isErasing) ctx.globalCompositeOperation = 'destination-out'; 
     recordedStrokes.push({ type: 'clear' }); saveState(); 
@@ -782,29 +876,47 @@ function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; up
 function updateTransform() { if (!zoomContainer) return; if (canvasTransform.scale <= 1) { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; } zoomContainer.style.transformOrigin = `0 0`; zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
 function getCoordinates(clientX, clientY) { const rect = canvas.getBoundingClientRect(); return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height }; }
 
+// ИСПРАВЛЕНИЕ: Многопальцевый зум отменяет случайные штрихи
 function startPosition(e) {
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (activePointers.size === 2) {
-        isDrawing = false; isDrawingShape = false;
+
+    if (activePointers.size >= 2) {
+        if (isDrawing || isDrawingShape) {
+            isDrawing = false; isDrawingShape = false;
+            if (currentStroke && recordedStrokes.length > 0 && recordedStrokes[recordedStrokes.length-1] === currentStroke) {
+                recordedStrokes.pop();
+            }
+            currentStroke = null;
+            if (preZoomState) { 
+                let img = new Image(); img.src = preZoomState;
+                img.onload = () => { ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0,0); }
+            }
+        }
+        zoomPanActive = true;
         const pts = Array.from(activePointers.values());
         initialDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         lastZoomCenter = { x: (pts[0].x + pts[1].x)/2, y: (pts[0].y + pts[1].y)/2 };
-        if (preZoomState) { 
-            let img = new Image(); img.src = preZoomState;
-            img.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0,0); }
-        }
         return;
     }
-    if (activePointers.size > 2) return;
+    
+    zoomPanActive = false;
 
     try { canvas.setPointerCapture(e.pointerId); } catch(err){}
     let pos = getCoordinates(e.clientX, e.clientY); const mode = globalState.settings?.mode;
     
-    if (mode === 'lasso' && currentLocalRound > 2) {
+    if (mode === 'lasso' && currentLocalRound >= 3) {
         if (!activeLassoStampRef) return alert("Выберите фрагмент сверху!");
-        let size = document.getElementById('brush-size').value * 10; let opacity = parseFloat(document.getElementById('brush-opacity').value);
+        let w = parseInt(document.getElementById('stamp-w')?.value || 150); 
+        let h = parseInt(document.getElementById('stamp-h')?.value || 150);
+        let rot = parseInt(document.getElementById('stamp-r')?.value || 0);
+        let opacity = parseFloat(document.getElementById('brush-opacity').value);
         let img = lassoStampsCache[activeLassoStampRef];
-        if (img) { ctx.globalAlpha = opacity; ctx.drawImage(img, pos.x - size/2, pos.y - size/2, size, size); recordedStrokes.push({ type: 'stamp', ref: activeLassoStampRef, s: size, o: opacity, p: [pos.x, pos.y] }); saveState(); }
+        if (img) { 
+            ctx.globalAlpha = opacity; ctx.save();
+            ctx.translate(pos.x, pos.y); ctx.rotate(rot * Math.PI / 180);
+            ctx.drawImage(img, -w/2, -h/2, w, h); ctx.restore();
+            recordedStrokes.push({ type: 'stamp', ref: activeLassoStampRef, w: w, h: h, rot: rot, o: opacity, p: [pos.x, pos.y] }); saveState(); 
+        }
         isDrawing = false; return;
     }
 
@@ -833,23 +945,29 @@ function draw(e) {
   if (!activePointers.has(e.pointerId)) return;
   activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  if (activePointers.size === 2) {
+  if (activePointers.size >= 2 || zoomPanActive) {
       if (e.pointerType === 'touch') e.preventDefault();
+      if (activePointers.size < 2) return;
       const pts = Array.from(activePointers.values());
       const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       const cx = (pts[0].x + pts[1].x)/2; const cy = (pts[0].y + pts[1].y)/2;
+      
       if (initialDistance === 0) { initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; }
+      
       let newScale = canvasTransform.scale * (currentDist / initialDistance);
-      if (newScale < 1) newScale = 1; if (newScale > 5) newScale = 5;
+      if (newScale < 1) newScale = 1; if (newScale > 10) newScale = 10;
+      
       const wrapperRect = zoomContainer.parentElement.getBoundingClientRect();
       canvasTransform.x -= (cx - wrapperRect.left - canvasTransform.x) * (newScale / canvasTransform.scale - 1);
       canvasTransform.y -= (cy - wrapperRect.top - canvasTransform.y) * (newScale / canvasTransform.scale - 1);
       canvasTransform.x += (cx - lastZoomCenter.x); canvasTransform.y += (cy - lastZoomCenter.y);
-      canvasTransform.scale = newScale; initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; 
+      canvasTransform.scale = newScale; 
+      
+      initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; 
       updateTransform(); return;
   }
   
-  if (activePointers.size > 2 || (!isDrawing && !isDrawingShape)) return; 
+  if (!isDrawing && !isDrawingShape) return; 
   if (e.pointerType === 'touch') e.preventDefault(); 
   
   let pos = getCoordinates(e.clientX, e.clientY); const mode = globalState.settings?.mode;
@@ -885,7 +1003,8 @@ function endPosition(e) {
         activePointers.delete(e.pointerId);
         try { if(canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId); } catch(err){}
     }
-    if (activePointers.size > 0) { isDrawing = false; isDrawingShape = false; initialDistance = 0; return; }
+    if (activePointers.size > 0) { if (activePointers.size === 1) initialDistance = 0; return; }
+    if (zoomPanActive) { zoomPanActive = false; return; }
     
     ctx.beginPath(); ctx.filter = 'none'; ctx.shadowBlur = 0;
     let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
@@ -1043,51 +1162,73 @@ function syncPresentationView(players) {
     }
 
     let pData = extractData(globalState.submissions?.[`round_${pres.round}`]?.[bookOwnerId]);
-
-    if (mode === 'impostor' && pData.isText) {
-        if (isHost) setTimeout(nextSlide, 500); 
-        renderedPresentationState = currentStateId; return;
-    }
-
     let authorId = players[(players.indexOf(bookOwnerId) + pres.round - 1 + players.length * 10) % players.length];
     let authorName = globalState.playerNames?.[authorId] || "Аноним";
     let authorAvatar = globalState.playerAvatars?.[authorId] || "https://picsum.photos/100";
     
     const side = pData.isText ? 'left' : 'right'; let visualContent = '';
 
-    if (pData.isText) { 
-        if (pData.babelData) {
-            visualContent = `<div class="msg-text"><div style="font-size:0.9rem; opacity:0.7; margin-bottom:5px;">Оригинал: ${pData.babelData.original}</div><div style="color:#fbbf24; font-weight:bold;">${pData.babelData.translated}</div></div>`;
-        } else {
-            visualContent = `<div class="msg-text">${pData.textData}</div>`; 
-        }
-    } else {
-        if (mode === 'coop' && pres.round === 2) {
-            const p1 = bookOwnerId;
-            const p2 = players[(players.indexOf(bookOwnerId) + 1) % players.length];
+    if (mode === 'impostor' && pData.isText) {
+        if (isHost) setTimeout(nextSlide, 500); 
+        renderedPresentationState = currentStateId; return;
+    }
+
+    // ЛОГИКА РЕНДЕРИНГА
+    if (mode === 'coop') {
+        const p1 = bookOwnerId;
+        const p2 = players[(players.indexOf(bookOwnerId) + 1) % players.length];
+        const author1 = globalState.playerNames?.[p1] || "Игрок 1";
+        const author2 = globalState.playerNames?.[p2] || "Игрок 2";
+        authorName = `${author1} & ${author2}`;
+
+        if (pres.round === 1) {
+            const w1 = extractData(globalState.submissions?.[`round_1`]?.[p1])?.textData || "...";
+            const w2 = extractData(globalState.submissions?.[`round_1`]?.[p2])?.textData || "...";
+            visualContent = `<div class="msg-text">Слова: <br><span style="color:#fbbf24">${w1}</span> и <span style="color:#22c55e">${w2}</span></div>`;
+            speakText(`Тема: ${w1} и ${w2}`);
+        } else if (pres.round === 2) {
             const p1Data = extractData(globalState.submissions?.[`round_2`]?.[p1]);
             const p2Data = extractData(globalState.submissions?.[`round_2`]?.[p2]);
-            const author1 = globalState.playerNames?.[p1] || "Игрок 1";
-            const author2 = globalState.playerNames?.[p2] || "Игрок 2";
-            
-            authorName = `${author1} & ${author2}`;
             visualContent = `
             <div style="position:relative; width:100%; max-height: 40vh; aspect-ratio: 4/3; background: white; border-radius:12px; border: 2px solid rgba(255,255,255,0.9); overflow: hidden;">
                <img src="${p1Data.imgUrl}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain;">
                <img src="${p2Data.imgUrl}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain;">
-               <div style="position:absolute; left:50%; top:0; bottom:0; width:4px; background:#d946ef; opacity:0.8; box-shadow: 0 0 10px #d946ef;"></div>
+               <div style="position:absolute; left:50%; top:0; bottom:0; width:4px; background:#ef4444; opacity:0.8; box-shadow: 0 0 10px #ef4444;"></div>
             </div>`;
+        }
+    } else if (pData.isText) { 
+        if (pData.babelData) {
+            visualContent = `<div class="msg-text"><div style="font-size:0.9rem; opacity:0.7; margin-bottom:5px;">Оригинал: ${pData.babelData.original}</div><div style="color:#fbbf24; font-weight:bold; font-size:1.2rem;">${pData.babelData.translated}</div></div>`;
+            speakText(`Оригинал: ${pData.babelData.original}. Итог: ${pData.babelData.translated}`);
         } else {
-            // ИСПРАВЛЕНИЕ: Теперь для всех рисунков (включая Babel) грузится надежный тег img, а не пустой canvas
-            visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img" style="width:100%; height:auto; border-radius:12px; border:2px solid rgba(255,255,255,0.1);"></div>`;
+            visualContent = `<div class="msg-text">${pData.textData}</div>`; 
+            speakText(pData.textData);
+        }
+    } else {
+        if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism' || mode === 'impostor') {
+            visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img"></div>`;
+        } else {
+            // ДЛЯ ОБЫЧНЫХ РЕЖИМОВ ВОЗВРАЩЕНА АНИМАЦИЯ НА CANVAS!
+            visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}" style="width:100%; border-radius:12px; border:2px solid rgba(255,255,255,0.1); background:${mode==='darkmode'?'#000':'#fff'}"></canvas></div>`;
         }
     }
 
     const msgHTML = `<div class="msg-row ${side}"><img src="${authorAvatar}" class="msg-avatar"><div class="msg-bubble"><div class="msg-author">${authorName}</div>${visualContent}</div></div>`;
     const chatContainer = document.getElementById('chat-messages');
-    if (chatContainer) { chatContainer.insertAdjacentHTML('beforeend', msgHTML); setTimeout(() => { chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' }); }, 50); }
+    if (chatContainer) { 
+        chatContainer.insertAdjacentHTML('beforeend', msgHTML); 
+        setTimeout(() => { chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' }); }, 50); 
+    }
 
-    if (pData.isText) speakText(pData.textData); 
+    // Запуск анимации рисования, если сгенерирован холст
+    if (visualContent.includes('anim-canvas')) {
+        setTimeout(() => {
+            const c = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);
+            if (c && pData.strokes) {
+                animateStrokes(pData.strokes, c, mode === 'darkmode');
+            }
+        }, 100);
+    }
 
     if (isHost) {
         if (pres.round === calculatedTotalRounds) {

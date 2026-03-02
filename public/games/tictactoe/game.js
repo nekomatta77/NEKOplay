@@ -1,6 +1,7 @@
 const urlParams = new URLSearchParams(window.location.search);
 const playersCount = parseInt(urlParams.get('players')) || 2;
 const myName = urlParams.get('name') || 'Аноним';
+const isHost = urlParams.get('isHost') === 'true'; // Проверяем хоста
 
 let BOARD_SIZE = 4;
 let WIN_STREAK = 3;
@@ -15,11 +16,10 @@ if (typeof applyRulesText === 'function') {
   applyRulesText(playersCount, BOARD_SIZE, WIN_STREAK);
 }
 
-// СОСТОЯНИЯ ИГРЫ
 let boardState = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
 let isOnCooldown = false;
 let isGameOver = false;
-let isStarting = true; // Флаг: игра еще не началась!
+let isStarting = true; 
 
 const NEON_COLORS = ['#f43f5e', '#a855f7', '#3b82f6', '#10b981', '#f59e0b', '#06b6d4', '#ec4899', '#8b5cf6'];
 const myColor = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
@@ -29,7 +29,7 @@ const boardEl = document.getElementById('board');
 const cooldownEl = document.getElementById('cooldown');
 
 function initBoard() {
-  boardEl.innerHTML = ''; // Очищаем перед созданием (полезно для рестарта)
+  boardEl.innerHTML = ''; 
   for (let y = 0; y < BOARD_SIZE; y++) {
     for (let x = 0; x < BOARD_SIZE; x++) {
       const cell = document.createElement('div');
@@ -46,7 +46,6 @@ function initBoard() {
   }
 }
 
-// ОТСЧЕТ ПЕРЕД БОЕМ (Фикс рассинхрона)
 function startCountdown() {
   isStarting = true;
   isGameOver = false;
@@ -62,7 +61,6 @@ function startCountdown() {
 
   const timer = setInterval(() => {
     count--;
-    // Перезапускаем анимацию
     textEl.classList.remove('pop');
     void textEl.offsetWidth; 
     textEl.classList.add('pop');
@@ -74,13 +72,12 @@ function startCountdown() {
     } else {
       clearInterval(timer);
       overlay.classList.remove('active');
-      isStarting = false; // Разрешаем кликать!
+      isStarting = false; 
     }
   }, 1000);
 }
 
 function handleCellClick(x, y) {
-  // Блокируем клики, если идет отсчет, игра окончена или клетка занята
   if (isStarting || isGameOver || isOnCooldown || boardState[y][x]) return;
 
   startCooldownBar();
@@ -98,29 +95,25 @@ function leaveGame() {
   window.parent.postMessage({ type: 'leave_game' }, '*');
 }
 
-// РЕСТАРТ: Игрок нажал "Играть еще раз"
 function requestRestart() {
-  // 1. Отправляем сигнал всем остальным
+  if (!isHost) return;
   window.parent.postMessage({
     type: 'game_action',
     action: { type: 'restart' }
   }, '*');
-  // 2. Перезапускаем у себя
   doRestart();
 }
 
-// РЕСТАРТ: Выполняем очистку поля
 function doRestart() {
   boardState = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
   document.getElementById('winnerOverlay').classList.remove('active');
-  initBoard(); // Перерисовываем чистое поле
-  startCountdown(); // Запускаем эпичный отсчет заново!
+  initBoard(); 
+  startCountdown(); 
 }
 
 function startCooldownBar() {
   isOnCooldown = true;
   cooldownEl.style.transform = 'scaleX(0)';
-  
   let progress = 0;
   const interval = setInterval(() => {
     progress += 0.1;
@@ -146,17 +139,13 @@ function placeToken(x, y, color) {
   cell.appendChild(token);
 }
 
-// Слушаем Firebase (Мост React)
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'game_action') {
     const action = event.data.action;
-    
-    // Если прилетел ход
     if (action.type === 'move') {
       placeToken(action.x, action.y, action.color);
       checkWin(action.x, action.y, action.color, action.playerName);
     }
-    // Если кто-то нажал РЕСТАРТ
     else if (action.type === 'restart') {
       doRestart();
     }
@@ -188,12 +177,23 @@ function showWinner(color, winnerName) {
   isGameOver = true;
   const overlay = document.getElementById('winnerOverlay');
   const text = document.getElementById('winnerText');
+  const restartBtn = document.getElementById('restartBtn');
   
   overlay.classList.add('active');
   text.style.color = color;
   text.innerText = `ПОБЕДИЛ ${winnerName.toUpperCase()}!`;
+
+  // Логика кнопки рестарта
+  if (isHost) {
+      restartBtn.innerText = "ИГРАТЬ ЕЩЕ РАЗ";
+      restartBtn.disabled = false;
+      restartBtn.onclick = requestRestart;
+  } else {
+      restartBtn.innerText = "ОЖИДАЕМ ХОСТА...";
+      restartBtn.disabled = true;
+      restartBtn.onclick = null;
+  }
 }
 
-// ЗАПУСК ИГРЫ
 initBoard();
-startCountdown(); // Запускаем отсчет при входе!
+startCountdown();
