@@ -1,4 +1,4 @@
-let animationFrameId = null; // Глобальное объявление для предотвращения ошибки сброса
+let animationFrameId = null; 
 
 function setDisplay(id, display) { const el = document.getElementById(id); if (el) el.style.display = display; }
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
@@ -31,6 +31,17 @@ else setDisplay('guest-waiting', 'flex');
 
 function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 function requestFullscreen() { window.parent.postMessage({ type: 'request_fullscreen' }, '*'); }
+
+// ВЕРНУЛ ПОТЕРЯННУЮ ФУНКЦИЮ
+function showPhase(phaseId) {
+  document.querySelectorAll('.screen, .phase-container').forEach(el => el.classList.remove('active'));
+  const target = document.getElementById(phaseId);
+  if (target) {
+      if (target.classList.contains('screen')) target.classList.add('active');
+      else { const gs = document.getElementById('game-screen'); if(gs) gs.classList.add('active'); target.classList.add('active'); }
+  }
+  setDisplay('leave-btn', (phaseId === 'lobby-screen' || phaseId === 'ready-to-present-phase' || phaseId === 'presentation-phase' || phaseId.includes('voting')) ? 'flex' : 'none');
+}
 
 function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -164,7 +175,7 @@ function updateWaitingScreen() {
     if (!listEl) return;
     
     const iconReady = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#22c55e" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-    const iconWaiting = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#eab308" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+    const iconWaiting = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="#eab308" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 16 14"></polyline></svg>`;
 
     listEl.innerHTML = players.map(id => {
         const name = globalState.playerNames?.[id] || "Аноним";
@@ -201,7 +212,6 @@ function startGame() {
   }, '*');
 }
 
-// Принудительный тотальный сброс для стабильной новой игры
 function playAgain() {
   if (!isHost) return;
   let resetSubs = {};
@@ -283,7 +293,6 @@ function handleStateChange() {
     return;
   }
 
-  // Расчет кругов (Для Коопа всегда 2 этапа)
   calculatedTotalRounds = players.length * (globalState.settings?.roundsMultiplier || 1);
   if (globalState.settings?.mode === 'coop') calculatedTotalRounds = 2;
 
@@ -356,7 +365,6 @@ function handleStateChange() {
   }
 }
 
-// Логика тетрадей для Коопа (разбивка на пары)
 function getCurrentNotebookId(round, players) {
     if (globalState.settings?.mode === 'tagteam') return players[0]; 
     const myIndex = players.indexOf(myUserId);
@@ -440,7 +448,7 @@ function startRound(round, players) {
           if (typeof previousData === 'string') {
               if (previousData.startsWith('{')) {
                   try { let pd = JSON.parse(previousData); prevImg = pd.img; 
-                        if(mode === 'coop' && pd.original) { setText('word-to-draw', pd.original); } // Coop word text backup
+                        if(mode === 'coop' && pd.original) { setText('word-to-draw', pd.original); } 
                   } catch(e){}
               } else { prevImg = previousData; }
           }
@@ -464,7 +472,6 @@ function startRound(round, players) {
                   if(sc) sc.appendChild(im);
               });
           } else { 
-              // Babel mode translation extraction
               let displayWord = previousData || "...";
               if (typeof previousData === 'string' && previousData.startsWith('{')) {
                   try { let p = JSON.parse(previousData); if(p.translated) displayWord = p.translated; } catch(e){}
@@ -483,8 +490,6 @@ function startRound(round, players) {
           if (mode === 'impostor') {
               let p = ["Слово", "Слово"];
               if (typeof getImpostorPair === 'function') p = getImpostorPair();
-              let isImpostor = players.indexOf(myUserId) === 0; // Host is impostor technically, but it's assigned randomly by arrays
-              // Actually impostor should be random. Let's use seed
               let impIndex = Math.floor(seededRandom(globalState.settings?.seed || 1) * players.length);
               let isImpostorMatch = players.indexOf(myUserId) === impIndex;
               if(wi) { wi.value = isImpostorMatch ? p[1] : p[0]; wi.disabled = true; }
@@ -522,7 +527,6 @@ function submitWord(isManual = false) {
   const wi = document.getElementById('word-input');
   if (wi && wi.value.trim()) word = wi.value.trim();
 
-  // Логика перевода в режиме Babel
   if (globalState.settings?.mode === 'babel' && !isCurrentPhaseDrawing) {
       setDisplay('babel-translation', 'block'); setText('babel-translation', "Сломанный переводчик...");
       setTimeout(() => {
@@ -536,7 +540,6 @@ function submitWord(isManual = false) {
       return;
   }
   
-  // Для Коопа сохраняем слово как JSON чтобы не потерялось
   if (globalState.settings?.mode === 'coop') {
       word = JSON.stringify({ type: 'coop', original: word });
   }
@@ -565,7 +568,6 @@ function submitDrawing(isManual = false) {
   } else if (mode === 'coop') {
       const players = globalState.players || [];
       const isLeft = players.indexOf(myUserId) % 2 === 0;
-      // Очищаем в прозрачность чужую половину
       ctx.globalCompositeOperation = 'destination-out';
       if (isLeft) ctx.fillRect(canvas.width / 2, 0, canvas.width / 2, canvas.height);
       else ctx.fillRect(0, 0, canvas.width / 2, canvas.height);
@@ -580,7 +582,7 @@ function submitDrawing(isManual = false) {
   const updates = {};
   
   let targetId = getCurrentNotebookId(currentLocalRound, globalState.players || []);
-  if (mode === 'coop') targetId = myUserId; // В Коопе каждый грузит свою половину в СВОЙ ID (чтобы не перезаписывать друг друга)
+  if (mode === 'coop') targetId = myUserId; 
 
   updates[`submissions/round_${currentLocalRound}/${targetId}`] = finalData;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -913,7 +915,6 @@ function submitVote(targetId) {
 
 function renderVotingResults() {
     const players = globalState.players || [];
-    // Предатель случайно выбирается на основе seed (тот же что и при старте)
     const impIndex = Math.floor(seededRandom(globalState.settings?.seed || 1) * players.length);
     const impostorId = players[impIndex]; 
     const impostorName = globalState.playerNames?.[impostorId] || "Аноним";
@@ -949,7 +950,6 @@ function syncPresentationView(players) {
     const bookOwnerId = players[pres.bookIndex];
     const mode = globalState.settings?.mode;
     
-    // В Коопе название тетради - общая
     let bookTitle = `История: ${globalState.playerNames?.[bookOwnerId] || "Аноним"}`;
     if (mode === 'coop') bookTitle = "Общий Шедевр";
     setText('chat-book-title', bookTitle);
@@ -961,7 +961,7 @@ function syncPresentationView(players) {
             avatarsContainer.innerHTML = '';
             for (let i = 0; i < calculatedTotalRounds; i++) {
                 let stepAuthorId = players[(players.indexOf(bookOwnerId) + i + players.length * 10) % players.length];
-                if (mode === 'coop' && i === 1) stepAuthorId = players[(players.indexOf(bookOwnerId) + 1) % players.length]; // Партнер
+                if (mode === 'coop' && i === 1) stepAuthorId = players[(players.indexOf(bookOwnerId) + 1) % players.length]; 
                 
                 const avatar = globalState.playerAvatars?.[stepAuthorId] || "https://picsum.photos/100";
                 const wrap = document.createElement('div'); wrap.className = 'pres-avatar-node';
@@ -988,7 +988,6 @@ function syncPresentationView(players) {
         }
     }
 
-    // Извлечение данных с поддержкой JSON (Кооп и Переводчик)
     function extractData(rawData) {
         let textData = rawData, imgUrl = rawData, strokes = null, isText = true, babelData = null;
         if (typeof rawData === 'string') {
@@ -1008,7 +1007,6 @@ function syncPresentationView(players) {
 
     let pData = extractData(globalState.submissions?.[`round_${pres.round}`]?.[bookOwnerId]);
 
-    // Пропуск текста для Предателя
     if (mode === 'impostor' && pData.isText) {
         if (isHost) setTimeout(nextSlide, 500); 
         renderedPresentationState = currentStateId; return;
@@ -1079,7 +1077,7 @@ function nextSlide() {
     const pres = globalState.presentation; const players = globalState.players || [];
     let nextR = pres.round + 1; let nextB = pres.bookIndex;
     if (nextR > calculatedTotalRounds) { 
-        if (globalState.settings?.mode === 'coop') nextB += 2; // Пропускаем тетрадь партнера
+        if (globalState.settings?.mode === 'coop') nextB += 2; 
         else nextB++; 
         nextR = 1; 
     }
