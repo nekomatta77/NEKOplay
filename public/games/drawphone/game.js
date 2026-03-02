@@ -37,17 +37,17 @@ function switchTab(tabId) {
 }
 
 const modeDescriptions = {
-    'classic': 'Обычная игра. Рисуй, отгадывай и веселись!',
-    'icebreaker': 'Ледокол! Игра начинается не с текста, а с рисунка. Нарисуйте на первом этапе что угодно.',
-    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза.',
-    'nocolor': 'Секретный режим! Палитра заблокирована. Рисуем только черным.',
-    'hardcore': 'Без права на ошибку! Ластик, отмена и очистка отключены.',
+    'classic': 'Обычная игра. Рисуй, отгадывай и веселись без жестких ограничений!',
+    'icebreaker': 'Ледокол! Игра начинается не с текста, а с рисунка. Нарисуйте на первом этапе что угодно, а следующий игрок попытается это угадать!',
+    'speedrun': 'Экстремальный режим! Время раунда урезается в 2 раза. Придется думать и рисовать очень быстро!',
+    'nocolor': 'Секретный режим! Палитра заблокирована. Рисуем только черным цветом, как настоящие графики.',
+    'hardcore': 'Без права на ошибку! Ластик, отмена действий и очистка холста отключены. Рисуй с первого раза!',
     'story': 'История! Рисования нет вообще. Только текст. Вы пишете продолжение предыдущей фразы, создавая смешной рассказ.',
     'copycat': 'Подделка! Первый пишет фразу, второй рисует, а все остальные пытаются скопировать (перерисовать) предыдущий рисунок.',
     'blind': 'Вслепую! Во время рисования ваши штрихи невидимы на холсте. Рисуйте по памяти!',
     'onecolor': 'Один цвет! На раунд выдается один случайный цвет на всех. Палитра спрятана.',
     'chaos': 'Хаос! При каждом касании экрана цвет и размер кисти меняются случайным образом.',
-    'masterpiece': 'Шедевр! Времени на рисование дается в 2 раза больше.',
+    'masterpiece': 'Шедевр! Времени на рисование дается в 2 раза больше. Создайте картины великих художников!',
     'mirror': 'Зазеркалье! Холст аппаратно отзеркален. Попробуйте нарисовать хоть что-то ровно!',
     'earthquake': 'Землетрясение! Во время рисования мольберт постоянно трясется.',
     'drunk': 'Пьяный мастер! Ваши координаты немного смещаются. Кисть живет своей жизнью!',
@@ -137,6 +137,7 @@ function startPhaseTimer(isDrawing) {
     clearInterval(phaseTimerInterval);
     currentPhaseSubmitted = false;
     isCurrentPhaseDrawing = isDrawing;
+    
     let timeLimit = globalState.settings?.time || 90;
     let timeRemaining = timeLimit;
     updateTimerUI(timeRemaining, timeLimit);
@@ -299,13 +300,11 @@ function startRound(round, players) {
   let previousData = round > 1 ? globalState.submissions?.[`round_${round - 1}`]?.[notebookId] : null;
 
   if (isDrawingPhase) {
-      // Сброс классов эффектов
       const zContainer = document.getElementById('zoom-container');
       zContainer.className = ''; 
       document.getElementById('blindfold').style.display = 'none';
       document.getElementById('brush-settings').style.display = 'flex';
       
-      // Инициализация визуальных режимов
       if (mode === 'mirror') zContainer.classList.add('mode-mirror');
       if (mode === 'earthquake') zContainer.classList.add('mode-earthquake');
       if (mode === 'tiny') zContainer.classList.add('mode-tiny');
@@ -388,7 +387,7 @@ function submitDrawing(isManual = false) {
 }
 
 // ==========================================
-// ХОЛСТ: ИНСТРУМЕНТЫ И ЛОГИКА
+// ХОЛСТ: НОВЫЕ ИНСТРУМЕНТЫ (ФИГУРЫ, ТЕКСТ, СИММЕТРИЯ)
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
@@ -400,11 +399,21 @@ let isErasing = false;
 let isFilling = false;
 let isEyedropper = false;
 let isBlur = false;
+let isRect = false;
+let isCircle = false;
+let isText = false;
+let isSymmetry = false;
 
 let canvasTransform = { x: 0, y: 0, scale: 1 };
 let initialDistance = 0;
 let lastZoomCenter = { x: 0, y: 0 };
 let preZoomState = null; 
+
+let shapeStartX = 0;
+let shapeStartY = 0;
+let shapeImgData = null;
+let isDrawingShape = false;
+let lastX = 0, lastY = 0;
 
 let recordedStrokes = [];
 let strokesHistory = []; 
@@ -435,8 +444,10 @@ function undo() { if (historyIndex > 0) { historyIndex--; restoreState(historyIn
 function redo() { if (historyIndex < drawHistory.length - 1) { historyIndex++; restoreState(historyIndex); } }
 
 function clearTools() { 
-    isErasing = false; isFilling = false; isEyedropper = false; isBlur = false; 
-    document.querySelectorAll('.tool-btn').forEach(s => s.classList.remove('active-swatch')); 
+    isErasing = false; isFilling = false; isEyedropper = false; isBlur = false; isRect = false; isCircle = false; isText = false;
+    document.querySelectorAll('.tool-btn').forEach(s => {
+        if (!s.classList.contains('sym-tool')) s.classList.remove('active-swatch'); 
+    }); 
 }
 function setColor(color, element) {
     clearTools(); currentColor = color; ctx.globalCompositeOperation = 'source-over';
@@ -447,6 +458,15 @@ function setEraser(element) { clearTools(); isErasing = true; ctx.globalComposit
 function setFill(element) { clearTools(); isFilling = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setEyedropper(element) { clearTools(); isEyedropper = true; element.classList.add('active-swatch'); }
 function setBlur(element) { clearTools(); isBlur = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
+function setRect(element) { clearTools(); isRect = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
+function setCircle(element) { clearTools(); isCircle = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
+function setText(element) { clearTools(); isText = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
+
+// Симметрия не отключает другие инструменты!
+function toggleSymmetry(element) {
+    isSymmetry = !isSymmetry;
+    element.classList.toggle('active-swatch', isSymmetry);
+}
 
 function clearCanvas() {
   ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.globalCompositeOperation = 'source-over'; 
@@ -540,53 +560,134 @@ function startPosition(e) {
         pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40;
     }
 
-    preZoomState = canvas.toDataURL(); isDrawing = true; 
     let opacity = parseFloat(document.getElementById('brush-opacity').value);
+
+    // ИНСТРУМЕНТ: ТЕКСТ
+    if (isText) {
+        let text = prompt("Введите текст для вставки на холст:");
+        if (text) {
+            let size = document.getElementById('brush-size').value * 3;
+            ctx.font = `bold ${size}px sans-serif`;
+            ctx.fillStyle = currentColor;
+            ctx.globalAlpha = opacity;
+            ctx.fillText(text, pos.x, pos.y);
+            
+            if (isSymmetry) {
+                let metrics = ctx.measureText(text);
+                ctx.fillText(text, canvas.width - pos.x - metrics.width, pos.y);
+            }
+            
+            recordedStrokes.push({ type: 'text', c: currentColor, s: size, text: text, o: opacity, sym: isSymmetry?1:0, p: [Math.round(pos.x), Math.round(pos.y)] });
+            saveState();
+        }
+        return;
+    }
+
+    // ИНСТРУМЕНТЫ: ФИГУРЫ
+    if (isRect || isCircle) {
+        shapeStartX = Math.round(pos.x);
+        shapeStartY = Math.round(pos.y);
+        shapeImgData = ctx.getImageData(0,0,canvas.width, canvas.height);
+        isDrawingShape = true;
+        return;
+    }
+
+    preZoomState = canvas.toDataURL(); isDrawing = true; 
     
     currentStroke = { 
         c: currentColor, s: document.getElementById('brush-size').value, 
-        e: isErasing?1:0, o: opacity, b: isBlur?1:0, 
+        e: isErasing?1:0, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0,
         p: [Math.round(pos.x), Math.round(pos.y)] 
     };
+    
+    lastX = pos.x; lastY = pos.y;
     draw(e); 
 }
 
 function draw(e) {
   if (e.touches && e.touches.length >= 2) { e.preventDefault(); return handlePinchZoom(e); }
-  if (!isDrawing) return; e.preventDefault(); 
+  if (!isDrawing && !isDrawingShape) return; 
+  e.preventDefault(); 
+  
   let pos = getCoordinates(e);
   const mode = globalState.settings?.mode;
 
   if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
   if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
 
-  if(currentStroke) { currentStroke.p.push(Math.round(pos.x), Math.round(pos.y)); }
-
-  ctx.lineWidth = document.getElementById('brush-size').value;
-  ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
-  ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
-  ctx.strokeStyle = currentColor;
-  
   let opacity = parseFloat(document.getElementById('brush-opacity').value);
+  ctx.lineWidth = document.getElementById('brush-size').value;
+  ctx.strokeStyle = currentColor;
   ctx.globalAlpha = isErasing ? 1 : opacity;
   ctx.filter = isBlur ? 'blur(5px)' : 'none';
   ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
 
-  ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
+  // ФИГУРЫ (ПРЕВЬЮ В РЕАЛЬНОМ ВРЕМЕНИ)
+  if (isDrawingShape) {
+      ctx.putImageData(shapeImgData, 0, 0);
+      ctx.beginPath();
+      
+      if (isRect) {
+          ctx.strokeRect(shapeStartX, shapeStartY, pos.x - shapeStartX, pos.y - shapeStartY);
+          if (isSymmetry) ctx.strokeRect(canvas.width - shapeStartX, shapeStartY, -(pos.x - shapeStartX), pos.y - shapeStartY);
+      } else if (isCircle) {
+          let r = Math.hypot(pos.x - shapeStartX, pos.y - shapeStartY);
+          ctx.arc(shapeStartX, shapeStartY, r, 0, Math.PI*2); ctx.stroke();
+          if (isSymmetry) { ctx.beginPath(); ctx.arc(canvas.width - shapeStartX, shapeStartY, r, 0, Math.PI*2); ctx.stroke(); }
+      }
+      lastX = pos.x; lastY = pos.y;
+      return;
+  }
+
+  // ОБЫЧНАЯ КИСТЬ
+  if(currentStroke) { currentStroke.p.push(Math.round(pos.x), Math.round(pos.y)); }
+
+  if (mode !== 'blind') {
+      ctx.lineCap = mode === 'pixelart' ? 'square' : 'round';
+      ctx.lineJoin = mode === 'pixelart' ? 'miter' : 'round';
+      
+      ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
+      
+      if (isSymmetry) {
+          ctx.beginPath();
+          ctx.moveTo(canvas.width - lastX, lastY);
+          ctx.lineTo(canvas.width - pos.x, pos.y);
+          ctx.stroke();
+          ctx.beginPath();
+      }
+  }
+  
+  lastX = pos.x; lastY = pos.y;
 }
 
 function endPosition() { 
+    ctx.beginPath(); ctx.filter = 'none';
+
+    if (isDrawingShape) {
+        isDrawingShape = false;
+        recordedStrokes.push({
+            type: isRect ? 'rect' : 'circle',
+            c: currentColor, s: document.getElementById('brush-size').value,
+            o: parseFloat(document.getElementById('brush-opacity').value),
+            b: isBlur?1:0, sym: isSymmetry?1:0,
+            p: [shapeStartX, shapeStartY, lastX, lastY]
+        });
+        saveState();
+        return;
+    }
+
     if (!isDrawing) return; 
-    isDrawing = false; ctx.beginPath(); ctx.filter = 'none';
+    isDrawing = false; 
+    
     if (globalState.settings?.mode === 'oneline') hasDrawnStrokeOneline = true;
     if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; }
     saveState(); 
 }
 
 function handlePinchZoom(e) {
-    if (isDrawing) {
-        isDrawing = false; ctx.beginPath(); ctx.filter = 'none'; currentStroke = null;
-        if (preZoomState) {
+    if (isDrawing || isDrawingShape) {
+        isDrawing = false; isDrawingShape = false; ctx.beginPath(); ctx.filter = 'none'; currentStroke = null;
+        if (preZoomState && globalState.settings?.mode !== 'blind') {
             let img = new Image(); img.src = preZoomState;
             img.onload = () => { ctx.globalAlpha=1; ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img, 0, 0); }
         }
@@ -615,7 +716,7 @@ canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave'
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ (УМНАЯ АНИМАЦИЯ Х1.5 И ФИКС ОТРИСОВКИ)
+// ЧАТ-ПРЕЗЕНТАЦИЯ (АНИМАЦИЯ С НОВЫМИ ИНСТРУМЕНТАМИ)
 // ==========================================
 let voices = [];
 window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
@@ -649,7 +750,6 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
         else totalPoints += 1;
     }
     
-    // Калькулятор кадров (Анимация всегда плавная и идет ~2 секунды)
     let pointsPerFrame = Math.max(2, Math.ceil(totalPoints / 120)); 
     
     function drawStep() {
@@ -660,20 +760,45 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
                 actx.globalAlpha=1; actx.filter='none'; actx.globalCompositeOperation = 'source-over'; 
                 actx.drawImage(im, 0, 0); 
             };
-            return; // Конец
+            return; 
         }
         
         let pointsDrawn = 0;
         while (pointsDrawn < pointsPerFrame && strokeIdx < strokes.length) {
             let stroke = strokes[strokeIdx];
             
+            actx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
+            actx.filter = stroke.b ? 'blur(5px)' : 'none';
+            actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
+
             if (stroke.type === 'clear') {
                 actx.globalAlpha = 1; actx.filter = 'none'; actx.globalCompositeOperation = 'source-over'; 
                 actx.fillStyle = isDarkMode ? '#000000' : '#ffffff';
                 actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
-            if (stroke.type === 'fill') {
+            if (stroke.type === 'fill') { strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue; }
+            
+            if (stroke.type === 'rect') {
+                actx.beginPath(); actx.lineWidth = stroke.s; actx.strokeStyle = stroke.c;
+                actx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]);
+                if(stroke.sym) actx.strokeRect(canvasEl.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]);
+                strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
+            }
+            if (stroke.type === 'circle') {
+                actx.beginPath(); actx.lineWidth = stroke.s; actx.strokeStyle = stroke.c;
+                let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]);
+                actx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke();
+                if(stroke.sym) { actx.beginPath(); actx.arc(canvasEl.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); actx.stroke(); }
+                strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
+            }
+            if (stroke.type === 'text') {
+                actx.font = `bold ${stroke.s}px sans-serif`; actx.fillStyle = stroke.c;
+                actx.fillText(stroke.text, stroke.p[0], stroke.p[1]);
+                if(stroke.sym) {
+                    let metrics = actx.measureText(stroke.text);
+                    actx.fillText(stroke.text, canvasEl.width - stroke.p[0] - metrics.width, stroke.p[1]);
+                }
                 strokeIdx++; pointIdx = 0; pointsDrawn += 5; continue;
             }
             
@@ -682,15 +807,24 @@ function playDrawingAnimation(canvasEl, strokes, finalImg, isDarkMode) {
 
             if (pointIdx === 0) {
                 actx.beginPath(); actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round';
-                actx.strokeStyle = stroke.c; actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
-                actx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
-                actx.filter = stroke.b ? 'blur(5px)' : 'none';
+                actx.strokeStyle = stroke.c; 
                 actx.moveTo(pts[0], pts[1]); pointIdx = 2;
             }
             
             if (pointIdx < pts.length) {
                 actx.lineTo(pts[pointIdx], pts[pointIdx+1]); actx.stroke();
                 actx.beginPath(); actx.moveTo(pts[pointIdx], pts[pointIdx+1]);
+                
+                // Анимация симметрии
+                if (stroke.sym) {
+                    let prevX = canvasEl.width - pts[pointIdx-2];
+                    let prevY = pts[pointIdx-1];
+                    let curX = canvasEl.width - pts[pointIdx];
+                    let curY = pts[pointIdx+1];
+                    actx.beginPath(); actx.moveTo(prevX, prevY); actx.lineTo(curX, curY); actx.stroke();
+                    actx.beginPath();
+                }
+                
                 pointIdx += 2; pointsDrawn++;
             } else { strokeIdx++; pointIdx = 0; }
         }
