@@ -71,7 +71,7 @@ function renderPlayersList(players) {
 }
 
 // ==========================================
-// АУДИО И ТАЙМЕР
+// АУДИО И ТАЙМЕРЫ (СИНХРОНИЗАЦИЯ ЭКРАНА ОЖИДАНИЯ)
 // ==========================================
 let audioCtx = null;
 function initAudio() {
@@ -97,40 +97,43 @@ function playWarningBeep() {
 
 let phaseTimerInterval = null;
 let currentPhaseSubmitted = false;
+let isCurrentPhaseDrawing = false;
+
+function updateTimerUI(remaining, limit) {
+    // Если игрок уже отправил результат, обновляем таймер на экране ожидания
+    let targetPrefix = currentPhaseSubmitted ? 'waiting' : (isCurrentPhaseDrawing ? 'draw' : 'text');
+    
+    let timerText = document.getElementById(`${targetPrefix}-timer-text`);
+    let timerPath = document.getElementById(`${targetPrefix}-timer-path`);
+    let timerContainer = document.getElementById(`${targetPrefix}-timer-container`);
+
+    if (timerText) timerText.innerText = remaining;
+    if (timerPath) {
+        let dashoffset = 100 - (remaining / limit) * 100;
+        timerPath.style.strokeDashoffset = dashoffset;
+        
+        timerPath.style.stroke = '#22c55e'; // Зеленый 
+        if (remaining <= 10 && remaining > 0) {
+            if (timerContainer) timerContainer.classList.add('timer-warning');
+            if (!currentPhaseSubmitted) playWarningBeep(); // Пищим только если еще не отправил
+        } else if (remaining <= limit / 2 && remaining > 10) {
+            timerPath.style.stroke = '#eab308'; // Желтый 
+            if (timerContainer) timerContainer.classList.remove('timer-warning');
+        } else {
+            if (timerContainer) timerContainer.classList.remove('timer-warning');
+        }
+    }
+}
 
 function startPhaseTimer(isDrawing) {
     clearInterval(phaseTimerInterval);
     currentPhaseSubmitted = false;
+    isCurrentPhaseDrawing = isDrawing;
     
     let timeLimit = globalState.settings?.time || 90;
     let timeRemaining = timeLimit;
     
-    let pathId = isDrawing ? 'draw-timer-path' : 'text-timer-path';
-    let textId = isDrawing ? 'draw-timer-text' : 'text-timer-text';
-    let containerId = isDrawing ? 'draw-timer-container' : 'text-timer-container';
-    
-    let timerPath = document.getElementById(pathId);
-    let timerText = document.getElementById(textId);
-    let timerContainer = document.getElementById(containerId);
-
-    // Сброс стилей
-    timerContainer.classList.remove('timer-warning');
-    timerPath.style.stroke = '#22c55e'; // Зеленый в начале
-
-    function updateUI() {
-        if (currentPhaseSubmitted) return;
-        timerText.innerText = timeRemaining;
-        let dashoffset = 100 - (timeRemaining / timeLimit) * 100;
-        timerPath.style.strokeDashoffset = dashoffset;
-
-        if (timeRemaining <= 10 && timeRemaining > 0) {
-            timerContainer.classList.add('timer-warning');
-            playWarningBeep();
-        } else if (timeRemaining <= timeLimit / 2 && timeRemaining > 10) {
-            timerPath.style.stroke = '#eab308'; // Желтый на половине
-        }
-    }
-    updateUI();
+    updateTimerUI(timeRemaining, timeLimit);
 
     phaseTimerInterval = setInterval(() => {
         timeRemaining--;
@@ -141,18 +144,41 @@ function startPhaseTimer(isDrawing) {
                 else submitWord(false);
             }
         } else {
-            updateUI();
+            updateTimerUI(timeRemaining, timeLimit);
         }
     }, 1000);
 }
 
+// Обновление списка игроков на экране ожидания
+function updateWaitingScreen() {
+    if (!document.getElementById('waiting-phase').classList.contains('active')) return;
+    
+    const players = globalState.players || [];
+    const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
+    
+    const listEl = document.getElementById('waiting-players-list');
+    if (!listEl) return;
+
+    listEl.innerHTML = players.map(id => {
+        const name = globalState.playerNames?.[id] || "Аноним";
+        const isReady = currentSubs[id] !== undefined;
+        const statusIcon = isReady ? '✅' : '⏳';
+        const statusClass = isReady ? 'ready' : 'not-ready';
+        
+        return `<div class="waiting-player-item ${statusClass}">
+            <span>${name}</span>
+            <span>${statusIcon}</span>
+        </div>`;
+    }).join('');
+}
+
 
 // ==========================================
-// СТАРТ ИГРЫ
+// СТАРТ ИГРЫ И СИНХРОНИЗАЦИЯ СОСТОЯНИЙ
 // ==========================================
 function startGame() {
   if (!isHost) return;
-  initAudio(); // Активируем звук по клику
+  initAudio(); 
   requestFullscreen();
   
   let baseTime = parseInt(document.getElementById('setting-time').value);
@@ -217,6 +243,9 @@ function handleStateChange() {
 
   if (globalState.round > currentLocalRound) startRound(globalState.round, players);
 
+  // Обновляем список ожидания в реальном времени при получении нового стейта
+  updateWaitingScreen();
+
   if (isHost) {
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
     if (Object.keys(currentSubs).length >= players.length) {
@@ -249,7 +278,6 @@ function startRound(round, players) {
   const isIcebreaker = globalState.settings?.mode === 'icebreaker';
   const isDrawingPhase = isIcebreaker ? (round % 2 !== 0) : (round % 2 === 0);
   
-  // Обновление бейджа с раундом
   const badgeText = `Этап ${round}/${calculatedTotalRounds}`;
   document.getElementById('text-round-badge').innerText = badgeText;
   document.getElementById('draw-round-badge').innerText = badgeText;
@@ -271,7 +299,6 @@ function startRound(round, players) {
     const notebookId = getCurrentNotebookId(round, players);
     let previousData = globalState.submissions?.[`round_${round - 1}`]?.[notebookId];
     
-    // Если пред. данные - это объект (рисунок со штрихами), достаем картинку
     if (typeof previousData === 'string' && previousData.startsWith('{')) {
         try { previousData = JSON.parse(previousData).img; } catch(e){}
     }
@@ -295,28 +322,27 @@ function submitWord(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
   currentPhaseSubmitted = true;
-  clearInterval(phaseTimerInterval);
-
+  
   let word = document.getElementById('word-input').value.trim();
-  if (!word) word = "Секретик"; // Дефолтное слово при автосабмите
+  if (!word) word = "Секретик"; 
   
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = word;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
+  
   showPhase('waiting-phase');
+  updateWaitingScreen();
 }
 
 function submitDrawing(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
   currentPhaseSubmitted = true;
-  clearInterval(phaseTimerInterval);
-
+  
   ctx.globalCompositeOperation = 'destination-over';
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  // УПАКОВКА ИЗОБРАЖЕНИЯ И ИСТОРИИ ШТРИХОВ (Для крутой анимации)
   const finalData = JSON.stringify({
       img: canvas.toDataURL('image/png'),
       strokes: recordedStrokes
@@ -325,12 +351,14 @@ function submitDrawing(isManual = false) {
   const updates = {};
   updates[`submissions/round_${currentLocalRound}/${getCurrentNotebookId(currentLocalRound, globalState.players || [])}`] = finalData;
   window.parent.postMessage({ type: 'update_state', updates }, '*');
+  
   resetCanvasTransform();
   showPhase('waiting-phase');
+  updateWaitingScreen();
 }
 
 // ==========================================
-// ИДЕАЛЬНЫЙ ХОЛСТ С ЗАПИСЬЮ ИСТОРИИ (Анимация Рисования)
+// ИДЕАЛЬНЫЙ ХОЛСТ С ЗАПИСЬЮ ИСТОРИИ И ФИКСОМ ЗУМА
 // ==========================================
 const canvas = document.getElementById('drawing-board');
 const ctx = canvas.getContext('2d');
@@ -343,7 +371,6 @@ let initialDistance = 0;
 let lastZoomCenter = { x: 0, y: 0 };
 let preZoomState = null; 
 
-// Запись штрихов
 let recordedStrokes = [];
 let strokesHistory = []; 
 let currentStroke = null;
@@ -362,7 +389,6 @@ function saveState() {
         strokesHistory.length = historyIndex + 1;
     }
     drawHistory.push(canvas.toDataURL());
-    // Глубокая копия штрихов
     strokesHistory.push(JSON.parse(JSON.stringify(recordedStrokes)));
     historyIndex++;
 }
@@ -401,7 +427,10 @@ function clearCanvas() {
 }
 
 function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; updateTransform(); }
-function updateTransform() { canvas.style.transformOrigin = `0 0`; canvas.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
+function updateTransform() { 
+    canvas.style.transformOrigin = `0 0`; 
+    canvas.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; 
+}
 
 function getCoordinates(e) {
   const rect = canvas.getBoundingClientRect();
@@ -422,9 +451,7 @@ function draw(e) {
   if (!isDrawing) return; e.preventDefault(); 
   const pos = getCoordinates(e);
   
-  if(currentStroke) {
-      currentStroke.p.push(Math.round(pos.x), Math.round(pos.y));
-  }
+  if(currentStroke) { currentStroke.p.push(Math.round(pos.x), Math.round(pos.y)); }
 
   ctx.lineWidth = document.getElementById('brush-size').value;
   ctx.lineCap = 'round'; ctx.strokeStyle = currentColor; ctx.lineTo(pos.x, pos.y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
@@ -463,7 +490,7 @@ canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseleave'
 canvas.addEventListener('touchstart', startPosition, {passive: false}); canvas.addEventListener('touchmove', draw, {passive: false});
 
 // ==========================================
-// ЧАТ-ПРЕЗЕНТАЦИЯ И АНИМАЦИЯ ХОЛСТА
+// ЧАТ-ПРЕЗЕНТАЦИЯ И УСКОРЕННАЯ АНИМАЦИЯ (X3)
 // ==========================================
 let voices = [];
 window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
@@ -483,7 +510,6 @@ function startPresentation() {
     window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: true, bookIndex: 0, round: 1 } }}, '*');
 }
 
-// Движок проигрывания анимации
 function playDrawingAnimation(canvasEl, strokes, finalImg) {
     const actx = canvasEl.getContext('2d');
     actx.fillStyle = '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
@@ -491,14 +517,13 @@ function playDrawingAnimation(canvasEl, strokes, finalImg) {
     
     function drawStep() {
         if (strokeIdx >= strokes.length) {
-            // В конце на всякий случай рисуем финальную картинку для идеальной точности
             let im = new Image(); im.src = finalImg; 
             im.onload = () => { actx.globalCompositeOperation = 'source-over'; actx.drawImage(im, 0, 0); };
             return;
         }
         
-        // Рисуем по 15 точек за кадр (быстрая анимация)
-        for (let i = 0; i < 15; i++) {
+        // УСКОРЕНИЕ В 3 РАЗА (Отрисовываем по 45 точек за кадр вместо 15)
+        for (let i = 0; i < 45; i++) {
             if (strokeIdx >= strokes.length) break;
             let stroke = strokes[strokeIdx];
             
@@ -547,7 +572,6 @@ function syncPresentationView(players) {
     let imgUrl = rawData;
     let strokesData = null;
 
-    // Распаковка данных (Текст или JSON рисунка)
     if (typeof rawData === 'string' && rawData.startsWith('{')) {
         try {
             let parsed = JSON.parse(rawData);
@@ -563,7 +587,6 @@ function syncPresentationView(players) {
     const isText = isIcebreaker ? (pres.round % 2 === 0) : (pres.round % 2 !== 0);
     const side = isText ? 'left' : 'right';
 
-    // Для рисунка создаем <canvas> вместо <img>
     const visualContent = isText 
         ? `<div class="msg-text">${rawData}</div>` 
         : `<canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}"></canvas>`;
@@ -585,15 +608,16 @@ function syncPresentationView(players) {
     if (isText) {
         speakText(rawData);
     } else {
-        // Запуск анимации
-        const canvasAnim = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);
-        if (strokesData && strokesData.length > 0) {
-            playDrawingAnimation(canvasAnim, strokesData, imgUrl);
-        } else {
-            // Фолбэк (если кто-то играл со старой версией без истории штрихов)
-            const cctx = canvasAnim.getContext('2d');
-            let im = new Image(); im.src = imgUrl; im.onload = () => cctx.drawImage(im, 0, 0);
-        }
+        // Задержка в 100мс гарантирует, что canvas успел добавиться в DOM перед стартом анимации
+        setTimeout(() => {
+            const canvasAnim = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);
+            if (canvasAnim && strokesData && strokesData.length > 0) {
+                playDrawingAnimation(canvasAnim, strokesData, imgUrl);
+            } else if (canvasAnim) {
+                const cctx = canvasAnim.getContext('2d');
+                let im = new Image(); im.src = imgUrl; im.onload = () => cctx.drawImage(im, 0, 0);
+            }
+        }, 100);
     }
 
     if (isHost) {

@@ -199,10 +199,20 @@
     </div>
 
     <div id="waiting-phase" class="phase-container">
-      <div class="glass-card text-center">
-        <div class="spinner mx-auto mb-4"></div>
+      <div class="glass-card text-center" style="width: 100%; max-width: 400px;">
         <h2 class="task-title">Отлично!</h2>
-        <p class="text-muted">Ждем остальных гениев...</p>
+        <p class="text-muted mb-4">Ждем остальных гениев...</p>
+        
+        <div class="timer-container mx-auto mb-4" id="waiting-timer-container" style="transform: scale(1.5); margin: 30px auto;">
+          <svg class="timer-svg" viewBox="0 0 36 36">
+            <path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <path class="timer-path" id="waiting-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          </svg>
+          <div class="timer-text" id="waiting-timer-text">60</div>
+        </div>
+        
+        <div class="waiting-players-list" id="waiting-players-list">
+           </div>
       </div>
     </div>
   </div>
