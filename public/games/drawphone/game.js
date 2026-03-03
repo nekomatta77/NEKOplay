@@ -33,6 +33,20 @@ function getRandomHex() {
     return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
 }
 
+// Вспомогательная функция для отрисовки стрелки
+function drawArrow(context, fromx, fromy, tox, toy) {
+    let headlen = 15; 
+    let dx = tox - fromx;
+    let dy = toy - fromy;
+    let angle = Math.atan2(dy, dx);
+    context.moveTo(fromx, fromy);
+    context.lineTo(tox, toy);
+    context.moveTo(tox, toy);
+    context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+    context.moveTo(tox, toy);
+    context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+}
+
 function setDisplay(id, display) { const el = document.getElementById(id); if (el) el.style.display = display; }
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
 function setHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
@@ -770,34 +784,51 @@ function floodFillCore(startX, startY, fillColorHex) {
     ctx.putImageData(imgData, 0, 0);
 }
 
-function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
-    targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over';
-    targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+// ОБНОВЛЕНО: теперь Blur и Неон правильно перерисовываются
+function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg = true) {
+    if (clearBg) {
+        targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over';
+        targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    }
     
     for (let stroke of strokes) {
         targetCtx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
         targetCtx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
+        targetCtx.filter = stroke.b ? 'blur(5px)' : 'none';
         
         if (stroke.type === 'clear') { 
             targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; 
+            targetCtx.filter = 'none'; targetCtx.shadowBlur = 0;
             targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+            continue;
         }
-        else if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
+
+        // Поддержка Неона (и для кисти, и для фигур)
+        if (stroke.n && !stroke.e) { 
+            targetCtx.shadowBlur = Math.max(10, stroke.s * 2); 
+            targetCtx.shadowColor = stroke.c; 
+            targetCtx.strokeStyle = '#ffffff'; 
+        } else { 
+            targetCtx.shadowBlur = 0; 
+            targetCtx.shadowColor = 'transparent'; 
+            targetCtx.strokeStyle = stroke.c; 
+        }
+
+        if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
-        else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
+        else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
         else if (stroke.type === 'arrow') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; drawArrow(targetCtx, stroke.p[0], stroke.p[1], stroke.p[2], stroke.p[3]); if(stroke.sym) { targetCtx.beginPath(); drawArrow(targetCtx, targetCanvas.width - stroke.p[0], stroke.p[1], targetCanvas.width - stroke.p[2], stroke.p[3]); } }
-        else if (stroke.type === 'fill') { } 
+        else if (stroke.type === 'fill') { /* Fill ignores redraw */ } 
         else { 
             let pts = stroke.p; if (!pts || pts.length < 2) continue; 
             targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round'; 
-            if (stroke.n && !stroke.e) { targetCtx.shadowBlur = Math.max(10, stroke.s * 2); targetCtx.shadowColor = stroke.c; targetCtx.strokeStyle = '#ffffff'; } 
-            else { targetCtx.shadowBlur = 0; targetCtx.shadowColor = 'transparent'; targetCtx.strokeStyle = stroke.c; }
             targetCtx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i+=2) { targetCtx.lineTo(pts[i], pts[i+1]); } targetCtx.stroke(); 
             if (stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - pts[0], pts[1]); for (let i = 2; i < pts.length; i+=2) { targetCtx.lineTo(targetCanvas.width - pts[i], pts[i+1]); } targetCtx.stroke(); } 
         }
     }
 }
 
+// ОБНОВЛЕНО: теперь анимация презентации учитывает Blur и правильный Неон
 function animateStrokes(strokes, canvasEl, isDark) {
     const actx = canvasEl.getContext('2d');
     const mode = globalState.settings?.mode;
@@ -820,8 +851,17 @@ function animateStrokes(strokes, canvasEl, isDark) {
             actx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
             actx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
             actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round';
-            if (stroke.n && !stroke.e) { actx.shadowBlur = Math.max(10, stroke.s * 2); actx.shadowColor = stroke.c; actx.strokeStyle = '#ffffff'; } 
-            else { actx.shadowBlur = 0; actx.shadowColor = 'transparent'; actx.strokeStyle = stroke.c; }
+            actx.filter = stroke.b ? 'blur(5px)' : 'none';
+            
+            if (stroke.n && !stroke.e) { 
+                actx.shadowBlur = Math.max(10, stroke.s * 2); 
+                actx.shadowColor = stroke.c; 
+                actx.strokeStyle = '#ffffff'; 
+            } else { 
+                actx.shadowBlur = 0; 
+                actx.shadowColor = 'transparent'; 
+                actx.strokeStyle = stroke.c; 
+            }
             
             let pts = stroke.p;
             if (pointIndex < pts.length) {
@@ -835,7 +875,8 @@ function animateStrokes(strokes, canvasEl, isDark) {
                 requestAnimationFrame(drawNext);
             } else { strokeIndex++; pointIndex = 2; drawNext(); }
         } else {
-            redrawFromStrokesSync([stroke], actx, canvasEl, isDark);
+            // Для фигур мы передаем false, чтобы не стирать весь холст!
+            redrawFromStrokesSync([stroke], actx, canvasEl, isDark, false);
             strokeIndex++; pointIndex = 2; drawNext();
         }
     }
@@ -884,7 +925,7 @@ function setCircle(element) { clearTools(); isCircle = true; ctx.globalComposite
 function setLine(element) { clearTools(); isLine = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setArrow(element) { clearTools(); isArrow = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function toggleSymmetry(element) { 
-    if (globalState.settings?.mode === 'mirror') return; // Запрещаем отключать симметрию в режиме зеркало
+    if (globalState.settings?.mode === 'mirror') return; 
     isSymmetry = !isSymmetry; 
     element.classList.toggle('active-swatch', isSymmetry); 
 }
@@ -937,7 +978,6 @@ function startPosition(e) {
     if (isEyedropper) { const p = ctx.getImageData(pos.x, pos.y, 1, 1).data; const hex = "#" + ("000000" + ((p[0] << 16) | (p[1] << 8) | p[2]).toString(16)).slice(-6); setColor(hex); setBrush(document.querySelector('.brush-tool')); return; }
     if (isFilling) { floodFillCore(pos.x, pos.y, currentColor); recordedStrokes.push({ type: 'fill', c: currentColor, p: [Math.round(pos.x), Math.round(pos.y)] }); saveState(); return; }
     
-    // --- РУЛЕТКА (Хаос) ---
     if (mode === 'chaos') { 
         currentColor = getRandomHex(); 
         const randomSize = Math.floor(Math.random() * 30) + 5;
