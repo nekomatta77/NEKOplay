@@ -31,6 +31,8 @@ let currentLocalRound = 0;
 let selectedMode = 'classic'; 
 let calculatedTotalRounds = 1; 
 
+let finishitBaseImg = new Image(); // Исправление бага "finishitBaseImg is not defined"
+
 setText('players-count-display', playersCountParam);
 setText('player-name-display', myName);
 
@@ -236,8 +238,6 @@ function resetLocalGameData() {
     if (avatarsContainer) avatarsContainer.innerHTML = '';
     
     renderedPresentationState = '';
-    lassoStampsCache = {};
-    activeLassoStampRef = null;
     dotsArray = [];
     hasDrawnStrokeOneline = false;
     isGyroEnabled = false;
@@ -273,18 +273,6 @@ window.addEventListener('message', (event) => {
     handleStateChange();
   }
 });
-
-let lassoStampsCache = {};
-function preloadLassoStamps() {
-    lassoStampsCache = {};
-    const r1 = globalState.submissions?.round_1;
-    if (!r1) return;
-    Object.keys(r1).forEach(k => {
-        let data = r1[k];
-        if (typeof data === 'string' && data.startsWith('{')) { try { data = JSON.parse(data).img; } catch(e){} }
-        if (data) { let img = new Image(); img.src = data; lassoStampsCache[k] = img; }
-    });
-}
 
 function seededRandom(seed) { var x = Math.sin(seed++) * 10000; return x - Math.floor(x); }
 
@@ -332,7 +320,7 @@ function handleStateChange() {
   }
 
   const mode = globalState.settings?.mode;
-  const noColorModes = ['nocolor', 'onecolor', 'chaos', 'darkmode', 'amnesia'];
+  const noColorModes = ['onecolor', 'chaos', 'darkmode', 'amnesia'];
   
   if (noColorModes.includes(mode)) {
       setDisplay('color-palette', 'none'); setDisplay('tool-divider-2', 'none');
@@ -354,8 +342,6 @@ function handleStateChange() {
   if (mode === 'hardcore') { setDisplay('action-tools', 'none'); setDisplay('tool-divider-1', 'none'); } 
   else { setDisplay('action-tools', 'flex'); setDisplay('tool-divider-1', 'block'); }
 
-  if (mode === 'lasso' && globalState.round > 2) preloadLassoStamps();
-
   if (globalState.round > currentLocalRound) startRound(globalState.round, players);
   updateWaitingScreen();
 
@@ -370,11 +356,9 @@ function handleStateChange() {
   }
 }
 
-// ИСПРАВЛЕНИЕ ЗАВИСАНИЯ КООП РЕЖИМА: 
-// Теперь каждый игрок в коопе пишет в СВОЮ тетрадь, а не перезаписывает тетрадь напарника.
 function getCurrentNotebookId(round, players) {
     const myIndex = players.indexOf(myUserId);
-    if (globalState.settings?.mode === 'coop') return myUserId; // <--- Решает баг!
+    if (globalState.settings?.mode === 'coop') return myUserId;
     if (myIndex === -1) return myUserId; 
     return players[(myIndex - round + 1 + players.length * 10) % players.length];
 }
@@ -394,12 +378,11 @@ function startRound(round, players) {
   hasDrawnStrokeOneline = false; isGyroEnabled = false;
   
   let isDrawingPhase = (round % 2 === 0);
-  if (mode === 'icebreaker' || mode === 'tagteam') isDrawingPhase = (round % 2 !== 0);
+  if (mode === 'icebreaker' || mode === 'tagteam' || mode === 'triplethreat') isDrawingPhase = (round % 2 !== 0);
   if (mode === 'story') isDrawingPhase = false;
   if (mode === 'plagiarism' || mode === 'finishit' || mode === 'tagteam') isDrawingPhase = true;
   if (mode === 'copycat') isDrawingPhase = (round > 1);
   if (mode === 'coop') isDrawingPhase = (round === 2);
-  if (mode === 'lasso') isDrawingPhase = (round % 2 !== 0);
 
   if (mode === 'onecolor' && isDrawingPhase) currentColor = getRandomHex();
 
@@ -421,7 +404,7 @@ function startRound(round, players) {
       setDisplay('brush-settings', 'flex'); setDisplay('plagiarism-overlay', 'none');
       setDisplay('ink-meter-container', 'none'); setDisplay('coop-divider', 'none');
       setDisplay('btn-gyro-start', 'none'); setDisplay('gyro-cursor', 'none');
-      setDisplay('lasso-stamps-container', 'none'); setDisplay('sidebar-tools', 'flex');
+      setDisplay('sidebar-tools', 'flex');
       
       if (mode === 'mirror' && zContainer) zContainer.classList.add('mode-mirror');
       if (mode === 'earthquake' && zContainer) zContainer.classList.add('mode-earthquake');
@@ -455,38 +438,15 @@ function startRound(round, players) {
 
       resetCanvasTransform(); clearCanvas(); initHistory(); setBrush(document.querySelector('.brush-tool'));
       
-      if (mode === 'connectdots' || mode === 'constellation') {
+      if (mode === 'connectdots') {
           dotsArray = [];
           for(let i=0; i<30; i++) dotsArray.push({x: Math.random()*700+50, y: Math.random()*500+50});
-          ctx.fillStyle = (globalState.settings?.mode === 'darkmode' || mode === 'constellation') ? '#fff' : '#000';
+          ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#fff' : '#000';
           dotsArray.forEach(d => { ctx.beginPath(); ctx.arc(d.x, d.y, 5, 0, Math.PI*2); ctx.fill(); });
       }
 
-      let lsSettings = document.getElementById('lasso-settings');
-      if (mode === 'lasso' && round >= 3) {
-          if (!lsSettings) {
-              lsSettings = document.createElement('div');
-              lsSettings.id = 'lasso-settings';
-              lsSettings.innerHTML = `
-                  <div style="display:flex; justify-content:center; gap:10px; padding:10px; background:rgba(0,0,0,0.5); border-radius:10px; margin-top:10px; flex-wrap:wrap;">
-                      <label style="font-size:0.8rem; color:#fff;">Ширина: <input type="range" id="stamp-w" min="20" max="600" value="150" style="width:70px;"></label>
-                      <label style="font-size:0.8rem; color:#fff;">Высота: <input type="range" id="stamp-h" min="20" max="600" value="150" style="width:70px;"></label>
-                      <label style="font-size:0.8rem; color:#fff;">Поворот: <input type="range" id="stamp-r" min="0" max="360" value="0" style="width:70px;"></label>
-                  </div>`;
-              document.getElementById('lasso-stamps-container').parentElement.appendChild(lsSettings);
-          }
-          lsSettings.style.display = 'block';
-      } else { if (lsSettings) lsSettings.style.display = 'none'; }
-
-
       if (round === 1) { 
           if (mode === 'finishit') setHTML('word-to-draw', "Нарисуйте заготовку!");
-          else if (mode === 'lasso') setHTML('word-to-draw', "Нарисуй: " + getRandomRussianWord());
-          else if (mode === 'triplethreat') {
-              let w = "Три случайных слова";
-              if (typeof getRandomTriple === 'function') w = getRandomTriple();
-              setHTML('word-to-draw', w);
-          }
           else setHTML('word-to-draw', "Что угодно!");
       } else {
           let prevImg = null;
@@ -505,15 +465,6 @@ function startRound(round, players) {
               if (bgRef) { bgRef.src = prevImg; bgRef.style.display = 'block'; bgRef.style.opacity = '1'; }
           } else if (mode === 'copycat' && prevImg && prevImg.length > 50) {
               setHTML('word-to-draw', `<img src="${prevImg}" style="height:35px; border-radius:5px; margin-left:10px;"> Перерисуй!`);
-          } else if (mode === 'lasso' && round >= 3) {
-              setText('word-to-draw', "Собери из фрагментов: " + previousData);
-              setDisplay('sidebar-tools', 'none'); setDisplay('lasso-stamps-container', 'flex');
-              const sc = document.getElementById('lasso-stamps-container'); if(sc) sc.innerHTML = '';
-              Object.keys(lassoStampsCache).forEach(k => {
-                  let im = new Image(); im.src = lassoStampsCache[k].src; im.className = 'lasso-stamp-img';
-                  im.onclick = () => { document.querySelectorAll('.lasso-stamp-img').forEach(i=>i.classList.remove('active')); im.classList.add('active'); activeLassoStampRef = k; };
-                  if(sc) sc.appendChild(im);
-              });
           } else if (mode === 'coop' && round === 2) {
               const myIndex = players.indexOf(myUserId);
               const p1Index = myIndex % 2 === 0 ? myIndex : myIndex - 1;
@@ -545,6 +496,10 @@ function startRound(round, players) {
               let isImpostorMatch = players.indexOf(myUserId) === impIndex;
               if(wi) { wi.value = isImpostorMatch ? p[1] : p[0]; wi.disabled = true; }
               setText('text-instruction', "Ваше слово:");
+          } else if (mode === 'triplethreat') {
+              let w = `${getRandomRussianWord()}, ${getRandomRussianWord()}, ${getRandomRussianWord()}`;
+              if(wi) { wi.value = w; wi.disabled = true; }
+              setText('text-instruction', "Ваша тема (нажмите Готово):");
           } else { if(wi) wi.disabled = false; }
 
       } else {
@@ -555,12 +510,6 @@ function startRound(round, players) {
               setText('text-instruction', 'Продолжите историю...');
               setDisplay('image-to-guess', 'none'); setDisplay('text-to-continue', 'block');
               setText('text-to-continue', `"...${previousData}"`);
-          } else if (mode === 'lasso') {
-              setText('text-instruction', 'Какую безумную тему из этого можно собрать?');
-              const imgEl = document.getElementById('image-to-guess');
-              if (typeof previousData === 'string' && previousData.startsWith('{')) { try { previousData = JSON.parse(previousData).img; } catch(e){} }
-              if (imgEl) imgEl.src = previousData || ""; 
-              setDisplay('image-to-guess', 'inline-block'); setDisplay('text-to-continue', 'none');
           } else {
               setText('text-instruction', 'Что здесь нарисовано?');
               const imgEl = document.getElementById('image-to-guess');
@@ -627,10 +576,8 @@ function submitDrawing(isManual = false) {
   currentPhaseSubmitted = true; clearInterval(phaseTimerInterval);
   const mode = globalState.settings?.mode; let finalDataUrl = '';
 
-  if (mode === 'lasso' && currentLocalRound === 1) {
-      finalDataUrl = canvas.toDataURL('image/png');
-  } else if (mode === 'amnesia') {
-      redrawFromStrokesSync(recordedStrokes, ctx, canvas, mode === 'darkmode');
+  if (mode === 'amnesia') {
+      redrawFromStrokesSync(recordedStrokes, ctx, canvas, false);
       finalDataUrl = canvas.toDataURL('image/png');
   } else if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) {
       const tc = document.createElement('canvas'); tc.width = canvas.width; tc.height = canvas.height;
@@ -717,28 +664,15 @@ function floodFillCore(startX, startY, fillColorHex) {
 
 function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
     targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over';
-    const mode = globalState.settings?.mode;
-    
-    if (mode === 'lasso' && globalState.presentation?.round === 1) {
-        targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
-    } else {
-        targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
-    }
+    targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
     
     for (let stroke of strokes) {
         targetCtx.globalAlpha = stroke.o !== undefined ? stroke.o : 1;
         targetCtx.globalCompositeOperation = stroke.e ? 'destination-out' : 'source-over';
         
-        if (stroke.type === 'stamp' && lassoStampsCache[stroke.ref]) { 
-            let w = stroke.w || stroke.s || 100; let h = stroke.h || stroke.s || 100; let rot = stroke.rot || 0;
-            targetCtx.save(); targetCtx.translate(stroke.p[0], stroke.p[1]); targetCtx.rotate(rot * Math.PI / 180);
-            targetCtx.drawImage(lassoStampsCache[stroke.ref], -w/2, -h/2, w, h); targetCtx.restore();
-            continue; 
-        }
         if (stroke.type === 'clear') { 
             targetCtx.globalAlpha = 1; targetCtx.globalCompositeOperation = 'source-over'; 
-            if (mode === 'lasso' && globalState.presentation?.round === 1) targetCtx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
-            else { targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height); }
+            targetCtx.fillStyle = isDark ? '#000000' : '#ffffff'; targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
         }
         else if (stroke.type === 'rect') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.strokeRect(stroke.p[0], stroke.p[1], stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); if(stroke.sym) targetCtx.strokeRect(targetCanvas.width - stroke.p[0], stroke.p[1], -(stroke.p[2]-stroke.p[0]), stroke.p[3]-stroke.p[1]); }
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
@@ -759,13 +693,8 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark) {
 function animateStrokes(strokes, canvasEl, isDark) {
     const actx = canvasEl.getContext('2d');
     const mode = globalState.settings?.mode;
-    
-    if (mode === 'lasso' && globalState.presentation?.round === 1) {
-        actx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    } else {
-        actx.fillStyle = isDark ? '#000000' : '#ffffff';
-        actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
-    }
+    actx.fillStyle = isDark ? '#000000' : '#ffffff';
+    actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     
     let strokeIndex = 0;
     let pointIndex = 2; 
@@ -775,8 +704,7 @@ function animateStrokes(strokes, canvasEl, isDark) {
         let stroke = strokes[strokeIndex];
         
         if (stroke.type === 'clear') {
-            if (mode === 'lasso' && globalState.presentation?.round === 1) actx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-            else { actx.fillStyle = isDark ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height); }
+            actx.fillStyle = isDark ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
             strokeIndex++; pointIndex = 2; requestAnimationFrame(drawNext); return;
         }
         
@@ -824,8 +752,6 @@ function restoreState(index) {
         ctx.globalAlpha=1; ctx.filter='none'; ctx.shadowBlur=0; ctx.globalCompositeOperation = 'source-over'; 
         const mode = globalState.settings?.mode;
         if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); } 
-        else if (mode === 'lasso' && currentLocalRound === 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); }
-        else if (mode === 'coop') { ctx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
         else { ctx.fillStyle = (mode === 'darkmode') ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
         ctx.drawImage(img, 0, 0); 
     }; 
@@ -857,7 +783,6 @@ function clearCanvas() {
     ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.shadowBlur = 0; ctx.globalCompositeOperation = 'source-over'; 
     const mode = globalState.settings?.mode; const isDark = mode === 'darkmode'; 
     if ((mode === 'finishit' || mode === 'tagteam') && currentLocalRound > 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); } 
-    else if (mode === 'lasso' && currentLocalRound === 1) { ctx.clearRect(0, 0, canvas.width, canvas.height); }
     else { ctx.fillStyle = isDark ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); const cw = document.getElementById('canvas-wrapper'); if(cw) cw.style.backgroundColor = isDark ? '#000000' : '#ffffff'; }
     if(isErasing) ctx.globalCompositeOperation = 'destination-out'; 
     recordedStrokes.push({ type: 'clear' }); saveState(); 
@@ -893,22 +818,6 @@ function startPosition(e) {
 
     try { canvas.setPointerCapture(e.pointerId); } catch(err){}
     let pos = getCoordinates(e.clientX, e.clientY); const mode = globalState.settings?.mode;
-    
-    if (mode === 'lasso' && currentLocalRound >= 3) {
-        if (!activeLassoStampRef) return alert("Выберите фрагмент сверху!");
-        let w = parseInt(document.getElementById('stamp-w')?.value || 150); 
-        let h = parseInt(document.getElementById('stamp-h')?.value || 150);
-        let rot = parseInt(document.getElementById('stamp-r')?.value || 0);
-        let opacity = parseFloat(document.getElementById('brush-opacity').value);
-        let img = lassoStampsCache[activeLassoStampRef];
-        if (img) { 
-            ctx.globalAlpha = opacity; ctx.save();
-            ctx.translate(pos.x, pos.y); ctx.rotate(rot * Math.PI / 180);
-            ctx.drawImage(img, -w/2, -h/2, w, h); ctx.restore();
-            recordedStrokes.push({ type: 'stamp', ref: activeLassoStampRef, w: w, h: h, rot: rot, o: opacity, p: [pos.x, pos.y] }); saveState(); 
-        }
-        isDrawing = false; return;
-    }
 
     if (mode === 'coop') { const players = globalState.players || []; const isLeft = players.indexOf(myUserId) % 2 === 0; if (isLeft && pos.x > 400) return; if (!isLeft && pos.x < 400) return; }
     if (mode === 'nohands' || (mode === 'inkmeter' && currentInk <= 0) || (mode === 'oneline' && hasDrawnStrokeOneline)) return; 
@@ -918,7 +827,7 @@ function startPosition(e) {
     if (mode === 'chaos') { currentColor = getRandomHex(); const bs = document.getElementById('brush-size'); if(bs) bs.value = Math.floor(Math.random() * 35) + 5; }
     if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
     if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
-    if (mode === 'connectdots' || mode === 'constellation') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return;  }
+    if (mode === 'connectdots') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return;  }
     
     let opacity = 1; const bo = document.getElementById('brush-opacity'); if (bo) opacity = parseFloat(bo.value);
     if (isRect || isCircle || isLine || isArrow) { shapeStartX = Math.round(pos.x); shapeStartY = Math.round(pos.y); shapeImgData = ctx.getImageData(0,0,canvas.width, canvas.height); isDrawingShape = true; return; }
@@ -964,7 +873,7 @@ function draw(e) {
   if (mode === 'coop') { const players = globalState.players || []; const isLeft = players.indexOf(myUserId) % 2 === 0; if (isLeft && pos.x > 400) pos.x = 400; if (!isLeft && pos.x < 400) pos.x = 400; }
   if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
   if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
-  if (mode === 'connectdots' || mode === 'constellation') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return; }
+  if (mode === 'connectdots') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return; }
   
   let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
   if (mode === 'inkmeter') { let dist = Math.hypot(pos.x - lastX, pos.y - lastY); currentInk -= dist * (bsVal / 5); if (currentInk < 0) currentInk = 0; const im = document.getElementById('ink-meter-bar'); if(im) im.style.width = `${(currentInk/maxInk)*100}%`; if (currentInk === 0) return; }
@@ -1003,12 +912,23 @@ function endPosition(e) {
     if (isDrawingShape) {
         isDrawingShape = false; let t = isRect ? 'rect' : (isCircle ? 'circle' : (isLine ? 'line' : 'arrow'));
         recordedStrokes.push({ type: t, c: currentColor, s: bsVal, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [shapeStartX, shapeStartY, lastX, lastY] });
-        saveState(); return;
+        saveState(); 
+        if (globalState.settings?.mode === 'amnesia') {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        return;
     }
     if (!isDrawing) return; isDrawing = false; 
     if (globalState.settings?.mode === 'oneline') hasDrawnStrokeOneline = true;
     if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; }
     saveState(); 
+    if (globalState.settings?.mode === 'amnesia') {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 }
 
 canvas.addEventListener('pointerdown', startPosition); 
