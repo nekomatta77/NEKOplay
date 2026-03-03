@@ -16,5 +16,15 @@ export const GAMES: Game[] = [
     image: 'https://picsum.photos/seed/drawphone/400/300?blur=2',
     minPlayers: 2, 
     maxPlayers: 12,
+  },
+  {
+    // Важно: id должен совпадать с названием папки в public/games/
+    id: 'bunker', 
+    name: 'Бункер',
+    description: 'Постапокалиптическая игра на выживание. Докажи, что ты достоин места в бункере!',
+    // Картинка тоже генерируется случайно, но можешь потом заменить на свою
+    image: 'https://picsum.photos/seed/bunker/400/300?blur=2',
+    minPlayers: 3, // Для бункера лучше минимум 3 игрока
+    maxPlayers: 16, // Максимум можно поставить побольше
   }
 ];

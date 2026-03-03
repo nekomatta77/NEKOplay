@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BUNKER // OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loading-screen" class="screen active">
+        <div class="loader-container">
+            <div class="spinner"></div>
+            <h1 class="glow-text font-header">BUNKER OS</h1>
+            <p class="text-muted">Инициализация ядра...</p>
+        </div>
+    </div>
+
+    <div id="setup-screen" class="screen">
+        <div class="glass-panel" style="max-width: 500px; width: 100%;">
+            <div class="panel-header mb-20" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">
+                <h2 class="font-header text-accent" style="font-size: 1.8rem;">ПАРАМЕТРЫ СИМУЛЯЦИИ</h2>
+            </div>
+            
+            <div class="form-group mb-20">
+                <label class="text-muted mb-10" style="display: block; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Голосование на 1 раунде:</label>
+                <select id="setting-vote-r1" class="cyber-select">
+                    <option value="false" selected>Отключено (Только знакомство)</option>
+                    <option value="true">Включено (Выгоняем сразу)</option>
+                </select>
+            </div>
+            
+            <div class="form-group mb-20">
+                <label class="text-muted mb-10" style="display: block; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">Открывать по 2 карты начиная с:</label>
+                <select id="setting-double-round" class="cyber-select">
+                    <option value="2">Раунда 2</option>
+                    <option value="3" selected>Раунда 3</option>
+                    <option value="4">Раунда 4</option>
+                    <option value="99">Никогда (Всегда по 1 карте)</option>
+                </select>
+            </div>
+
+            <button onclick="confirmSetup()" class="btn-primary full-width mt-10 glow-hover" style="font-size: 1.2rem; padding: 18px;">
+                СГЕНЕРИРОВАТЬ БУНКЕР
+            </button>
+        </div>
+    </div>
+
+    <div id="guest-setup-screen" class="screen">
+        <div class="loader-container">
+            <div class="spinner"></div>
+            <h3 class="font-header text-accent mt-20" style="letter-spacing: 2px;">ОЖИДАНИЕ ЛИДЕРА</h3>
+            <p class="text-muted">Хост настраивает параметры выживания...</p>
+        </div>
+    </div>
+
+    <div id="exile-screen" class="screen" style="background: rgba(10, 0, 0, 0.95); z-index: 999;">
+        <div class="text-center">
+            <h2 class="text-danger font-header mb-20" style="font-size: 2rem; letter-spacing: 6px;">ПРОТОКОЛ ИЗГНАНИЯ ЗАВЕРШЕН</h2>
+            <div class="exile-avatar-container mb-20">
+                <img id="exile-avatar" src="" alt="avatar">
+                <div class="cross-overlay"></div>
+            </div>
+            <h1 id="exile-name" class="font-header glitch-text" style="font-size: 4rem; color: var(--danger); text-shadow: 0 0 40px var(--danger); text-transform: uppercase;">ИМЯ ИГРОКА</h1>
+            <p class="text-muted mt-15 font-header" style="font-size: 1.5rem; letter-spacing: 4px; color: #ff88a0;">ОТПРАВЛЕН НА ПОВЕРХНОСТЬ</p>
+        </div>
+    </div>
+
+    <div id="end-screen" class="screen">
+        <div class="glass-panel text-center" style="max-width: 500px; width: 100%;">
+            <h1 class="text-success font-header mb-20" style="font-size: 3rem; text-shadow: 0 0 30px rgba(0,230,118,0.4);">СИМУЛЯЦИЯ ЗАВЕРШЕНА</h1>
+            <p class="text-main mb-20" style="font-size: 1.1rem; line-height: 1.5;">Гермодвери заблокированы. Выжившие успешно интегрированы в систему бункера.</p>
+            <div id="winners-list" class="players-list mb-20"></div>
+            <p class="text-muted" style="font-size: 0.9rem;">Миссия выполнена. Можете покинуть комнату.</p>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen" style="padding: 0;">
+        <div class="game-layout">
+            
+            <div class="tabs-nav">
+                <button class="tab-btn active font-header" onclick="switchTab('tab-world')">СВОДКА</button>
+                <button class="tab-btn font-header" onclick="switchTab('tab-me')">МОИ ДАННЫЕ</button>
+                <button class="tab-btn font-header" onclick="switchTab('tab-players')">ВЫЖИВШИЕ</button>
+            </div>
+
+            <div class="status-banner" id="status-banner">
+                <div class="round-info font-header" id="ui-round-info">РАУНД 1: ОТКРЫТИЕ</div>
+                <div class="turn-info" id="ui-turn-info">Ожидание...</div>
+            </div>
+
+            <div class="tabs-container">
+                <div id="tab-world" class="tab-content active">
+                    <div class="glass-panel premium-shadow">
+                        <h2 class="mb-20 font-header text-accent" style="font-size: 1.8rem; letter-spacing: 1px;">ДАННЫЕ О МИРЕ</h2>
+                        <div class="world-grid mb-20">
+                            <div class="world-item danger-bg">
+                                <span class="label text-danger font-header">УГРОЗА</span>
+                                <span id="ui-catastrophe" class="value">Загрузка...</span>
+                            </div>
+                            <div class="world-item primary-bg">
+                                <span class="label text-accent font-header">УБЕЖИЩЕ</span>
+                                <span id="ui-bunker" class="value">Загрузка...</span>
+                            </div>
+                        </div>
+                        <div class="capacity-block">
+                            <div class="capacity-title font-header text-accent">ДОСТУПНО МЕСТ</div>
+                            <div class="capacity-number font-header" id="ui-capacity">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-me" class="tab-content">
+                    <div class="glass-panel premium-shadow">
+                        <div class="panel-header mb-20">
+                            <h2 class="font-header text-accent" style="font-size: 1.8rem; letter-spacing: 1px;">ДОСЬЕ</h2>
+                            <span class="hint" id="ui-my-turn-hint">Эти карты видите только вы.</span>
+                        </div>
+                        <div id="my-cards-container" class="cards-grid"></div>
+                    </div>
+                </div>
+
+                <div id="tab-players" class="tab-content">
+                    <div class="glass-panel premium-shadow" style="padding: 20px;">
+                        <h2 class="font-header mb-10 text-accent" style="font-size: 1.8rem; letter-spacing: 2px;">ВЫЖИВШИЕ СУБЪЕКТЫ</h2>
+                        <p class="hint mb-20 text-muted">Система отслеживает открытые данные кандидатов.</p>
+                        <div id="ingame-players-list" class="players-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="discussion-modal" class="modal-overlay">
+        <div class="glass-panel modal-content premium-shadow" style="border-color: rgba(0, 230, 118, 0.4); max-width: 600px;">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <h2 class="text-success font-header" style="font-size: 2rem; letter-spacing: 2px;">ФАЗА ОБСУЖДЕНИЯ</h2>
+                <p class="text-muted">Проведите дебаты. Нажмите на профиль игрока, чтобы изучить его открытые данные.</p>
+            </div>
+            
+            <div id="discussion-players-list" class="discussion-list mb-25"></div>
+            
+            <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+                <button id="btn-ready" class="btn-primary glow-hover full-width" style="font-size: 1.1rem; padding: 16px;" onclick="toggleReady()">
+                    ПОДТВЕРДИТЬ ГОТОВНОСТЬ
+                </button>
+                <div class="ready-tracker mt-15">
+                    <div class="ready-bar"><div id="ui-ready-bar-fill" class="ready-bar-fill"></div></div>
+                    <div class="text-muted mt-5" style="font-size: 0.8rem; text-align: right;">Готово: <span id="ui-ready-count" class="text-main">0</span> / <span id="ui-alive-count">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="voting-modal" class="modal-overlay">
+        <div class="glass-panel modal-content premium-shadow" style="border-color: rgba(255, 42, 85, 0.3);">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 class="text-danger font-header" style="font-size: 2rem; letter-spacing: 2px;">ПРОТОКОЛ ИЗГНАНИЯ</h2>
+                <p class="text-muted mb-15">Определите слабейшее звено. Выбор окончательный.</p>
+                
+                <div class="timer-container mb-20 mt-15">
+                    <div id="voting-timer" class="font-header text-danger" style="font-size: 3.5rem; text-shadow: 0 0 20px rgba(255,51,102,0.6); line-height: 1;">60</div>
+                    <div class="font-header text-muted" style="font-size: 1rem; letter-spacing: 3px;">СЕКУНД ОСТАЛОСЬ</div>
+                </div>
+            </div>
+
+            <div id="voting-players" class="voting-list"></div>
+            
+            <div class="mt-20 pt-20 text-center" style="border-top: 1px solid rgba(255,255,255,0.05);">
+                <p class="text-muted" style="font-size: 0.85rem;">Система автоматически завершит голосование, когда все сделают выбор или истечет время.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
