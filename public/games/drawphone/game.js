@@ -1,5 +1,34 @@
 let animationFrameId = null; 
 
+// Добавляем динамические стили для эффектов Землетрясения (Тряски) и Лилипута (маленький холст)
+const extraStyles = document.createElement('style');
+extraStyles.innerHTML = `
+@keyframes earthquakeShake {
+    0% { transform: translate(2px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+.mode-earthquake .canvas-wrapper-outer { 
+    animation: earthquakeShake 0.4s infinite; 
+}
+.mode-tiny .canvas-wrapper-outer { 
+    transform: scale(0.25) !important; 
+    transform-origin: center center; 
+    border: 8px solid #d946ef; 
+    border-radius: 12px; 
+    box-shadow: 0 0 20px #d946ef; 
+}
+`;
+document.head.appendChild(extraStyles);
+
 function getRandomHex() {
     return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
 }
@@ -399,9 +428,6 @@ function handleStateChange() {
       document.querySelectorAll('#color-palette .swatch').forEach(c => c.style.display = 'block');
   }
 
-  if (mode === 'hardcore') { setDisplay('action-tools', 'none'); setDisplay('tool-divider-1', 'none'); } 
-  else { setDisplay('action-tools', 'flex'); setDisplay('tool-divider-1', 'block'); }
-
   if (globalState.round > currentLocalRound) startRound(globalState.round, players);
   updateWaitingScreen();
 
@@ -457,22 +483,43 @@ function startRound(round, players) {
   const bgRef = document.getElementById('bg-reference-img');
   if (bgRef) { bgRef.style.display = 'none'; bgRef.src = ''; }
 
+  // --- ХАРДКОР ЛОГИКА ИНТЕРФЕЙСА ---
+  if (mode === 'hardcore') { 
+      setDisplay('action-tools', 'none'); setDisplay('tool-divider-1', 'none'); 
+      const eraser = document.querySelector('.eraser-tool'); if(eraser) eraser.style.display = 'none';
+      const fill = document.querySelector('.fill-tool'); if(fill) fill.style.display = 'none';
+      const clear = document.querySelector('.clear'); if(clear) clear.style.display = 'none';
+  } else { 
+      setDisplay('action-tools', 'flex'); setDisplay('tool-divider-1', 'block'); 
+      const eraser = document.querySelector('.eraser-tool'); if(eraser) eraser.style.display = 'flex';
+      const fill = document.querySelector('.fill-tool'); if(fill) fill.style.display = 'flex';
+      const clear = document.querySelector('.clear'); if(clear) clear.style.display = 'flex';
+  }
+
   if (isDrawingPhase) {
       const zContainer = document.getElementById('zoom-container');
-      if(zContainer) zContainer.className = ''; 
+      if(zContainer) {
+          zContainer.className = ''; 
+          if (mode === 'earthquake') zContainer.classList.add('mode-earthquake');
+          if (mode === 'tiny') zContainer.classList.add('mode-tiny');
+      }
       
       setDisplay('brush-settings', 'flex'); setDisplay('plagiarism-overlay', 'none');
       setDisplay('ink-meter-container', 'none'); setDisplay('coop-divider', 'none');
       setDisplay('btn-gyro-start', 'none'); setDisplay('gyro-cursor', 'none');
       setDisplay('sidebar-tools', 'flex');
       
-      if (mode === 'mirror' && zContainer) zContainer.classList.add('mode-mirror');
-      if (mode === 'earthquake' && zContainer) zContainer.classList.add('mode-earthquake');
-      if (mode === 'tiny' && zContainer) zContainer.classList.add('mode-tiny');
+      // --- ЗЕРКАЛО ЛОГИКА ---
+      if (mode === 'mirror') {
+          isSymmetry = true;
+          const symBtn = document.querySelector('.sym-tool');
+          if (symBtn) symBtn.classList.add('active-swatch');
+      } else {
+          isSymmetry = false;
+      }
+
       if (mode === 'giant') { setDisplay('brush-settings', 'none'); const bs = document.getElementById('brush-size'); if(bs) bs.value = 40; }
-      if (mode === 'fading') { setDisplay('brush-settings', 'none'); const bo = document.getElementById('brush-opacity'); if(bo) bo.value = 0.05; }
       if (mode === 'pixelart') { setDisplay('brush-settings', 'none'); const bs = document.getElementById('brush-size'); if(bs) bs.value = 15; }
-      
       if (mode === 'inkmeter') { setDisplay('ink-meter-container', 'block'); currentInk = maxInk; const im = document.getElementById('ink-meter-bar'); if(im) im.style.width = '100%'; }
       if (mode === 'nohands') setDisplay('btn-gyro-start', 'block');
 
@@ -668,7 +715,6 @@ function submitDrawing(isManual = false) {
   resetCanvasTransform(); showPhase('waiting-phase'); updateWaitingScreen();
 }
 
-// ОПТИМИЗИРОВАННЫЙ АЛГОРИТМ ЗАЛИВКИ (Решает проблему лагов на мобильных в режиме 'Ночь')
 function floodFillCore(startX, startY, fillColorHex) {
     startX = Math.round(startX); startY = Math.round(startY);
     const w = canvas.width, h = canvas.height;
@@ -689,13 +735,12 @@ function floodFillCore(startX, startY, fillColorHex) {
     const startPos = startY * w + startX;
     const startColor = readData[startPos];
     
-    // Получаем ИДЕАЛЬНЫЙ Uint32 цвет через встроенный API браузера (решает проблемы endianness на мобилках)
     const tc = document.createElement('canvas'); tc.width = 1; tc.height = 1;
     const tx = tc.getContext('2d'); tx.fillStyle = fillColorHex; tx.fillRect(0, 0, 1, 1);
     const targetColorData = tx.getImageData(0, 0, 1, 1);
     const fillColor = new Uint32Array(targetColorData.data.buffer)[0];
 
-    if (startColor === fillColor) return; // Если цвета совпадают, выходим, чтобы не зациклиться
+    if (startColor === fillColor) return; 
     
     const stack = new Int32Array(w * h); let stackPtr = 0; stack[stackPtr++] = startPos;
     
@@ -838,7 +883,11 @@ function setRect(element) { clearTools(); isRect = true; ctx.globalCompositeOper
 function setCircle(element) { clearTools(); isCircle = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setLine(element) { clearTools(); isLine = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
 function setArrow(element) { clearTools(); isArrow = true; ctx.globalCompositeOperation = 'source-over'; element.classList.add('active-swatch'); }
-function toggleSymmetry(element) { isSymmetry = !isSymmetry; element.classList.toggle('active-swatch', isSymmetry); }
+function toggleSymmetry(element) { 
+    if (globalState.settings?.mode === 'mirror') return; // Запрещаем отключать симметрию в режиме зеркало
+    isSymmetry = !isSymmetry; 
+    element.classList.toggle('active-swatch', isSymmetry); 
+}
 function toggleNeon(element) { isNeon = !isNeon; element.classList.toggle('active-swatch', isNeon); }
 function toggleBlur(element) { isBlur = !isBlur; element.classList.toggle('active-swatch', isBlur); }
 
@@ -887,7 +936,15 @@ function startPosition(e) {
     
     if (isEyedropper) { const p = ctx.getImageData(pos.x, pos.y, 1, 1).data; const hex = "#" + ("000000" + ((p[0] << 16) | (p[1] << 8) | p[2]).toString(16)).slice(-6); setColor(hex); setBrush(document.querySelector('.brush-tool')); return; }
     if (isFilling) { floodFillCore(pos.x, pos.y, currentColor); recordedStrokes.push({ type: 'fill', c: currentColor, p: [Math.round(pos.x), Math.round(pos.y)] }); saveState(); return; }
-    if (mode === 'chaos') { currentColor = getRandomHex(); const bs = document.getElementById('brush-size'); if(bs) bs.value = Math.floor(Math.random() * 35) + 5; }
+    
+    // --- РУЛЕТКА (Хаос) ---
+    if (mode === 'chaos') { 
+        currentColor = getRandomHex(); 
+        const randomSize = Math.floor(Math.random() * 30) + 5;
+        const bs = document.getElementById('brush-size'); 
+        if(bs) bs.value = randomSize; 
+    }
+
     if (mode === 'pixelart') { pos.x = Math.floor(pos.x / 15) * 15; pos.y = Math.floor(pos.y / 15) * 15; }
     if (mode === 'drunk') { pos.x += (Math.random() - 0.5) * 40; pos.y += (Math.random() - 0.5) * 40; }
     if (mode === 'connectdots') { let closest = null; let minDist = Infinity; dotsArray.forEach(d => { let dist = Math.hypot(d.x - pos.x, d.y - pos.y); if (dist < 40 && dist < minDist) { minDist = dist; closest = d; } }); if (closest) pos = {x: closest.x, y: closest.y}; else return;  }
