@@ -1,13 +1,8 @@
 let animationFrameId = null; 
 
-let russianWords = ["Слон", "Космос", "Любовь", "Монстр", "Машина", "Кот"]; 
-// Изменен путь: теперь файл ищется в той же папке, что и сама игра
-fetch('russian.txt').then(r => r.text()).then(text => {
-    let parsed = text.split('\n').map(w => w.trim()).filter(w => w.length > 0);
-    if(parsed.length > 0) russianWords = parsed;
-}).catch(e => console.log("Файл russian.txt не найден"));
-
-function getRandomRussianWord() { return russianWords[Math.floor(Math.random() * russianWords.length)]; }
+function getRandomHex() {
+    return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+}
 
 function setDisplay(id, display) { const el = document.getElementById(id); if (el) el.style.display = display; }
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
@@ -260,25 +255,21 @@ function enableGyro() {
 function handleGyroMove(event) {
     if (!isGyroEnabled || globalState.settings?.mode !== 'nohands') return;
     
-    // Получаем наклон устройства
-    let dx = event.gamma || 0; // Наклон влево-вправо (-90 до 90)
-    let dy = (event.beta || 0) - 45; // Наклон вперед-назад (считаем 45 градусов за нейтральное положение)
+    let dx = event.gamma || 0; 
+    let dy = (event.beta || 0) - 45; 
     
-    gyroX += dx * 0.3; // Чувствительность
+    gyroX += dx * 0.3; 
     gyroY += dy * 0.3;
     
-    // Ограничиваем в рамках холста
     gyroX = Math.max(0, Math.min(canvas.width, gyroX));
     gyroY = Math.max(0, Math.min(canvas.height, gyroY));
     
-    // Двигаем курсор-указатель
     const cursor = document.getElementById('gyro-cursor');
     if (cursor) {
         cursor.style.left = (gyroX / canvas.width * 100) + '%';
         cursor.style.top = (gyroY / canvas.height * 100) + '%';
     }
     
-    // Рисуем на холсте
     let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
     let opacity = 1; const bo = document.getElementById('brush-opacity'); if (bo) opacity = parseFloat(bo.value);
     ctx.lineWidth = bsVal; ctx.globalAlpha = isErasing ? 1 : opacity; ctx.filter = isBlur ? 'blur(5px)' : 'none'; ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
@@ -299,7 +290,7 @@ function resetLocalGameData() {
     clearInterval(phaseTimerInterval);
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
     
-    window.removeEventListener('deviceorientation', handleGyroMove); // Очистка гироскопа
+    window.removeEventListener('deviceorientation', handleGyroMove);
     isGyroEnabled = false;
     
     setDisplay('play-again-btn', 'none'); 
@@ -447,7 +438,7 @@ function startRound(round, players) {
   hasDrawnStrokeOneline = false; isGyroEnabled = false;
   
   let isDrawingPhase = (round % 2 === 0);
-  if (mode === 'icebreaker' || mode === 'tagteam' || mode === 'triplethreat') isDrawingPhase = (round % 2 !== 0);
+  if (mode === 'icebreaker' || mode === 'tagteam') isDrawingPhase = (round % 2 !== 0);
   if (mode === 'story') isDrawingPhase = false;
   if (mode === 'plagiarism' || mode === 'finishit' || mode === 'tagteam') isDrawingPhase = true;
   if (mode === 'copycat') isDrawingPhase = (round > 1);
@@ -565,10 +556,6 @@ function startRound(round, players) {
               let isImpostorMatch = players.indexOf(myUserId) === impIndex;
               if(wi) { wi.value = isImpostorMatch ? p[1] : p[0]; wi.disabled = true; }
               setText('text-instruction', "Ваше слово:");
-          } else if (mode === 'triplethreat') {
-              let w = `${getRandomRussianWord()}, ${getRandomRussianWord()}, ${getRandomRussianWord()}`;
-              if(wi) { wi.value = w; wi.disabled = true; }
-              setText('text-instruction', "Ваша тема (нажмите Готово):");
           } else { if(wi) wi.disabled = false; }
 
       } else {
@@ -644,7 +631,6 @@ function submitDrawing(isManual = false) {
   if (isManual) { initAudio(); requestFullscreen(); }
   currentPhaseSubmitted = true; clearInterval(phaseTimerInterval);
   
-  // ДОБАВЛЕНО: сохраняем активную линию от гироскопа или если игрок не успел отпустить палец
   if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; saveState(); }
   
   const mode = globalState.settings?.mode; let finalDataUrl = '';
@@ -682,6 +668,7 @@ function submitDrawing(isManual = false) {
   resetCanvasTransform(); showPhase('waiting-phase'); updateWaitingScreen();
 }
 
+// ОПТИМИЗИРОВАННЫЙ АЛГОРИТМ ЗАЛИВКИ (Решает проблему лагов на мобильных в режиме 'Ночь')
 function floodFillCore(startX, startY, fillColorHex) {
     startX = Math.round(startX); startY = Math.round(startY);
     const w = canvas.width, h = canvas.height;
@@ -702,11 +689,13 @@ function floodFillCore(startX, startY, fillColorHex) {
     const startPos = startY * w + startX;
     const startColor = readData[startPos];
     
-    const r = parseInt(fillColorHex.slice(1,3), 16);
-    const g = parseInt(fillColorHex.slice(3,5), 16);
-    const b = parseInt(fillColorHex.slice(5,7), 16);
-    const fillColor = (255 << 24) | (b << 16) | (g << 8) | r;
-    if (startColor === fillColor) return;
+    // Получаем ИДЕАЛЬНЫЙ Uint32 цвет через встроенный API браузера (решает проблемы endianness на мобилках)
+    const tc = document.createElement('canvas'); tc.width = 1; tc.height = 1;
+    const tx = tc.getContext('2d'); tx.fillStyle = fillColorHex; tx.fillRect(0, 0, 1, 1);
+    const targetColorData = tx.getImageData(0, 0, 1, 1);
+    const fillColor = new Uint32Array(targetColorData.data.buffer)[0];
+
+    if (startColor === fillColor) return; // Если цвета совпадают, выходим, чтобы не зациклиться
     
     const stack = new Int32Array(w * h); let stackPtr = 0; stack[stackPtr++] = startPos;
     
@@ -718,7 +707,8 @@ function floodFillCore(startX, startY, fillColorHex) {
         
         while (x < w && readData[curPos] === startColor) {
             data[curPos] = fillColor; 
-            readData[curPos] = fillColor; 
+            if (readData !== data) readData[curPos] = fillColor; 
+            
             if (y > 0) {
                 let above = curPos - w;
                 if (!spanAbove && readData[above] === startColor) { stack[stackPtr++] = above; spanAbove = true; } 
