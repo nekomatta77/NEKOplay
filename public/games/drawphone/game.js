@@ -1,7 +1,8 @@
 let animationFrameId = null; 
 
 let russianWords = ["Слон", "Космос", "Любовь", "Монстр", "Машина", "Кот"]; 
-fetch('/russian.txt').then(r => r.text()).then(text => {
+// Изменен путь: теперь файл ищется в той же папке, что и сама игра
+fetch('russian.txt').then(r => r.text()).then(text => {
     let parsed = text.split('\n').map(w => w.trim()).filter(w => w.length > 0);
     if(parsed.length > 0) russianWords = parsed;
 }).catch(e => console.log("Файл russian.txt не найден"));
@@ -31,7 +32,7 @@ let currentLocalRound = 0;
 let selectedMode = 'classic'; 
 let calculatedTotalRounds = 1; 
 
-let finishitBaseImg = new Image(); // Исправление бага "finishitBaseImg is not defined"
+let finishitBaseImg = new Image(); 
 
 setText('players-count-display', playersCountParam);
 setText('player-name-display', myName);
@@ -227,10 +228,79 @@ function playAgain() {
   window.parent.postMessage({ type: 'play_again' }, '*');
 }
 
+// ==== ЛОГИКА ГИРОСКОПА ====
+let isGyroEnabled = false;
+let gyroX = 400, gyroY = 300;
+
+function startGyro() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(permissionState => {
+                if (permissionState === 'granted') enableGyro();
+                else alert("Доступ к гироскопу запрещен.");
+            })
+            .catch(console.error);
+    } else {
+        enableGyro();
+    }
+}
+
+function enableGyro() {
+    setDisplay('btn-gyro-start', 'none');
+    setDisplay('gyro-cursor', 'block');
+    isGyroEnabled = true;
+    gyroX = canvas.width / 2;
+    gyroY = canvas.height / 2;
+    lastX = gyroX; lastY = gyroY;
+    preZoomState = canvas.toDataURL();
+    isDrawing = true;
+    window.addEventListener('deviceorientation', handleGyroMove);
+}
+
+function handleGyroMove(event) {
+    if (!isGyroEnabled || globalState.settings?.mode !== 'nohands') return;
+    
+    // Получаем наклон устройства
+    let dx = event.gamma || 0; // Наклон влево-вправо (-90 до 90)
+    let dy = (event.beta || 0) - 45; // Наклон вперед-назад (считаем 45 градусов за нейтральное положение)
+    
+    gyroX += dx * 0.3; // Чувствительность
+    gyroY += dy * 0.3;
+    
+    // Ограничиваем в рамках холста
+    gyroX = Math.max(0, Math.min(canvas.width, gyroX));
+    gyroY = Math.max(0, Math.min(canvas.height, gyroY));
+    
+    // Двигаем курсор-указатель
+    const cursor = document.getElementById('gyro-cursor');
+    if (cursor) {
+        cursor.style.left = (gyroX / canvas.width * 100) + '%';
+        cursor.style.top = (gyroY / canvas.height * 100) + '%';
+    }
+    
+    // Рисуем на холсте
+    let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
+    let opacity = 1; const bo = document.getElementById('brush-opacity'); if (bo) opacity = parseFloat(bo.value);
+    ctx.lineWidth = bsVal; ctx.globalAlpha = isErasing ? 1 : opacity; ctx.filter = isBlur ? 'blur(5px)' : 'none'; ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
+    if (isNeon && !isErasing) { ctx.shadowBlur = Math.max(10, bsVal * 2); ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff'; } else { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor; }
+    
+    if(!currentStroke) {
+         currentStroke = { c: currentColor, s: bsVal, e: isErasing?1:0, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [Math.round(gyroX), Math.round(gyroY)] };
+    }
+    currentStroke.p.push(Math.round(gyroX), Math.round(gyroY));
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(gyroX, gyroY); ctx.stroke();
+    lastX = gyroX; lastY = gyroY;
+}
+// ==========================
+
 function resetLocalGameData() {
     currentLocalRound = 0;
     clearInterval(phaseTimerInterval);
     if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    
+    window.removeEventListener('deviceorientation', handleGyroMove); // Очистка гироскопа
+    isGyroEnabled = false;
     
     setDisplay('play-again-btn', 'none'); 
     setHTML('chat-messages', ''); 
@@ -240,7 +310,6 @@ function resetLocalGameData() {
     renderedPresentationState = '';
     dotsArray = [];
     hasDrawnStrokeOneline = false;
-    isGyroEnabled = false;
     finishitBaseImg = new Image();
     
     currentColor = '#000000';
@@ -574,6 +643,10 @@ function submitDrawing(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
   currentPhaseSubmitted = true; clearInterval(phaseTimerInterval);
+  
+  // ДОБАВЛЕНО: сохраняем активную линию от гироскопа или если игрок не успел отпустить палец
+  if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; saveState(); }
+  
   const mode = globalState.settings?.mode; let finalDataUrl = '';
 
   if (mode === 'amnesia') {
