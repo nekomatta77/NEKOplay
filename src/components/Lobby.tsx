@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Room, User } from '../types';
 import { ref, update, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
-import { GAMES } from '../lib/games'; // ДОБАВЛЕНО: Импорт игр
+import { GAMES } from '../lib/games';
 import { motion } from 'motion/react';
 import { Users, LogOut, Play, Crown } from 'lucide-react';
 
@@ -15,9 +15,17 @@ interface LobbyProps {
 export const Lobby: React.FC<LobbyProps> = ({ room, user, onLeave }) => {
   const currentPlayers = room.players || [];
   const isHost = currentPlayers.find(p => p.id === user.id)?.isHost;
-  
-  // ДОБАВЛЕНО: Динамическое получение названия игры
   const gameInfo = GAMES.find(g => g.id === room.gameType) || GAMES[0];
+
+  // Пинг активности в Лобби
+  useEffect(() => {
+    const updateActivity = () => {
+      update(ref(db, `rooms/${room.id}`), { lastActive: Date.now() }).catch(() => {});
+    };
+    updateActivity();
+    const interval = setInterval(updateActivity, 60000); // Раз в минуту
+    return () => clearInterval(interval);
+  }, [room.id]);
 
   const handleStartGame = async () => {
     if (isHost) {
@@ -29,15 +37,10 @@ export const Lobby: React.FC<LobbyProps> = ({ room, user, onLeave }) => {
 
   const handleLeaveRoom = async () => {
     const updatedPlayers = currentPlayers.filter(p => p.id !== user.id);
-    
     if (isHost || updatedPlayers.length === 0) {
-      // Если выходит хост или последний игрок - удаляем комнату
       await remove(ref(db, `rooms/${room.id}`));
     } else {
-      // Иначе просто обновляем список игроков
-      await update(ref(db, `rooms/${room.id}`), { 
-        players: updatedPlayers 
-      });
+      await update(ref(db, `rooms/${room.id}`), { players: updatedPlayers });
     }
     onLeave();
   };
@@ -49,14 +52,12 @@ export const Lobby: React.FC<LobbyProps> = ({ room, user, onLeave }) => {
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 relative overflow-hidden"
       >
-        {/* Фоновое свечение */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-32 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none" />
 
         <div className="relative z-10">
           <header className="flex justify-between items-start mb-8">
             <div>
               <h1 className="text-3xl font-black text-white mb-2">{room.name}</h1>
-              {/* ИСПРАВЛЕНО: Теперь тут выводится реальное название игры */}
               <p className="text-indigo-400 font-bold uppercase tracking-widest text-sm flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
                 {gameInfo.name}
@@ -102,7 +103,6 @@ export const Lobby: React.FC<LobbyProps> = ({ room, user, onLeave }) => {
                 </div>
               ))}
               
-              {/* Пустые слоты */}
               {Array.from({ length: room.maxPlayers - currentPlayers.length }).map((_, i) => (
                 <div key={`empty-${i}`} className="flex items-center gap-4 p-3 rounded-xl border border-zinc-800/30 border-dashed bg-zinc-900/20 opacity-50">
                   <div className="w-10 h-10 rounded-full border-2 border-zinc-800 border-dashed" />

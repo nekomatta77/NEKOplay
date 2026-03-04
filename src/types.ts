@@ -17,6 +17,7 @@ export interface Room {
   maxPlayers: number;
   players: Player[];
   status: "waiting" | "playing";
+  lastActive?: number; // <- Добавили сюда поле для отслеживания АФК-комнат
 }
 
 export interface Game {

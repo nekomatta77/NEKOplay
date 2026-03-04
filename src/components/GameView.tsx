@@ -30,6 +30,16 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     onLeave();
   };
 
+  // Пинг активности (чтобы комната не удалялась, пока в ней активно играют)
+  useEffect(() => {
+    const updateActivity = () => {
+      update(ref(db, `rooms/${room.id}`), { lastActive: Date.now() }).catch(() => {});
+    };
+    updateActivity(); // Обновляем сразу при входе
+    const activityInterval = setInterval(updateActivity, 60000); // Раз в минуту
+    return () => clearInterval(activityInterval);
+  }, [room.id]);
+
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       // Запрос на полный экран
@@ -57,13 +67,12 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
         });
       }
 
-      // Возврат в лобби
+      // ИСПРАВЛЕНО: Возврат в лобби (корректная очистка состояния)
       if (event.data?.type === 'play_again') {
-        await update(ref(db, `rooms/${room.id}/gameState`), {
-          status: 'waiting',
-          round: 0,
-          submissions: null
-        });
+        const updates: any = {};
+        updates[`rooms/${room.id}/gameState`] = null; // Удаляем данные прошлой игры
+        updates[`rooms/${room.id}/status`] = 'waiting'; // Возвращаем комнату в ожидание
+        await update(ref(db), updates);
       }
 
       // Отправка хода (сохраняем в Firebase)
@@ -100,7 +109,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return () => unsubscribe();
   }, [room.id]);
 
-  // НОВОЕ: Слушаем действия (game_action) из Firebase и передаем их в iframe для других игроков (решает рассинхрон!)
+  // Слушаем действия (game_action) из Firebase
   useEffect(() => {
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {

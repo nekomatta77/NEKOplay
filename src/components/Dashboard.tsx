@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Room } from '../types';
-import { ref, onValue, push, set, serverTimestamp } from 'firebase/database';
+import { ref, onValue, push, set, serverTimestamp, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
-import { GAMES } from '../lib/games'; // ДОБАВЛЕНО: Импортируем список игр
+import { GAMES } from '../lib/games';
 import { motion } from 'motion/react';
 import { LogOut, Plus, Users, Gamepad2, X } from 'lucide-react';
 
@@ -15,11 +15,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [roomName, setRoomName] = useState('Комната ' + user.name);
-  // ДОБАВЛЕНО: Состояние для выбранной игры (по умолчанию первая из списка)
   const [selectedGameId, setSelectedGameId] = useState(GAMES[0].id); 
   const [maxPlayers, setMaxPlayers] = useState(GAMES[0].maxPlayers);
 
-  // ДОБАВЛЕНО: При смене игры обновляем лимиты игроков
   const handleGameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newGameId = e.target.value;
     setSelectedGameId(newGameId);
@@ -36,8 +34,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
     const unsubscribe = onValue(roomsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        const roomsArray = Object.values(data) as Room[];
-        setRooms(roomsArray);
+        const now = Date.now();
+        const validRooms: Room[] = [];
+        
+        Object.entries(data).forEach(([roomId, roomData]: [string, any]) => {
+          // ИСПРАВЛЕНО: Автоматическое удаление комнат, неактивных более 30 минут (1800000 мс)
+          if (roomData.lastActive && (now - roomData.lastActive > 1800000)) {
+            remove(ref(db, `rooms/${roomId}`)).catch(console.error);
+          } else {
+            validRooms.push(roomData as Room);
+          }
+        });
+        
+        setRooms(validRooms);
       } else {
         setRooms([]); 
       }
@@ -56,7 +65,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
     const newRoom: Room = {
       id: roomId,
       name: roomName,
-      gameType: selectedGameId, // ИСПРАВЛЕНО: Теперь берем игру из состояния
+      gameType: selectedGameId,
       maxPlayers: maxPlayers,
       players: [{
         ...user,
@@ -64,7 +73,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
         isHost: true,
         isReady: false
       }],
-      status: "waiting"
+      status: "waiting",
+      lastActive: Date.now() // Задаем время активности при создании
     };
 
     await set(newRoomRef, {
@@ -93,18 +103,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
       }];
       
       await set(ref(db, `rooms/${room.id}/players`), updatedPlayers);
+      // Обновляем активность при входе нового игрока
+      await set(ref(db, `rooms/${room.id}/lastActive`), Date.now());
     }
 
     onJoinRoom(room);
   };
 
-  // ДОБАВЛЕНО: Вспомогательная функция для получения названия игры по её ID
   const getGameName = (gameId: string) => {
     const game = GAMES.find(g => g.id === gameId);
     return game ? game.name : 'Неизвестная игра';
   };
 
-  // Получаем текущую выбранную игру для настройки ползунка игроков
   const selectedGameObj = GAMES.find(g => g.id === selectedGameId) || GAMES[0];
 
   return (
@@ -171,7 +181,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                   </span>
                 </div>
                 
-                {/* ИСПРАВЛЕНО: Теперь выводим реальное название игры */}
                 <p className="text-sm text-indigo-400 font-medium mb-6 uppercase tracking-wider">
                   {getGameName(room.gameType)}
                 </p>
@@ -215,7 +224,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                 />
               </div>
 
-              {/* ИСПРАВЛЕНО: Заменили заблокированный блок на выпадающий список (select) */}
               <div>
                 <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">Режим игры</label>
                 <select 
@@ -231,7 +239,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                 </select>
               </div>
 
-              {/* ИСПРАВЛЕНО: Ползунок игроков теперь зависит от выбранной игры */}
               <div>
                 <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wider">
                   Игроков: <span className="text-white">{maxPlayers}</span>
