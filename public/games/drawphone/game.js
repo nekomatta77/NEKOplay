@@ -167,6 +167,7 @@ let isCurrentPhaseDrawing = false;
 let timeMultiplier = 1;
 let maxInk = 5000;
 let currentInk = 5000;
+let expectedEndTime = 0;
 
 function updateTimerUI(remaining, limit) {
     let targetPrefix = currentPhaseSubmitted ? 'waiting' : (isCurrentPhaseDrawing ? 'draw' : 'text');
@@ -204,10 +205,12 @@ function startPhaseTimer(isDrawing) {
     if (globalState.settings?.mode === 'plagiarism' && currentLocalRound > 1) timeLimit = Math.max(15, timeLimit - (currentLocalRound - 1) * 15);
     if (globalState.settings?.mode === 'finishit' && currentLocalRound === 1) timeLimit = 10;
 
-    let timeRemaining = timeLimit; updateTimerUI(timeRemaining, timeLimit);
+    // Глобальная синхронизация с защитой от сворачивания вкладки
+    expectedEndTime = Date.now() + (timeLimit * 1000);
+    updateTimerUI(timeLimit, timeLimit);
 
     phaseTimerInterval = setInterval(() => {
-        timeRemaining -= (0.1 * timeMultiplier);
+        let timeRemaining = (expectedEndTime - Date.now()) / 1000;
         if (timeRemaining <= 0) {
             clearInterval(phaseTimerInterval);
             if (!currentPhaseSubmitted) { try { if (isDrawing) submitDrawing(false); else submitWord(false); } catch(e){} }
@@ -216,9 +219,16 @@ function startPhaseTimer(isDrawing) {
 }
 
 function updateWaitingScreen() {
-    if (!document.getElementById('waiting-phase').classList.contains('active')) return;
     const players = globalState.players || [];
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
+    
+    // Обновляем счетчик готовых игроков на основном интерфейсе (для всех фаз)
+    let activeReadyCount = players.filter(pid => typeof currentSubs[pid] === 'string' && currentSubs[pid].length > 0).length;
+    setText('draw-ready-count', `${activeReadyCount}/${players.length} Готово`);
+    setText('text-ready-count', `${activeReadyCount}/${players.length} Готово`);
+    
+    if (!document.getElementById('waiting-phase').classList.contains('active')) return;
+    
     const listEl = document.getElementById('waiting-players-list');
     if (!listEl) return;
     
@@ -660,7 +670,7 @@ async function getRealBabelTranslation(text) {
 function submitWord(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
-  currentPhaseSubmitted = true; clearInterval(phaseTimerInterval);
+  currentPhaseSubmitted = true; // Специально убрали clearInterval, чтобы таймер шел дальше!
   let word = "Секретик";
   const wi = document.getElementById('word-input');
   if (wi && wi.value.trim()) word = wi.value.trim();
@@ -690,7 +700,7 @@ function submitWord(isManual = false) {
 function submitDrawing(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
-  currentPhaseSubmitted = true; clearInterval(phaseTimerInterval);
+  currentPhaseSubmitted = true; // Специально убрали clearInterval, чтобы таймер шел дальше!
   
   if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; saveState(); }
   
@@ -784,7 +794,50 @@ function floodFillCore(startX, startY, fillColorHex) {
     ctx.putImageData(imgData, 0, 0);
 }
 
-// ОБНОВЛЕНО: теперь Blur и Неон правильно перерисовываются
+// Новая универсальная функция для заливки на любом холсте (нужна для презентаций)
+function genericFloodFill(targetCtx, w, h, startX, startY, fillColorHex) {
+    startX = Math.round(startX); startY = Math.round(startY);
+    if (startX < 0 || startX >= w || startY < 0 || startY >= h) return;
+    
+    const imgData = targetCtx.getImageData(0, 0, w, h);
+    const data = new Uint32Array(imgData.data.buffer);
+    const startPos = startY * w + startX;
+    const startColor = data[startPos];
+    
+    const tc = document.createElement('canvas'); tc.width = 1; tc.height = 1;
+    const tx = tc.getContext('2d'); tx.fillStyle = fillColorHex; tx.fillRect(0, 0, 1, 1);
+    const targetColorData = tx.getImageData(0, 0, 1, 1);
+    const fillColor = new Uint32Array(targetColorData.data.buffer)[0];
+
+    if (startColor === fillColor) return; 
+    
+    const stack = new Int32Array(w * h); let stackPtr = 0; stack[stackPtr++] = startPos;
+    
+    while (stackPtr > 0) {
+        let pos = stack[--stackPtr]; let y = Math.floor(pos / w); let x = pos % w;
+        let curPos = pos;
+        while (x > 0 && data[curPos - 1] === startColor) { curPos--; x--; }
+        let spanAbove = false, spanBelow = false;
+        
+        while (x < w && data[curPos] === startColor) {
+            data[curPos] = fillColor; 
+            if (y > 0) {
+                let above = curPos - w;
+                if (!spanAbove && data[above] === startColor) { stack[stackPtr++] = above; spanAbove = true; } 
+                else if (spanAbove && data[above] !== startColor) { spanAbove = false; }
+            }
+            if (y < h - 1) {
+                let below = curPos + w;
+                if (!spanBelow && data[below] === startColor) { stack[stackPtr++] = below; spanBelow = true; } 
+                else if (spanBelow && data[below] !== startColor) { spanBelow = false; }
+            }
+            curPos++; x++;
+        }
+    }
+    targetCtx.putImageData(imgData, 0, 0);
+}
+
+// ОБНОВЛЕНО: теперь Blur, Неон и ЗАЛИВКА правильно перерисовываются
 function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg = true) {
     if (clearBg) {
         targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over';
@@ -818,7 +871,9 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
         else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
         else if (stroke.type === 'arrow') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; drawArrow(targetCtx, stroke.p[0], stroke.p[1], stroke.p[2], stroke.p[3]); if(stroke.sym) { targetCtx.beginPath(); drawArrow(targetCtx, targetCanvas.width - stroke.p[0], stroke.p[1], targetCanvas.width - stroke.p[2], stroke.p[3]); } }
-        else if (stroke.type === 'fill') { /* Fill ignores redraw */ } 
+        else if (stroke.type === 'fill') { 
+            genericFloodFill(targetCtx, targetCanvas.width, targetCanvas.height, stroke.p[0], stroke.p[1], stroke.c); 
+        } 
         else { 
             let pts = stroke.p; if (!pts || pts.length < 2) continue; 
             targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round'; 
@@ -875,7 +930,7 @@ function animateStrokes(strokes, canvasEl, isDark) {
                 requestAnimationFrame(drawNext);
             } else { strokeIndex++; pointIndex = 2; drawNext(); }
         } else {
-            // Для фигур мы передаем false, чтобы не стирать весь холст!
+            // Для фигур и заливки мы передаем false, чтобы не стирать весь холст!
             redrawFromStrokesSync([stroke], actx, canvasEl, isDark, false);
             strokeIndex++; pointIndex = 2; drawNext();
         }

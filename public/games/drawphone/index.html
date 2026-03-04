@@ -81,8 +81,11 @@
   <div id="game-screen" class="screen">
     <div id="text-phase" class="phase-container">
       <div class="glass-card text-center text-scroll-wrapper" style="position: relative;">
-        <div class="phase-top-bar">
-          <div class="round-badge" id="text-round-badge">Этап 1/3</div>
+        <div class="phase-top-bar" style="padding-top: calc(env(safe-area-inset-top, 20px) + 15px);">
+          <div style="display: flex; gap: 10px; align-items: center;">
+             <div class="round-badge" id="text-round-badge">Этап 1/3</div>
+             <div class="round-badge" id="text-ready-count" style="background: rgba(0,0,0,0.5); color: #fbbf24; border: 1px solid rgba(255,255,255,0.2);">0/0 Готово</div>
+          </div>
           <div class="timer-container" id="text-timer-container">
             <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path class="timer-path" id="text-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>
             <div class="timer-text" id="text-timer-text">60</div>
@@ -103,7 +106,10 @@
       
       <div class="top-tool-bar">
           <div style="display:flex; width:100%; justify-content:space-between; align-items:center;">
-              <div class="round-badge" id="draw-round-badge">Этап 1/3</div>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                  <div class="round-badge" id="draw-round-badge">Этап 1/3</div>
+                  <div class="round-badge" id="draw-ready-count" style="background: rgba(0,0,0,0.5); color: #fbbf24; border: 1px solid rgba(255,255,255,0.2);">0/0 Готово</div>
+              </div>
               <h2 id="word-to-draw" class="target-word" style="text-align:center; flex-grow:1; margin: 0 10px; font-size: 1.2rem;">Слово</h2>
               <div class="timer-container" id="draw-timer-container">
                 <svg class="timer-svg" viewBox="0 0 36 36"><path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /><path class="timer-path" id="draw-timer-path" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" /></svg>

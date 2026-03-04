@@ -175,8 +175,13 @@ input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; bo
 @media screen and (orientation: portrait) {
     .draw-layout { flex-direction: column; padding: 0; gap: 0; background: var(--bg-color); justify-content: flex-start; }
     
-    .canvas-area { flex-grow: 1; padding: max(10px, env(safe-area-inset-top)) 10px 0 10px; display: flex; flex-direction: column; overflow: hidden; min-height: 50vh; }
-    .top-tool-bar { padding: 8px 12px; margin-bottom: 10px; border-radius: 0 0 16px 16px; border-top: none; }
+    .canvas-area { flex-grow: 1; padding: 0px 10px 0 10px; display: flex; flex-direction: column; overflow: hidden; min-height: 50vh; }
+    
+    /* Сдвиг под челку iPhone */
+    .top-tool-bar { 
+        padding: calc(env(safe-area-inset-top, 20px) + 15px) 12px 10px 12px; 
+        margin-bottom: 10px; border-radius: 0 0 16px 16px; border-top: none; 
+    }
     
     /* Заметный скроллбар под холстом */
     .canvas-wrapper-outer { 
