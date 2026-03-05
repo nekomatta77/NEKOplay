@@ -22,10 +22,14 @@ Promise.all([
     database.catastrophes = catastrophesData;
     database.bunkers = bunkersData;
     
-    // Безопасная проверка isHost (если globals.js еще не загрузился)
-    const checkIsHost = typeof isHost !== 'undefined' ? isHost : (new URLSearchParams(window.location.search).get('isHost') === 'true');
-    if (checkIsHost) window.parent.postMessage({ type: 'start_game', settings: { mode: 'bunker' } }, '*'); 
-}).catch(err => console.error("Ошибка загрузки баз данных:", err));
+    // БРОНЕБОЙНЫЙ ЗАПУСК (Защита от ошибки гостей)
+    try {
+        const checkIsHost = typeof isHost !== 'undefined' ? isHost : (new URLSearchParams(window.location.search).get('isHost') === 'true');
+        if (checkIsHost) window.parent.postMessage({ type: 'start_game', settings: { mode: 'bunker' } }, '*'); 
+    } catch(e) { console.error(e); }
+}).catch(err => {
+    console.error("Ошибка загрузки баз данных:", err);
+});
 
 window.addEventListener('message', (event) => {
     if (event.data?.type === 'sync_state') {
@@ -44,13 +48,7 @@ function handleStateChange() {
     if (globalState.status === 'playing') {
         if (!globalState.gameLogic) { 
             const checkIsHost = typeof isHost !== 'undefined' ? isHost : (new URLSearchParams(window.location.search).get('isHost') === 'true');
-            if (checkIsHost) {
-                const savedKey = localStorage.getItem('bunker_api_key');
-                if (savedKey && document.getElementById('setting-api-key')) {
-                    document.getElementById('setting-api-key').value = savedKey;
-                }
-                showScreen('setup-screen'); 
-            }
+            if (checkIsHost) showScreen('setup-screen'); 
             else showScreen('guest-setup-screen'); 
             return; 
         }
@@ -83,11 +81,7 @@ function handleStateChange() {
 
 // --- ЛОГИКА ХОСТА ---
 function confirmSetup() {
-    const apiKeyInput = document.getElementById('setting-api-key')?.value.trim();
-    if (apiKeyInput) {
-        localStorage.setItem('bunker_api_key', apiKeyInput);
-    }
-
+    // Больше не просим вводить ключ, он встроен!
     const firstVoteRound = parseInt(document.getElementById('setting-first-vote-round').value) || 2;
     const doubleRound = parseInt(document.getElementById('setting-double-round').value) || 3;
     
@@ -190,21 +184,11 @@ function renderGame() {
     document.getElementById('ingame-players-list').innerHTML = (globalState.players || []).map(id => {
         const pData = globalState.playersData?.[id] || {}; 
         const name = globalState.playerNames?.[id] || "Аноним";
-        let traitsHTML = '';
-        if (pData.cards) {
-            CARD_ORDER.forEach(key => { 
-                if (pData.cards[key]?.isOpen) {
-                    traitsHTML += `<div class="survivor-trait"><span class="trait-label">${pData.cards[key].label}</span><span class="trait-value">${pData.cards[key].value}</span></div>`; 
-                }
-            });
-        }
-        if (!traitsHTML) traitsHTML = '<div class="text-muted" style="grid-column:span 2">/// СКРЫТО ///</div>';
-        
         let quarantineBadge = logic.quarantinedPlayers?.[id] ? `<span class="quarantine-badge">${SVG_BIO_MINI} КАРАНТИН</span>` : '';
         
         return `
-            <div class="player-item ${pData.kicked ? 'kicked' : ''} ${id === activePlayerId && logic.phase === 'reveal' ? 'active-turn' : ''}">
-                <div class="player-header-row">
+            <div class="player-item aesthetic-player-card ${pData.kicked ? 'kicked' : ''} ${id === activePlayerId && logic.phase === 'reveal' ? 'active-turn' : ''}">
+                <div class="player-header-row mb-10">
                     <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR}'">
                     <div>
                         <div class="font-header" style="font-size:1.6rem;color:${id===myUserId?'var(--accent-cyan)':'var(--text-main)'}">
@@ -213,7 +197,7 @@ function renderGame() {
                         ${pData.kicked?'<div class="text-danger font-header">ИЗГНАН</div>':''}
                     </div>
                 </div>
-                <div class="survivor-traits-grid">${traitsHTML}</div>
+                ${window.getPlayerTraitsHTML(pData)}
             </div>`;
     }).join('');
 
@@ -332,7 +316,6 @@ function executeAction(targetId) {
     if (action.type === 'swap' && sourceCard && targetCard) {
         updates[`playersData/${myUserId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal;
         updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = activeAction.sourceOldVal;
-        // АВТОВСКРЫТИЕ КАРТ ПРИ ОБМЕНЕ
         updates[`playersData/${myUserId}/cards/${action.targetTrait}/isOpen`] = true;
         updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true;
     } 

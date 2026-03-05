@@ -1,4 +1,4 @@
-// --- SVG ИКОНКИ ДЛЯ СПЕЦПРОТОКОЛОВ (Без эмодзи) ---
+// --- SVG ИКОНКИ ДЛЯ СПЕЦПРОТОКОЛОВ ---
 const SVG_SWAP = `<svg viewBox="0 0 24 24"><path d="M12 2.75a9.25 9.25 0 1 0 4.737 17.197l-1.363-1.636A7.25 7.25 0 1 1 19.25 12h-2L20.5 8l3.25 4h-2.5a9.25 9.25 0 0 0-9.25-9.25z"/></svg>`;
 const SVG_REVEAL = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
 const SVG_BIOHAZARD = `<svg viewBox="0 0 24 24"><path d="M12 2A10 10 0 1 0 22 12 10.011 10.011 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8.009 8.009 0 0 1-8 8zm0-14a5.98 5.98 0 0 0-4.665 2.24l2.131 1.23A3.491 3.491 0 0 1 12 8.5a3.491 3.491 0 0 1 2.534.97l2.131-1.23A5.98 5.98 0 0 0 12 6zm-3.46 7.5a3.491 3.491 0 0 1-1.04-2.47H5A5.992 5.992 0 0 0 8.847 16l1.242-2.152a3.447 3.447 0 0 1-1.549-1.348zm6.92 0a3.447 3.447 0 0 1-1.549 1.348L15.153 16A5.992 5.992 0 0 0 19 11.03h-2.5a3.491 3.491 0 0 1-1.04 2.47zM12 10.5a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5z"/></svg>`;
@@ -51,7 +51,7 @@ function renderLogs() {
     container.scrollTop = container.scrollHeight;
 }
 
-// НОВАЯ УНИФИЦИРОВАННАЯ ГЕНЕРАЦИЯ ХАРАКТЕРИСТИК ДЛЯ МОБИЛОК (Выжившие, Дебаты, Изгнание)
+// === НОВЫЙ ДИЗАЙН ХАРАКТЕРИСТИК (Используется везде!) ===
 function generatePlayerTraitsList(pData) {
     let traitsHTML = '';
     if (pData.cards) {
@@ -67,10 +67,10 @@ function generatePlayerTraitsList(pData) {
     }
     return traitsHTML 
         ? `<div class="aesthetic-traits-container">${traitsHTML}</div>` 
-        : `<div class="aesthetic-traits-container"><div class="text-muted text-center" style="width: 100%; font-size: 0.9rem; padding: 10px 0;">/// ДАННЫЕ ЗАСЕКРЕЧЕНЫ ///</div></div>`;
+        : `<div class="aesthetic-traits-container"><div class="text-muted text-center" style="width: 100%; font-size: 0.9rem; padding: 10px 0; letter-spacing: 2px;">/// ДАННЫЕ ЗАСЕКРЕЧЕНЫ ///</div></div>`;
 }
 
-// Для совместимости со старым кодом в game.js
+// Пробрасываем для game.js
 window.getPlayerTraitsHTML = generatePlayerTraitsList;
 
 function handleDiscussionUI() {
@@ -183,9 +183,9 @@ function playActionCinema(actionData) {
     const effectPhase = document.getElementById('cinema-effect-phase');
     effectPhase.className = 'cinema-phase'; 
     
-    // Очищаем классы анимации с ПЛАШЕК ХАРАКТЕРИСТИК (а не с игроков)
-    document.getElementById('ep1-trait').className = 'survivor-trait effect-trait mt-10';
-    document.getElementById('ep2-trait').className = 'survivor-trait effect-trait mt-10';
+    // Снимаем классы анимации с плашек характеристик перед началом
+    document.getElementById('ep1-trait-box').className = 'aesthetic-trait-row mt-10';
+    document.getElementById('ep2-trait-box').className = 'aesthetic-trait-row mt-10';
 
     setTimeout(() => {
         document.getElementById('cinema-card-phase').classList.remove('active');
@@ -204,9 +204,9 @@ function playActionCinema(actionData) {
 
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
-            // Анимация вешается ИСКЛЮЧИТЕЛЬНО на плашки с текстом
-            document.getElementById('ep1-trait').classList.add('anim-swap-left');
-            document.getElementById('ep2-trait').classList.add('anim-swap-right');
+            // Анимация вешается ИСКЛЮЧИТЕЛЬНО на плашки характеристик!
+            document.getElementById('ep1-trait-box').classList.add('anim-swap-left');
+            document.getElementById('ep2-trait-box').classList.add('anim-swap-right');
         } else if (actionData.type === 'reveal') {
             svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`;
         } else if (actionData.type === 'quarantine') {

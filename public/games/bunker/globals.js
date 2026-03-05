@@ -16,6 +16,13 @@ var SVG_TARGET = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 
 
 var CAPACITY_MAP = { 3: 1, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4, 10: 4, 11: 5, 12: 5, 13: 6, 14: 6, 15: 7, 16: 7 };
 
+// === ШИФРОВАНИЕ КЛЮЧА ===
+const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
+
+function getApiKey() {
+    try { return atob(SECRET_KEY_BASE64); } catch(e) { return ""; }
+}
+
 function getAlivePlayers() { return (globalState.players || []).filter(id => !globalState.playersData?.[id]?.kicked); }
 function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -41,6 +48,7 @@ function addLog(text, type='info') {
     window.parent.postMessage({ type: 'update_state', updates }, '*'); 
 }
 
+// Принудительно пробрасываем в window, чтобы game.js их точно увидел
 window.isHost = isHost;
 window.myUserId = myUserId;
 window.myName = myName;
@@ -50,9 +58,9 @@ window.database = database;
 // --- НЕЙРОСЕТЬ (Прямой запрос к OpenRouter) ---
 const StoryGenerator = {
     async generate(aliveIds, playersData, world, onChunk) {
-        const apiKey = localStorage.getItem('bunker_api_key');
-        if (!apiKey) {
-            return "СИСТЕМНАЯ ОШИБКА: Ключ API не найден. Лидер должен указать ключ в настройках перед стартом игры.";
+        const apiKey = getApiKey();
+        if (!apiKey || apiKey.length < 10) {
+            return "СИСТЕМНАЯ ОШИБКА: Ключ API не найден или зашифрован неверно. Пожалуйста, проверьте SECRET_KEY_BASE64.";
         }
 
         if (!world.catastrophe || !world.bunker) return "Данные о мире утеряны...";
@@ -66,10 +74,10 @@ const StoryGenerator = {
             - Багаж: ${p.baggage?.value || 'Пусто'}
             - Фобия: ${p.phobia?.value || 'Нет'}
             - Хобби: ${p.hobby?.value || 'Нет'}
-            - Факт: ${p.fact?.value || 'Нет'}`;
+            - Факт/Особенность: ${p.fact?.value || 'Нет'}`;
         }).join("\n\n");
 
-        const prompt = `Ты — ИИ-рассказчик, пишущий детализированные концовки для игры "Бункер".
+        const prompt = `Ты — суровый ИИ-рассказчик, пишущий детализированные, мрачные или реалистичные концовки для игры "Бункер".
         САМОЕ ГЛАВНОЕ ПРАВИЛО: ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ! НИКАКОГО АНГЛИЙСКОГО!
 
         ДАННЫЕ О МИРЕ:
@@ -80,13 +88,14 @@ const StoryGenerator = {
         ${survivorsInfo}
         
         ЗАДАЧА:
-        Напиши логичную, захватывающую атмосферную концовку на 3-4 абзаца. 
-        1. Хватит ли им ресурсов бункера, чтобы пережить эту катастрофу? 
-        2. Опиши, как пригодились (или помешали) их профессии и багаж.
-        3. Учти их здоровье, фобии, факты и хобби.
-        4. Не делай концовку всегда счастливой. Если набор выживших ужасен — они должны столкнуться с суровыми проблемами.
+        Напиши логичную, захватывающую и атмосферную концовку на 3-4 абзаца. Ты должен сплести все эти элементы воедино:
+        1. Хватит ли им ресурсов именно этого бункера, чтобы пережить именно эту катастрофу? 
+        2. Обязательно опиши, как пригодились (или помешали) их профессии и багаж для выживания.
+        3. Учти их здоровье, фобии, факты и хобби. Если в бункере есть тяжелобольные — опиши, смогли ли их вылечить или они стали обузой. 
+        4. Если среди них есть нелюди, опиши их скрытую роль в бункере.
+        5. Не делай концовку всегда счастливой. Если набор выживших ужасен — они должны столкнуться с суровыми проблемами.
         
-        Пиши художественным текстом. Не используй списки или жирный шрифт.`;
+        Пиши художественным текстом в стиле постапокалипсиса. Не используй списки, жирный шрифт или звездочки.`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); 
@@ -147,7 +156,7 @@ const StoryGenerator = {
             return fullText;
         } catch (e) {
             clearTimeout(timeoutId);
-            return "Связь с ИИ-системой прервана. Проверьте интернет или API-ключ.";
+            return "Связь с ИИ-системой прервана. Проверьте интернет или зашифрованный API-ключ.";
         }
     }
 };
