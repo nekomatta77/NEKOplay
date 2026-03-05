@@ -1,8 +1,7 @@
 // =====================================================================
 // ВСТАВЬ СВОЙ API КЛЮЧ ОТ OPENROUTER СЮДА (между кавычками)
-// Пример: 'sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxx'
+const OPENAI_API_KEY = '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'; 
 // =====================================================================
-const OPENAI_API_KEY = ''; 
 
 // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И НАСТРОЙКИ ---
 const urlParams = new URLSearchParams(window.location.search);
@@ -27,21 +26,36 @@ function setupInteractions() {}
 
 function getAlivePlayers() { return (globalState.players || []).filter(id => !globalState.playersData?.[id]?.kicked); }
 function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-function generateBio() { const genders = ["Мужчина", "Женщина"]; return `${genders[Math.floor(Math.random() * genders.length)]}, ${Math.floor(Math.random() * (75 - 18 + 1)) + 18} лет`; }
-function getRoundRules(round) { const rules = globalState.gameLogic?.rules || { voteRound1: false, doubleRevealRound: 3 }; return { revealsRequired: round >= rules.doubleRevealRound ? 2 : 1, hasVoting: round === 1 ? rules.voteRound1 : true }; }
+
+function generateBio() { 
+    if (!database.bio || database.bio.length === 0) return "Неизвестно";
+    const entity = getRandom(database.bio);
+    const age = Math.floor(Math.random() * (entity.maxAge - entity.minAge + 1)) + entity.minAge;
+    return `${entity.name}, ${age} лет`; 
+}
+
+// ИЗМЕНЕНО: теперь учитываем настройку firstVoteRound
+function getRoundRules(round) { 
+    const rules = globalState.gameLogic?.rules || { firstVoteRound: 2, doubleRevealRound: 3 }; 
+    return { 
+        revealsRequired: round >= rules.doubleRevealRound ? 2 : 1, 
+        hasVoting: round >= rules.firstVoteRound 
+    }; 
+}
+
 function addLog(text, type='info') { const updates = {}; const logId = Date.now() + "_" + Math.random().toString(36).substr(2, 5); updates[`logs/${logId}`] = { time: new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}), text, type }; window.parent.postMessage({ type: 'update_state', updates }, '*'); }
 
-// --- НЕЙРОСЕТЬ (С ПОТОКОВЫМ ВЫВОДОМ И РУССКИМ ЯЗЫКОМ) ---
+// --- НЕЙРОСЕТЬ ---
 const StoryGenerator = {
     async generate(aliveIds, playersData, world, onChunk) {
         if (!world.catastrophe || !world.bunker) return "Данные о мире утеряны...";
-        if (!OPENAI_API_KEY || OPENAI_API_KEY === '') {
-            return "СИСТЕМНОЕ СООБЩЕНИЕ: API ключ нейросети не найден.";
-        }
+        if (!OPENAI_API_KEY || OPENAI_API_KEY === '') return "СИСТЕМНОЕ СООБЩЕНИЕ: API ключ нейросети не найден.";
 
+        // ИЗМЕНЕНО: Теперь мы передаем ИИ БИОГРАФИЮ (Сущность и Возраст)!
         let survivorsInfo = aliveIds.map(id => {
             const p = playersData[id].cards;
-            return `Игрок: ${globalState.playerNames?.[id]} 
+            return `Игрок: ${globalState.playerNames?.[id]}
+            Биография (Раса и Возраст): ${p.bio?.value || 'Неизвестно'}
             Профессия: ${p.prof?.value || 'Неизвестно'} | Здоровье: ${p.health?.value || 'Неизвестно'} 
             Багаж: ${p.baggage?.value || 'Пусто'} | Фобия: ${p.phobia?.value || 'Нет'} 
             Хобби: ${p.hobby?.value || 'Нет'}`;
@@ -56,7 +70,7 @@ const StoryGenerator = {
         Выжившие:
         ${survivorsInfo}
         
-        Напиши атмосферную концовку на 2-3 абзаца. Как они выжили? Помогли ли их профессии и вещи? Если нет врача, как они лечились? Пиши обычным текстом, без звездочек и жирного шрифта. ПИШИ ТОЛЬКО НА РУССКОМ.`;
+        Напиши атмосферную концовку на 2-3 абзаца. Обязательно учти их Биографию (если там есть оборотни, вампиры, андроиды или рептилоиды — опиши, как это повлияло на выживание среди людей!). Помогли ли их профессии и вещи? Пиши обычным текстом, без звездочек и жирного шрифта. ПИШИ ТОЛЬКО НА РУССКОМ.`;
 
         try {
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -68,14 +82,28 @@ const StoryGenerator = {
                     'X-Title': 'Bunker Game' 
                 },
                 body: JSON.stringify({
-                    model: 'arcee-ai/trinity-large-preview:free', // Вернули рабочую модель!
+                    model: 'arcee-ai/trinity-large-preview:free', 
                     messages: [{ role: 'user', content: prompt }], 
                     max_tokens: 800,
                     temperature: 0.8,
-                    stream: true // Потоковый вывод
+                    stream: true
                 })
             });
-            
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("OpenRouter API Error:", errorData);
+                return `ОШИБКА ИИ: ${errorData.error?.message || response.status}`;
+            }
+
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                const data = await response.json();
+                const text = data.choices[0]?.message?.content || "Ошибка: пустой ответ от ИИ.";
+                if (onChunk) onChunk(text); 
+                return text;
+            }
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder("utf-8");
             let fullText = "";
@@ -88,10 +116,11 @@ const StoryGenerator = {
                 const lines = chunk.split('\n');
                 
                 for (const line of lines) {
-                    if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
                         try {
-                            const data = JSON.parse(line.slice(6));
-                            if (data.choices[0].delta && data.choices[0].delta.content) {
+                            const data = JSON.parse(trimmedLine.slice(6));
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
                                 fullText += data.choices[0].delta.content;
                                 if (onChunk) onChunk(fullText);
                             }

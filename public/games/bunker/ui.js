@@ -256,7 +256,7 @@ function renderVotingList() {
     }).join('');
 }
 
-// ИЗМЕНЕНА ФУНКЦИЯ ДЛЯ ВЫЗОВА ИИ АСИНХРОННО
+// --- ИЗМЕНЕНА ДЛЯ СИНХРОНИЗАЦИИ КОНЦОВКИ У ВСЕХ ---
 let aiStoryGenerated = false;
 
 async function renderEndScreen() {
@@ -272,17 +272,56 @@ async function renderEndScreen() {
         document.getElementById('btn-exit-lobby').style.display = 'block';
     }
 
+    const storyEl = document.getElementById('ai-story-text');
+
+    // 1. Если история уже сгенерирована хостом и лежит в общей базе:
+    if (globalState.gameLogic?.aiStory) {
+        if (storyEl.getAttribute('data-loaded') !== 'true') {
+            storyEl.setAttribute('data-loaded', 'true');
+            
+            // Если это гость — делаем красивую имитацию печати текста
+            if (!isHost) {
+                storyEl.innerText = "";
+                let i = 0;
+                const text = globalState.gameLogic.aiStory;
+                const typeInterval = setInterval(() => {
+                    storyEl.innerText += text.charAt(i);
+                    i++;
+                    const screen = document.getElementById('end-screen');
+                    screen.scrollTop = screen.scrollHeight;
+                    if (i >= text.length) clearInterval(typeInterval);
+                }, 15); // Скорость печати для гостей
+            } else {
+                // Хост уже видел печать во время самой генерации
+                storyEl.innerText = globalState.gameLogic.aiStory;
+            }
+        }
+        return;
+    }
+
+    // 2. Если история еще НЕ сгенерирована (мы только попали на экран)
     if (!aiStoryGenerated) {
         aiStoryGenerated = true; 
-        const storyEl = document.getElementById('ai-story-text');
-        storyEl.innerText = ""; // Очищаем заглушку загрузки
         
-        // Запускаем генерацию и передаем функцию, которая обновляет текст на ходу
-        await StoryGenerator.generate(aliveIds, globalState.playersData, globalState.world, (newText) => {
-            storyEl.innerText = newText;
-            // Автоматически прокручиваем окно вниз по мере появления текста
-            const screen = document.getElementById('end-screen');
-            screen.scrollTop = screen.scrollHeight;
-        });
+        if (isHost) {
+            storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
+            
+            // ТОЛЬКО ХОСТ стучится в нейросеть
+            const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, globalState.world, (newText) => {
+                storyEl.innerText = newText;
+                const screen = document.getElementById('end-screen');
+                screen.scrollTop = screen.scrollHeight;
+            });
+            
+            // Когда хост закончил, он сохраняет финал для всех остальных игроков
+            window.parent.postMessage({ 
+                type: 'update_state', 
+                updates: { 'gameLogic/aiStory': finalText } 
+            }, '*');
+            
+        } else {
+            // Гости просто сидят и ждут сигнала от хоста
+            storyEl.innerHTML = `<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin-bottom: 10px;"></div> <br>Ожидание отчета от лидера...`;
+        }
     }
 }

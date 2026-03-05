@@ -1,7 +1,30 @@
-fetch('cards.json').then(res => res.json()).then(data => { 
-    database = data; 
+// --- ИНИЦИАЛИЗАЦИЯ И СИНХРОНИЗАЦИЯ ---
+Promise.all([
+    fetch('cards.json').then(res => res.json()), // Здесь пока остались Карты Действий
+    fetch('bio.json').then(res => res.json()),
+    fetch('professions.json').then(res => res.json()),
+    fetch('health.json').then(res => res.json()),
+    fetch('hobbies.json').then(res => res.json()),
+    fetch('phobias.json').then(res => res.json()),
+    fetch('baggages.json').then(res => res.json()),
+    fetch('traits.json').then(res => res.json()),
+    fetch('catastrophes.json').then(res => res.json()),
+    fetch('bunkers.json').then(res => res.json())
+]).then(([cardsData, bioData, profData, healthData, hobbiesData, phobiasData, baggagesData, traitsData, catastrophesData, bunkersData]) => { 
+    database = cardsData; 
+    database.bio = bioData; 
+    database.professions = profData; 
+    database.healths = healthData;   
+    database.hobbies = hobbiesData;
+    database.phobias = phobiasData;
+    database.baggages = baggagesData;
+    database.traits = traitsData;
+    database.catastrophes = catastrophesData;
+    // ЗАГРУЖАЕМ БУНКЕРЫ:
+    database.bunkers = bunkersData;
+    
     if (isHost) window.parent.postMessage({ type: 'start_game', settings: { mode: 'bunker' } }, '*'); 
-});
+}).catch(err => console.error("Ошибка загрузки баз данных:", err));
 
 window.addEventListener('message', (event) => {
     if (event.data?.type === 'sync_state') {
@@ -50,9 +73,10 @@ function handleStateChange() {
     }
 }
 
+// --- ЛОГИКА ХОСТА ---
 function confirmSetup() {
-    const voteR1 = document.getElementById('setting-vote-r1').value === 'true';
-    const doubleRound = parseInt(document.getElementById('setting-double-round').value);
+    const firstVoteRound = parseInt(document.getElementById('setting-first-vote-round').value) || 2;
+    const doubleRound = parseInt(document.getElementById('setting-double-round').value) || 3;
     
     const playersCount = globalState.players.length;
     const capacity = Math.ceil(playersCount / 2); 
@@ -74,7 +98,6 @@ function confirmSetup() {
         };
     });
 
-    // Берем объекты угрозы и убежища целиком
     const selectedCatastrophe = getRandom(database.catastrophes);
     const selectedBunker = getRandom(database.bunkers);
 
@@ -87,7 +110,7 @@ function confirmSetup() {
             gameLogic: { 
                 round: 1, phase: 'reveal', activePlayerIndex: 0, 
                 revealedThisTurn: 0, readyPlayers: {}, 
-                rules: { voteRound1: voteR1, doubleRevealRound: doubleRound } 
+                rules: { firstVoteRound: firstVoteRound, doubleRevealRound: doubleRound } 
             },
             voting: null 
         } 
@@ -122,6 +145,7 @@ function checkHostAutomations() {
     }
 }
 
+// --- ОТРИСОВКА ИГРЫ ---
 function renderGame() {
     const world = globalState.world || {}; 
     const logic = globalState.gameLogic || {}; 
@@ -133,7 +157,6 @@ function renderGame() {
     }
     const isMyTurn = (activePlayerId === myUserId) && (logic.phase === 'reveal');
 
-    // Отрисовка названия Угрозы и Убежища из объектов
     document.getElementById('ui-catastrophe').innerText = world.catastrophe?.title || "..."; 
     document.getElementById('ui-bunker').innerText = world.bunker?.title || "..."; 
     document.getElementById('ui-capacity').innerText = world.capacity || "0";
@@ -197,6 +220,7 @@ function renderGame() {
     }
 }
 
+// --- ХОДЫ И ДЕЙСТВИЯ ---
 function revealCard(cardKey) {
     const logic = globalState.gameLogic; 
     const required = getRoundRules(logic.round).revealsRequired;
