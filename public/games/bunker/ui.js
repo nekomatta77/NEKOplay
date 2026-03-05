@@ -6,7 +6,6 @@ const SVG_RAID = `<svg viewBox="0 0 24 24"><path d="M19.7 4.3a1 1 0 0 0-1.4 0L12
 const SVG_SCAVENGE = `<svg viewBox="0 0 24 24"><path d="M12 2C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm-1.5 9.5c-.83 0-1.5-.67-1.5-1.5S9.67 8.5 10.5 8.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3 0c-.83 0-1.5-.67-1.5-1.5S12.67 8.5 13.5 8.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM15 20h-6v2h6v-2z"/></svg>`;
 const FALLBACK_AVATAR_UI = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
 
-// --- ФУНКЦИИ ИНТЕРФЕЙСА ---
 function showScreen(id) {
     document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -52,32 +51,27 @@ function renderLogs() {
     container.scrollTop = container.scrollHeight;
 }
 
-// Генерация блока характеристик для обычных списков
-function getPlayerTraitsHTML(pData) {
+// НОВАЯ УНИФИЦИРОВАННАЯ ГЕНЕРАЦИЯ ХАРАКТЕРИСТИК ДЛЯ МОБИЛОК (Выжившие, Дебаты, Изгнание)
+function generatePlayerTraitsList(pData) {
     let traitsHTML = '';
     if (pData.cards) {
         CARD_ORDER.forEach(key => { 
             if (pData.cards[key]?.isOpen) {
-                traitsHTML += `<div class="survivor-trait"><span class="trait-label">${pData.cards[key].label}</span><span class="trait-value">${pData.cards[key].value}</span></div>`; 
+                traitsHTML += `
+                <div class="aesthetic-trait-row">
+                    <span class="trait-label">${pData.cards[key].label}</span>
+                    <span class="trait-value">${pData.cards[key].value}</span>
+                </div>`; 
             }
         });
     }
-    return traitsHTML ? `<div class="survivor-traits-grid" style="margin-top: 15px;">${traitsHTML}</div>` : `<div class="survivor-traits-grid" style="margin-top: 15px;"><div class="text-muted" style="grid-column:span 2">/// СКРЫТО ///</div></div>`;
+    return traitsHTML 
+        ? `<div class="aesthetic-traits-container">${traitsHTML}</div>` 
+        : `<div class="aesthetic-traits-container"><div class="text-muted text-center" style="width: 100%; font-size: 0.9rem; padding: 10px 0;">/// ДАННЫЕ ЗАСЕКРЕЧЕНЫ ///</div></div>`;
 }
 
-// Генератор списка характеристик специально для фазы обсуждения (во всю ширину)
-function getDiscussionTraitsHTML(pData) {
-    let traitsHTML = '';
-    if (pData.cards) {
-        CARD_ORDER.forEach(key => { 
-            if (pData.cards[key]?.isOpen) {
-                traitsHTML += `<div class="survivor-trait full-width-trait"><span class="trait-label">${pData.cards[key].label}</span><span class="trait-value">${pData.cards[key].value}</span></div>`; 
-            }
-        });
-    }
-    return traitsHTML ? `<div class="discussion-traits-list">${traitsHTML}</div>` : `<div class="discussion-traits-list"><div class="text-muted text-center" style="width: 100%;">/// СКРЫТО ///</div></div>`;
-}
-
+// Для совместимости со старым кодом в game.js
+window.getPlayerTraitsHTML = generatePlayerTraitsList;
 
 function handleDiscussionUI() {
     const logic = globalState.gameLogic;
@@ -94,7 +88,7 @@ function handleDiscussionUI() {
         if (isReady) readyCount++;
         
         return `
-            <div class="player-item" style="${isReady ? 'border-color: rgba(0, 230, 118, 0.4); background: rgba(0, 230, 118, 0.05);' : ''} padding: 15px;">
+            <div class="player-item aesthetic-player-card ${isReady ? 'ready-pulse' : ''}">
                 <div class="player-header-row">
                     <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'">
                     <div style="flex-grow: 1;">
@@ -104,7 +98,7 @@ function handleDiscussionUI() {
                     </div>
                     <div>${isReady ? SVG_CHECK : ''}</div>
                 </div>
-                ${getDiscussionTraitsHTML(pData)}
+                ${generatePlayerTraitsList(pData)}
             </div>`;
     }).join('');
 
@@ -145,7 +139,7 @@ function handleVotingUI() {
             const isSelected = myVote === id;
             
             return `
-            <div class="vote-item ${isSelected ? 'selected' : ''}" style="display: block; padding: 15px; ${isMe ? 'opacity: 0.5; cursor: not-allowed;' : ''}" ${!isMe && !isQuarantined ? `onclick="submitVote('${id}')"` : ''}>
+            <div class="vote-item aesthetic-player-card ${isSelected ? 'selected' : ''} ${isMe ? 'dimmed' : ''}" ${!isMe && !isQuarantined ? `onclick="submitVote('${id}')"` : ''}>
                 <div class="player-header-row">
                     <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'">
                     <div style="flex-grow: 1;">
@@ -153,7 +147,7 @@ function handleVotingUI() {
                     </div>
                     <div>${isSelected ? SVG_TARGET : ''}</div>
                 </div>
-                ${getPlayerTraitsHTML(pData)}
+                ${generatePlayerTraitsList(pData)}
             </div>`;
         }).join('');
 
@@ -189,9 +183,9 @@ function playActionCinema(actionData) {
     const effectPhase = document.getElementById('cinema-effect-phase');
     effectPhase.className = 'cinema-phase'; 
     
-    // Сбрасываем старые классы анимации перед новым показом
-    document.getElementById('effect-p1').classList.remove('anim-swap-left');
-    document.getElementById('effect-p2').classList.remove('anim-swap-right');
+    // Очищаем классы анимации с ПЛАШЕК ХАРАКТЕРИСТИК (а не с игроков)
+    document.getElementById('ep1-trait').className = 'survivor-trait effect-trait mt-10';
+    document.getElementById('ep2-trait').className = 'survivor-trait effect-trait mt-10';
 
     setTimeout(() => {
         document.getElementById('cinema-card-phase').classList.remove('active');
@@ -210,9 +204,9 @@ function playActionCinema(actionData) {
 
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
-            // Применяем классы анимации обмена для игроков
-            document.getElementById('effect-p1').classList.add('anim-swap-left');
-            document.getElementById('effect-p2').classList.add('anim-swap-right');
+            // Анимация вешается ИСКЛЮЧИТЕЛЬНО на плашки с текстом
+            document.getElementById('ep1-trait').classList.add('anim-swap-left');
+            document.getElementById('ep2-trait').classList.add('anim-swap-right');
         } else if (actionData.type === 'reveal') {
             svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`;
         } else if (actionData.type === 'quarantine') {

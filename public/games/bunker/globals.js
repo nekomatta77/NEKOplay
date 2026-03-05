@@ -47,9 +47,14 @@ window.myName = myName;
 window.globalState = globalState;
 window.database = database;
 
-// --- НЕЙРОСЕТЬ (С заглушкой от пустых ответов) ---
+// --- НЕЙРОСЕТЬ (Прямой запрос к OpenRouter) ---
 const StoryGenerator = {
     async generate(aliveIds, playersData, world, onChunk) {
+        const apiKey = localStorage.getItem('bunker_api_key');
+        if (!apiKey) {
+            return "СИСТЕМНАЯ ОШИБКА: Ключ API не найден. Лидер должен указать ключ в настройках перед стартом игры.";
+        }
+
         if (!world.catastrophe || !world.bunker) return "Данные о мире утеряны...";
 
         let survivorsInfo = aliveIds.map(id => {
@@ -61,7 +66,7 @@ const StoryGenerator = {
             - Багаж: ${p.baggage?.value || 'Пусто'}
             - Фобия: ${p.phobia?.value || 'Нет'}
             - Хобби: ${p.hobby?.value || 'Нет'}
-            - Факт/Особенность: ${p.fact?.value || 'Нет'}`;
+            - Факт: ${p.fact?.value || 'Нет'}`;
         }).join("\n\n");
 
         const prompt = `Ты — ИИ-рассказчик, пишущий детализированные концовки для игры "Бункер".
@@ -76,20 +81,25 @@ const StoryGenerator = {
         
         ЗАДАЧА:
         Напиши логичную, захватывающую атмосферную концовку на 3-4 абзаца. 
-        1. Хватит ли им ресурсов именно этого бункера, чтобы пережить именно эту катастрофу? 
-        2. Опиши, как пригодились (или помешали) их профессии и багаж для выживания.
+        1. Хватит ли им ресурсов бункера, чтобы пережить эту катастрофу? 
+        2. Опиши, как пригодились (или помешали) их профессии и багаж.
         3. Учти их здоровье, фобии, факты и хобби.
         4. Не делай концовку всегда счастливой. Если набор выживших ужасен — они должны столкнуться с суровыми проблемами.
         
-        Пиши художественным текстом. Не используй списки, жирный шрифт или звездочки.`;
+        Пиши художественным текстом. Не используй списки или жирный шрифт.`;
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); 
 
         try {
-            const response = await fetch('/api/generate', {
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': window.location.href,
+                    'X-Title': 'Bunker Simulation'
+                },
                 signal: controller.signal,
                 body: JSON.stringify({
                     model: 'arcee-ai/trinity-large-preview:free', 
@@ -103,52 +113,41 @@ const StoryGenerator = {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                return `ОШИБКА: Нейросеть временно недоступна или перегружена (Код ${response.status}).`;
+                return `ОШИБКА: Нейросеть недоступна или ключ API недействителен (Код ${response.status}).`;
             }
 
-            const contentType = response.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-                const data = await response.json();
-                const text = data.choices?.[0]?.message?.content || "";
-                if (text) {
-                    if (onChunk) onChunk(text); 
-                    return text;
-                }
-            } else {
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder("utf-8");
-                let fullText = "";
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullText = "";
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    
-                    const chunk = decoder.decode(value, { stream: true });
-                    const lines = chunk.split('\n');
-                    
-                    for (const line of lines) {
-                        const trimmedLine = line.trim();
-                        if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
-                            try {
-                                const data = JSON.parse(trimmedLine.slice(6));
-                                if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
-                                    fullText += data.choices[0].delta.content;
-                                    if (onChunk) onChunk(fullText);
-                                }
-                            } catch(e) {}
-                        }
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+                        try {
+                            const data = JSON.parse(trimmedLine.slice(6));
+                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                fullText += data.choices[0].delta.content;
+                                if (onChunk) onChunk(fullText);
+                            }
+                        } catch(e) {}
                     }
                 }
-                
-                // Если нейросеть сгенерировала пустой ответ, выводим красивую заглушку по лору игры
-                if (!fullText || fullText.trim() === "") {
-                    return "Связь с поверхностью прервана. ИИ-система не смогла передать итоговый отчет из-за сильных помех. \n\nТем не менее, гермодвери надежно заблокированы, и эти выжившие остались наедине друг с другом в бункере. Их дальнейшая судьба — смогут ли они пережить угрозу или сгинут в пучине безумия — теперь исключительно в их собственных руках.";
-                }
-                return fullText;
             }
+            
+            if (!fullText || fullText.trim() === "") {
+                return "Связь с поверхностью прервана. ИИ-система не смогла передать итоговый отчет из-за сильных помех. \n\nТем не менее, гермодвери надежно заблокированы. Дальнейшая судьба выживших теперь исключительно в их собственных руках.";
+            }
+            return fullText;
         } catch (e) {
             clearTimeout(timeoutId);
-            return "Связь с ИИ-системой прервана. Время ожидания вышло или сервер перегружен.";
+            return "Связь с ИИ-системой прервана. Проверьте интернет или API-ключ.";
         }
     }
 };
