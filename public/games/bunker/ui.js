@@ -51,7 +51,7 @@ function renderLogs() {
     container.scrollTop = container.scrollHeight;
 }
 
-// === НОВЫЙ ДИЗАЙН ХАРАКТЕРИСТИК (Используется везде!) ===
+// === НОВЫЙ ДИЗАЙН ХАРАКТЕРИСТИК ===
 function generatePlayerTraitsList(pData) {
     let traitsHTML = '';
     if (pData.cards) {
@@ -70,8 +70,17 @@ function generatePlayerTraitsList(pData) {
         : `<div class="aesthetic-traits-container"><div class="text-muted text-center" style="width: 100%; font-size: 0.9rem; padding: 10px 0; letter-spacing: 2px;">/// ДАННЫЕ ЗАСЕКРЕЧЕНЫ ///</div></div>`;
 }
 
-// Пробрасываем для game.js
 window.getPlayerTraitsHTML = generatePlayerTraitsList;
+
+// Раскрывающийся аккордеон для Дебатов
+window.toggleAccordion = function(id) {
+    const content = document.getElementById(`disc-content-${id}`);
+    const chevron = document.getElementById(`disc-chevron-${id}`);
+    if (content && chevron) {
+        content.classList.toggle('expanded');
+        chevron.classList.toggle('expanded');
+    }
+};
 
 function handleDiscussionUI() {
     const logic = globalState.gameLogic;
@@ -88,17 +97,21 @@ function handleDiscussionUI() {
         if (isReady) readyCount++;
         
         return `
-            <div class="player-item aesthetic-player-card ${isReady ? 'ready-pulse' : ''}">
-                <div class="player-header-row">
-                    <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'">
+            <div class="player-item aesthetic-player-card ${isReady ? 'ready-pulse' : ''}" style="padding: 15px;">
+                <div class="player-header-row" onclick="toggleAccordion('${id}')" style="cursor: pointer; position: relative;">
+                    <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'" style="width: 50px; height: 50px;">
                     <div style="flex-grow: 1;">
                         <div class="font-header" style="font-size:1.4rem;color:${isReady ? 'var(--success)' : 'var(--text-main)'}">
                             ${globalState.playerNames?.[id]}
                         </div>
                     </div>
-                    <div>${isReady ? SVG_CHECK : ''}</div>
+                    <div>
+                        ${isReady ? SVG_CHECK : `<svg id="disc-chevron-${id}" class="accordion-chevron" viewBox="0 0 24 24" width="24" height="24" fill="var(--accent-cyan)"><path d="M7 10l5 5 5-5z"/></svg>`}
+                    </div>
                 </div>
-                ${generatePlayerTraitsList(pData)}
+                <div id="disc-content-${id}" class="accordion-content">
+                    ${generatePlayerTraitsList(pData)}
+                </div>
             </div>`;
     }).join('');
 
@@ -133,27 +146,37 @@ function handleVotingUI() {
 
         document.getElementById('voting-counter').innerText = `${votedCount} / ${expectedVotes}`;
 
-        document.getElementById('voting-players').innerHTML = alive.map(id => {
-            const pData = globalState.playersData?.[id] || {}; 
+        let votingHTML = "";
+
+        // Красивая плашка карантина поверх списка
+        if (isQuarantined) {
+            votingHTML += `
+                <div class="quarantine-lockdown-panel">
+                    <div class="effect-center-icon" style="margin: 0 auto 10px auto; width: 50px; color: var(--danger);">${SVG_BIOHAZARD}</div>
+                    <h3 class="font-header text-danger mb-5" style="font-size: 1.6rem; letter-spacing: 3px;">БЛОКИРОВКА СИСТЕМЫ</h3>
+                    <p class="text-main" style="font-size: 0.95rem; opacity: 0.9;">Ваш голос заблокирован протоколом карантина.</p>
+                </div>
+            `;
+        }
+
+        // Очищенный список только с именами и аватарками
+        votingHTML += alive.map(id => {
             const isMe = id === myUserId;
             const isSelected = myVote === id;
             
             return `
-            <div class="vote-item aesthetic-player-card ${isSelected ? 'selected' : ''} ${isMe ? 'dimmed' : ''}" ${!isMe && !isQuarantined ? `onclick="submitVote('${id}')"` : ''}>
-                <div class="player-header-row">
-                    <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'">
+            <div class="vote-item aesthetic-player-card ${isSelected ? 'selected' : ''} ${isMe ? 'dimmed' : ''}" ${!isMe && !isQuarantined ? `onclick="submitVote('${id}')"` : ''} style="margin-bottom: 12px; padding: 12px 18px;">
+                <div class="player-header-row" style="margin-bottom: 0;">
+                    <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'" style="width: 48px; height: 48px;">
                     <div style="flex-grow: 1;">
-                        <span class="font-header" style="font-size: 1.4rem;">${globalState.playerNames?.[id]}</span>
+                        <span class="font-header" style="font-size: 1.4rem; line-height: 1;">${globalState.playerNames?.[id]}</span>
                     </div>
                     <div>${isSelected ? SVG_TARGET : ''}</div>
                 </div>
-                ${generatePlayerTraitsList(pData)}
             </div>`;
         }).join('');
 
-        if (isQuarantined) {
-            document.getElementById('voting-players').innerHTML += `<div class="text-danger font-header mt-15 text-center" style="font-size: 1.2rem; letter-spacing: 2px;">ВАШ ГОЛОС ЗАБЛОКИРОВАН КАРАНТИНОМ ${SVG_BIOHAZARD}</div>`;
-        }
+        document.getElementById('voting-players').innerHTML = votingHTML;
 
         clearInterval(votingInterval);
         const endTime = globalState.voting.endTime;
@@ -172,7 +195,7 @@ function handleVotingUI() {
     }
 }
 
-// --- КИНО-ЭКРАН АНИМАЦИИ (ОБНОВЛЕН ДЛЯ ИДЕАЛЬНОГО ОБМЕНА) ---
+// --- КИНО-ЭКРАН АНИМАЦИИ (ИДЕАЛЬНАЯ МАТЕМАТИКА ОТ ЦЕНТРА ДО ЦЕНТРА) ---
 function playActionCinema(actionData) {
     if (!actionData) return;
     
@@ -183,12 +206,11 @@ function playActionCinema(actionData) {
     const effectPhase = document.getElementById('cinema-effect-phase');
     effectPhase.className = 'cinema-phase'; 
     
-    // Снимаем все классы анимации с плашек перед началом
     const box1 = document.getElementById('ep1-trait-box');
     const box2 = document.getElementById('ep2-trait-box');
     box1.className = 'aesthetic-trait-row mt-10';
     box2.className = 'aesthetic-trait-row mt-10';
-    box1.style = ''; // Сбрасываем старые переменные координат
+    box1.style = ''; 
     box2.style = '';
 
     setTimeout(() => {
@@ -209,19 +231,24 @@ function playActionCinema(actionData) {
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
             
-            // Включаем отображение второго игрока, чтобы браузер рассчитал их позиции
             document.getElementById('effect-p2').style.display = 'flex';
             
-            // Магия математики: ждем 50мс, чтобы элементы появились на экране, вычисляем идеальную траекторию
+            // Ждем 100мс, чтобы браузер точно отрендерил финальные размеры плашек
             setTimeout(() => {
                 const rect1 = box1.getBoundingClientRect();
                 const rect2 = box2.getBoundingClientRect();
                 
-                // Вычисляем расстояние между ними по осям X и Y
-                const dX = rect2.left - rect1.left;
-                const dY = rect2.top - rect1.top;
+                // Вычисляем ИДЕАЛЬНЫЙ центр каждого элемента
+                const center1X = rect1.left + (rect1.width / 2);
+                const center1Y = rect1.top + (rect1.height / 2);
                 
-                // Записываем идеальные координаты прямо в CSS-переменные элементов
+                const center2X = rect2.left + (rect2.width / 2);
+                const center2Y = rect2.top + (rect2.height / 2);
+                
+                // Высчитываем разницу для перемещения от центра к центру
+                const dX = center2X - center1X;
+                const dY = center2Y - center1Y;
+                
                 box1.style.setProperty('--target-x', dX + 'px');
                 box1.style.setProperty('--target-y', dY + 'px');
                 box1.style.setProperty('--swap-color', 'var(--accent-cyan)');
@@ -230,10 +257,9 @@ function playActionCinema(actionData) {
                 box2.style.setProperty('--target-y', -dY + 'px');
                 box2.style.setProperty('--swap-color', 'var(--warning)');
                 
-                // Запускаем идеальную анимацию
                 box1.classList.add('anim-swap-dynamic');
                 box2.classList.add('anim-swap-dynamic');
-            }, 50);
+            }, 100);
 
         } else {
             if (actionData.type === 'reveal') {
