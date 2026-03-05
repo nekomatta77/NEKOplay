@@ -172,7 +172,7 @@ function handleVotingUI() {
     }
 }
 
-// --- КИНО-ЭКРАН АНИМАЦИИ ---
+// --- КИНО-ЭКРАН АНИМАЦИИ (ОБНОВЛЕН ДЛЯ ИДЕАЛЬНОГО ОБМЕНА) ---
 function playActionCinema(actionData) {
     if (!actionData) return;
     
@@ -183,9 +183,13 @@ function playActionCinema(actionData) {
     const effectPhase = document.getElementById('cinema-effect-phase');
     effectPhase.className = 'cinema-phase'; 
     
-    // Снимаем классы анимации с плашек характеристик перед началом
-    document.getElementById('ep1-trait-box').className = 'aesthetic-trait-row mt-10';
-    document.getElementById('ep2-trait-box').className = 'aesthetic-trait-row mt-10';
+    // Снимаем все классы анимации с плашек перед началом
+    const box1 = document.getElementById('ep1-trait-box');
+    const box2 = document.getElementById('ep2-trait-box');
+    box1.className = 'aesthetic-trait-row mt-10';
+    box2.className = 'aesthetic-trait-row mt-10';
+    box1.style = ''; // Сбрасываем старые переменные координат
+    box2.style = '';
 
     setTimeout(() => {
         document.getElementById('cinema-card-phase').classList.remove('active');
@@ -204,25 +208,50 @@ function playActionCinema(actionData) {
 
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
-            // Анимация вешается ИСКЛЮЧИТЕЛЬНО на плашки характеристик!
-            document.getElementById('ep1-trait-box').classList.add('anim-swap-left');
-            document.getElementById('ep2-trait-box').classList.add('anim-swap-right');
-        } else if (actionData.type === 'reveal') {
-            svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`;
-        } else if (actionData.type === 'quarantine') {
-            svgIcon = SVG_BIOHAZARD; text1 = "ИЗОЛЯЦИЯ"; text2 = "БЛОКИРОВКА ГОЛОСА";
-            document.getElementById('ep2-name').classList.add('text-danger');
-        } else if (actionData.type === 'raid') {
-            svgIcon = SVG_RAID; text1 = `ПОЛУЧЕНО: ${actionData.targetOldVal}`; text2 = "ПУСТО";
-        } else if (actionData.type === 'scavenge') {
-            svgIcon = SVG_SCAVENGE; text1 = `СЛУТАНО: ${actionData.targetOldVal}`; text2 = "МЕРТВ";
+            
+            // Включаем отображение второго игрока, чтобы браузер рассчитал их позиции
+            document.getElementById('effect-p2').style.display = 'flex';
+            
+            // Магия математики: ждем 50мс, чтобы элементы появились на экране, вычисляем идеальную траекторию
+            setTimeout(() => {
+                const rect1 = box1.getBoundingClientRect();
+                const rect2 = box2.getBoundingClientRect();
+                
+                // Вычисляем расстояние между ними по осям X и Y
+                const dX = rect2.left - rect1.left;
+                const dY = rect2.top - rect1.top;
+                
+                // Записываем идеальные координаты прямо в CSS-переменные элементов
+                box1.style.setProperty('--target-x', dX + 'px');
+                box1.style.setProperty('--target-y', dY + 'px');
+                box1.style.setProperty('--swap-color', 'var(--accent-cyan)');
+                
+                box2.style.setProperty('--target-x', -dX + 'px');
+                box2.style.setProperty('--target-y', -dY + 'px');
+                box2.style.setProperty('--swap-color', 'var(--warning)');
+                
+                // Запускаем идеальную анимацию
+                box1.classList.add('anim-swap-dynamic');
+                box2.classList.add('anim-swap-dynamic');
+            }, 50);
+
+        } else {
+            if (actionData.type === 'reveal') {
+                svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`;
+            } else if (actionData.type === 'quarantine') {
+                svgIcon = SVG_BIOHAZARD; text1 = "ИЗОЛЯЦИЯ"; text2 = "БЛОКИРОВКА ГОЛОСА";
+                document.getElementById('ep2-name').classList.add('text-danger');
+            } else if (actionData.type === 'raid') {
+                svgIcon = SVG_RAID; text1 = `ПОЛУЧЕНО: ${actionData.targetOldVal}`; text2 = "ПУСТО";
+            } else if (actionData.type === 'scavenge') {
+                svgIcon = SVG_SCAVENGE; text1 = `СЛУТАНО: ${actionData.targetOldVal}`; text2 = "МЕРТВ";
+            }
+            document.getElementById('effect-p2').style.display = 'flex';
         }
 
         document.getElementById('effect-center-icon').innerHTML = svgIcon;
         document.getElementById('ep1-trait').innerHTML = text1;
         document.getElementById('ep2-trait').innerHTML = text2;
-        
-        document.getElementById('effect-p2').style.display = 'flex';
 
         setTimeout(() => {
             if (isHost && globalState.gameLogic.nextPhase) {
