@@ -775,3 +775,80 @@ body {
         padding: 15px; /* Уменьшаем внутренние отступы у плашки игрока */
     }
 }
+/* --- НОВЫЕ ИСПРАВЛЕНИЯ ПО ВНЕШНЕМУ ВИДУ --- */
+
+/* ИСПРАВЛЕНИЕ 1: Идеальное центрирование бейджа "ОТКРЫТО" на мобилках */
+.card-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%; 
+}
+.bunker-card .value {
+    flex-grow: 1; /* Текст занимает всё свободное место... */
+}
+.status-badge {
+    margin-top: auto; /* ...а бейдж прижимается строго в самый низ! */
+    align-self: center; /* Центруем по горизонтали */
+    justify-content: center;
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+/* ИСПРАВЛЕНИЕ 3: Анимация обмена (Слет в центр, пауза 1 секунда, разлет) */
+/* Переписываем старые ключи swapL и swapR */
+.anim-swap-left { animation: complexSwapL 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards !important; }
+.anim-swap-right { animation: complexSwapR 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards !important; }
+
+@keyframes complexSwapL { 
+    0%   { transform: translateX(0); } 
+    40%  { transform: translateX(150px) scale(1.1); z-index:10; } /* Слет в центр */
+    60%  { transform: translateX(150px) scale(1.1); z-index:10; } /* Пауза в центре */
+    100% { transform: translateX(300px) scale(1); }               /* Разлет */
+}
+@keyframes complexSwapR { 
+    0%   { transform: translateX(0); } 
+    40%  { transform: translateX(-150px) scale(0.9); z-index:5; } /* Слет в центр */
+    60%  { transform: translateX(-150px) scale(0.9); z-index:5; } /* Пауза в центре */
+    100% { transform: translateX(-300px) scale(1); }              /* Разлет */
+}
+
+/* ИСПРАВЛЕНИЕ 5: Списки характеристик для фазы Дебатов (в ряд) */
+.discussion-traits-list { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px; 
+    margin-top: 15px; 
+    width: 100%; 
+    border-top: 1px solid rgba(255,255,255,0.05); 
+    padding-top: 15px; 
+}
+.full-width-trait { 
+    flex-direction: row !important; 
+    justify-content: space-between; 
+    align-items: center !important; 
+    text-align: left; 
+    padding: 12px 15px !important;
+}
+.full-width-trait .trait-label { margin-bottom: 0 !important; font-size: 0.8rem !important; }
+.full-width-trait .trait-value { text-align: right; max-width: 65%; font-size: 1rem !important; }
+
+
+/* АДАПТАЦИЯ ОБМЕНА ДЛЯ МОБИЛОК (Вертикальная анимация с паузой) */
+@media (max-width: 768px) { 
+    @keyframes complexSwapL { 
+        0%   { transform: translateY(0); } 
+        40%  { transform: translateY(150px) scale(1.1); z-index: 10; } 
+        60%  { transform: translateY(150px) scale(1.1); z-index: 10; } 
+        100% { transform: translateY(300px) scale(1); } 
+    } 
+    @keyframes complexSwapR { 
+        0%   { transform: translateY(0); } 
+        40%  { transform: translateY(-150px) scale(0.9); z-index: 5; } 
+        60%  { transform: translateY(-150px) scale(0.9); z-index: 5; } 
+        100% { transform: translateY(-300px) scale(1); } 
+    } 
+    
+    .full-width-trait { flex-direction: column !important; align-items: flex-start !important; }
+    .full-width-trait .trait-value { text-align: left; max-width: 100%; margin-top: 5px; }
+}

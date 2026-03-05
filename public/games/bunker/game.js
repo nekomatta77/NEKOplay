@@ -22,7 +22,9 @@ Promise.all([
     database.catastrophes = catastrophesData;
     database.bunkers = bunkersData;
     
-    if (isHost) window.parent.postMessage({ type: 'start_game', settings: { mode: 'bunker' } }, '*'); 
+    // Безопасная проверка isHost (если globals.js еще не загрузился)
+    const checkIsHost = typeof isHost !== 'undefined' ? isHost : (new URLSearchParams(window.location.search).get('isHost') === 'true');
+    if (checkIsHost) window.parent.postMessage({ type: 'start_game', settings: { mode: 'bunker' } }, '*'); 
 }).catch(err => console.error("Ошибка загрузки баз данных:", err));
 
 window.addEventListener('message', (event) => {
@@ -41,7 +43,8 @@ function handleStateChange() {
     
     if (globalState.status === 'playing') {
         if (!globalState.gameLogic) { 
-            if (isHost) {
+            const checkIsHost = typeof isHost !== 'undefined' ? isHost : (new URLSearchParams(window.location.search).get('isHost') === 'true');
+            if (checkIsHost) {
                 const savedKey = localStorage.getItem('bunker_api_key');
                 if (savedKey && document.getElementById('setting-api-key')) {
                     document.getElementById('setting-api-key').value = savedKey;
@@ -309,7 +312,6 @@ function executeAction(targetId) {
     const targetName = globalState.playerNames?.[targetId];
     addLog(`${myName} применил спецпротокол на ${targetName}`, "warning");
 
-    // ИСПРАВЛЕНИЕ 1: Безопасное чтение старых значений (если цель none - избегаем ошибки)
     const sourceCard = globalState.playersData[myUserId].cards[action.targetTrait];
     const targetCard = globalState.playersData[targetId].cards[action.targetTrait];
 
@@ -330,6 +332,9 @@ function executeAction(targetId) {
     if (action.type === 'swap' && sourceCard && targetCard) {
         updates[`playersData/${myUserId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal;
         updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = activeAction.sourceOldVal;
+        // АВТОВСКРЫТИЕ КАРТ ПРИ ОБМЕНЕ
+        updates[`playersData/${myUserId}/cards/${action.targetTrait}/isOpen`] = true;
+        updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true;
     } 
     else if (action.type === 'reveal' && targetCard) {
         updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true;

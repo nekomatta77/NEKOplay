@@ -47,7 +47,7 @@ window.myName = myName;
 window.globalState = globalState;
 window.database = database;
 
-// --- НЕЙРОСЕТЬ (Исправлена обработка ошибок и зависаний) ---
+// --- НЕЙРОСЕТЬ (С заглушкой от пустых ответов) ---
 const StoryGenerator = {
     async generate(aliveIds, playersData, world, onChunk) {
         if (!world.catastrophe || !world.bunker) return "Данные о мире утеряны...";
@@ -64,7 +64,7 @@ const StoryGenerator = {
             - Факт/Особенность: ${p.fact?.value || 'Нет'}`;
         }).join("\n\n");
 
-        const prompt = `Ты — суровый ИИ-рассказчик, пишущий детализированные концовки для игры "Бункер".
+        const prompt = `Ты — ИИ-рассказчик, пишущий детализированные концовки для игры "Бункер".
         САМОЕ ГЛАВНОЕ ПРАВИЛО: ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ! НИКАКОГО АНГЛИЙСКОГО!
 
         ДАННЫЕ О МИРЕ:
@@ -75,18 +75,16 @@ const StoryGenerator = {
         ${survivorsInfo}
         
         ЗАДАЧА:
-        Напиши логичную, захватывающую и атмосферную концовку на 3-4 абзаца. Ты должен сплести все эти элементы воедино:
+        Напиши логичную, захватывающую атмосферную концовку на 3-4 абзаца. 
         1. Хватит ли им ресурсов именно этого бункера, чтобы пережить именно эту катастрофу? 
-        2. Обязательно опиши, как пригодились (или помешали) их профессии и багаж для выживания.
-        3. Учти их здоровье, фобии, факты и хобби. Если в бункере есть тяжелобольные — опиши, смогли ли их вылечить или они стали обузой. 
-        4. Если среди них есть нелюди, опиши их скрытую роль в бункере.
-        5. Не делай концовку всегда счастливой. Если набор выживших ужасен — они должны столкнуться с суровыми проблемами.
+        2. Опиши, как пригодились (или помешали) их профессии и багаж для выживания.
+        3. Учти их здоровье, фобии, факты и хобби.
+        4. Не делай концовку всегда счастливой. Если набор выживших ужасен — они должны столкнуться с суровыми проблемами.
         
-        Пиши художественным текстом в стиле постапокалипсиса. Не используй списки, жирный шрифт или звездочки.`;
+        Пиши художественным текстом. Не используй списки, жирный шрифт или звездочки.`;
 
-        // Добавляем таймаут для прерывания (чтобы не зависло навсегда)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 секунд на генерацию макс.
+        const timeoutId = setTimeout(() => controller.abort(), 60000); 
 
         try {
             const response = await fetch('/api/generate', {
@@ -105,51 +103,52 @@ const StoryGenerator = {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error("Vercel API Error:", response.status, errorText);
-                return `ОШИБКА СЕРВЕРА: Внешняя нейросеть временно недоступна (Код ${response.status}). Пожалуйста, попробуйте сыграть еще раз позже.`;
+                return `ОШИБКА: Нейросеть временно недоступна или перегружена (Код ${response.status}).`;
             }
 
             const contentType = response.headers.get('content-type') || '';
             if (contentType.includes('application/json')) {
                 const data = await response.json();
-                const text = data.choices?.[0]?.message?.content || "Ошибка: пустой ответ от ИИ.";
-                if (onChunk) onChunk(text); 
-                return text;
-            }
+                const text = data.choices?.[0]?.message?.content || "";
+                if (text) {
+                    if (onChunk) onChunk(text); 
+                    return text;
+                }
+            } else {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let fullText = "";
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let fullText = "";
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
-                
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
-                        try {
-                            const data = JSON.parse(trimmedLine.slice(6));
-                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
-                                fullText += data.choices[0].delta.content;
-                                if (onChunk) onChunk(fullText);
-                            }
-                        } catch(e) {
-                            // Игнорируем битые чанки, продолжаем парсить следующие
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+                            try {
+                                const data = JSON.parse(trimmedLine.slice(6));
+                                if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                    fullText += data.choices[0].delta.content;
+                                    if (onChunk) onChunk(fullText);
+                                }
+                            } catch(e) {}
                         }
                     }
                 }
+                
+                // Если нейросеть сгенерировала пустой ответ, выводим красивую заглушку по лору игры
+                if (!fullText || fullText.trim() === "") {
+                    return "Связь с поверхностью прервана. ИИ-система не смогла передать итоговый отчет из-за сильных помех. \n\nТем не менее, гермодвери надежно заблокированы, и эти выжившие остались наедине друг с другом в бункере. Их дальнейшая судьба — смогут ли они пережить угрозу или сгинут в пучине безумия — теперь исключительно в их собственных руках.";
+                }
+                return fullText;
             }
-            return fullText || "Нейросеть сгенерировала пустой ответ.";
         } catch (e) {
             clearTimeout(timeoutId);
-            console.error("Fetch Error:", e);
-            if (e.name === 'AbortError') return "Время ожидания ответа от нейросети вышло. Сервер перегружен.";
-            return "Нет связи с сервером Vercel или API ключом нейросети.";
+            return "Связь с ИИ-системой прервана. Время ожидания вышло или сервер перегружен.";
         }
     }
 };

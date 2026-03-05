@@ -52,7 +52,7 @@ function renderLogs() {
     container.scrollTop = container.scrollHeight;
 }
 
-// Генерация блока характеристик для списков
+// Генерация блока характеристик для обычных списков
 function getPlayerTraitsHTML(pData) {
     let traitsHTML = '';
     if (pData.cards) {
@@ -64,6 +64,20 @@ function getPlayerTraitsHTML(pData) {
     }
     return traitsHTML ? `<div class="survivor-traits-grid" style="margin-top: 15px;">${traitsHTML}</div>` : `<div class="survivor-traits-grid" style="margin-top: 15px;"><div class="text-muted" style="grid-column:span 2">/// СКРЫТО ///</div></div>`;
 }
+
+// Генератор списка характеристик специально для фазы обсуждения (во всю ширину)
+function getDiscussionTraitsHTML(pData) {
+    let traitsHTML = '';
+    if (pData.cards) {
+        CARD_ORDER.forEach(key => { 
+            if (pData.cards[key]?.isOpen) {
+                traitsHTML += `<div class="survivor-trait full-width-trait"><span class="trait-label">${pData.cards[key].label}</span><span class="trait-value">${pData.cards[key].value}</span></div>`; 
+            }
+        });
+    }
+    return traitsHTML ? `<div class="discussion-traits-list">${traitsHTML}</div>` : `<div class="discussion-traits-list"><div class="text-muted text-center" style="width: 100%;">/// СКРЫТО ///</div></div>`;
+}
+
 
 function handleDiscussionUI() {
     const logic = globalState.gameLogic;
@@ -90,7 +104,7 @@ function handleDiscussionUI() {
                     </div>
                     <div>${isReady ? SVG_CHECK : ''}</div>
                 </div>
-                ${getPlayerTraitsHTML(pData)}
+                ${getDiscussionTraitsHTML(pData)}
             </div>`;
     }).join('');
 
@@ -120,8 +134,6 @@ function handleVotingUI() {
         const myVote = results[myUserId];
         
         let votedCount = Object.keys(results).length;
-        
-        // ИСПРАВЛЕНИЕ 4: Подсчитываем, сколько реально человек могут проголосовать
         const quarantinedCount = Object.keys(logic.quarantinedPlayers || {}).length;
         const expectedVotes = alive.length - quarantinedCount;
 
@@ -155,7 +167,6 @@ function handleVotingUI() {
             const left = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
             document.getElementById('voting-timer').innerText = left;
             
-            // ИСПРАВЛЕНИЕ 4: Автоматический пропуск, если все проголосовали
             if (left <= 0 || (votedCount >= expectedVotes && expectedVotes > 0)) {
                 clearInterval(votingInterval);
                 if (isHost && globalState.voting.active) executeExile();
@@ -177,6 +188,10 @@ function playActionCinema(actionData) {
     
     const effectPhase = document.getElementById('cinema-effect-phase');
     effectPhase.className = 'cinema-phase'; 
+    
+    // Сбрасываем старые классы анимации перед новым показом
+    document.getElementById('effect-p1').classList.remove('anim-swap-left');
+    document.getElementById('effect-p2').classList.remove('anim-swap-right');
 
     setTimeout(() => {
         document.getElementById('cinema-card-phase').classList.remove('active');
@@ -195,6 +210,9 @@ function playActionCinema(actionData) {
 
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
+            // Применяем классы анимации обмена для игроков
+            document.getElementById('effect-p1').classList.add('anim-swap-left');
+            document.getElementById('effect-p2').classList.add('anim-swap-right');
         } else if (actionData.type === 'reveal') {
             svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`;
         } else if (actionData.type === 'quarantine') {
