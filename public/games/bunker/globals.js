@@ -1,5 +1,4 @@
 // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И НАСТРОЙКИ ---
-// Используем var и window, чтобы обойти изоляцию модулей Vite
 window.urlParams = new URLSearchParams(window.location.search);
 var myName = window.urlParams.get('name') || 'Аноним';
 var myUserId = window.urlParams.get('userId');
@@ -16,9 +15,6 @@ var SVG_CHECK = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M9 16.17L4.8
 var SVG_TARGET = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5.08 4.06 5.6 7.41h-2.6c-.45-1.57-1.84-2.76-3.56-2.91v2.41c1.8.18 3.2 1.58 3.38 3.38h2.4c-.16 1.4-.76 2.68-1.62 3.65z"/></svg>`;
 
 var CAPACITY_MAP = { 3: 1, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4, 10: 4, 11: 5, 12: 5, 13: 6, 14: 6, 15: 7, 16: 7 };
-
-var SoundEngine = { init() {}, playTone() {}, hover() {}, click() {}, reveal() {}, alarm() {}, glitch() {}, heal() {}, burn() {} };
-function setupInteractions() {}
 
 function getAlivePlayers() { return (globalState.players || []).filter(id => !globalState.playersData?.[id]?.kicked); }
 function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -45,14 +41,13 @@ function addLog(text, type='info') {
     window.parent.postMessage({ type: 'update_state', updates }, '*'); 
 }
 
-// Принудительно пробрасываем в window, чтобы game.js их точно увидел
 window.isHost = isHost;
 window.myUserId = myUserId;
 window.myName = myName;
 window.globalState = globalState;
 window.database = database;
 
-// --- НЕЙРОСЕТЬ (Через безопасный Vercel Serverless Function) ---
+// --- НЕЙРОСЕТЬ (Исправлена обработка ошибок и зависаний) ---
 const StoryGenerator = {
     async generate(aliveIds, playersData, world, onChunk) {
         if (!world.catastrophe || !world.bunker) return "Данные о мире утеряны...";
@@ -69,7 +64,7 @@ const StoryGenerator = {
             - Факт/Особенность: ${p.fact?.value || 'Нет'}`;
         }).join("\n\n");
 
-        const prompt = `Ты — суровый ИИ-рассказчик, пишущий детализированные, мрачные или реалистичные концовки для игры "Бункер".
+        const prompt = `Ты — суровый ИИ-рассказчик, пишущий детализированные концовки для игры "Бункер".
         САМОЕ ГЛАВНОЕ ПРАВИЛО: ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ! НИКАКОГО АНГЛИЙСКОГО!
 
         ДАННЫЕ О МИРЕ:
@@ -89,13 +84,15 @@ const StoryGenerator = {
         
         Пиши художественным текстом в стиле постапокалипсиса. Не используй списки, жирный шрифт или звездочки.`;
 
+        // Добавляем таймаут для прерывания (чтобы не зависло навсегда)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 секунд на генерацию макс.
+
         try {
-            // Обращаемся к НАШЕМУ серверу на Vercel
             const response = await fetch('/api/generate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
                     model: 'arcee-ai/trinity-large-preview:free', 
                     messages: [{ role: 'user', content: prompt }], 
@@ -105,10 +102,12 @@ const StoryGenerator = {
                 })
             });
 
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error("Vercel API Error:", response.status, errorText);
-                return `ОШИБКА СЕРВЕРА: ${response.status}. Проверьте логи в панели Vercel (вкладка Logs).`;
+                return `ОШИБКА СЕРВЕРА: Внешняя нейросеть временно недоступна (Код ${response.status}). Пожалуйста, попробуйте сыграть еще раз позже.`;
             }
 
             const contentType = response.headers.get('content-type') || '';
@@ -139,14 +138,18 @@ const StoryGenerator = {
                                 fullText += data.choices[0].delta.content;
                                 if (onChunk) onChunk(fullText);
                             }
-                        } catch(e) {}
+                        } catch(e) {
+                            // Игнорируем битые чанки, продолжаем парсить следующие
+                        }
                     }
                 }
             }
-            return fullText;
+            return fullText || "Нейросеть сгенерировала пустой ответ.";
         } catch (e) {
+            clearTimeout(timeoutId);
             console.error("Fetch Error:", e);
-            return "Нет связи с сервером Vercel. Возможно, файл api/generate.js не загрузился.";
+            if (e.name === 'AbortError') return "Время ожидания ответа от нейросети вышло. Сервер перегружен.";
+            return "Нет связи с сервером Vercel или API ключом нейросети.";
         }
     }
 };

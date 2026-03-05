@@ -42,7 +42,6 @@ function handleStateChange() {
     if (globalState.status === 'playing') {
         if (!globalState.gameLogic) { 
             if (isHost) {
-                // Автоподстановка ключа из памяти для хоста
                 const savedKey = localStorage.getItem('bunker_api_key');
                 if (savedKey && document.getElementById('setting-api-key')) {
                     document.getElementById('setting-api-key').value = savedKey;
@@ -81,7 +80,6 @@ function handleStateChange() {
 
 // --- ЛОГИКА ХОСТА ---
 function confirmSetup() {
-    // Сохраняем ключ нейросети в память браузера
     const apiKeyInput = document.getElementById('setting-api-key')?.value.trim();
     if (apiKeyInput) {
         localStorage.setItem('bunker_api_key', apiKeyInput);
@@ -160,6 +158,7 @@ function checkHostAutomations() {
 
 // --- ОТРИСОВКА ИГРЫ ---
 const SVG_BIO_MINI = `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: currentColor;"><path d="M12 2A10 10 0 1 0 22 12 10.011 10.011 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8.009 8.009 0 0 1-8 8zm0-14a5.98 5.98 0 0 0-4.665 2.24l2.131 1.23A3.491 3.491 0 0 1 12 8.5a3.491 3.491 0 0 1 2.534.97l2.131-1.23A5.98 5.98 0 0 0 12 6zm-3.46 7.5a3.491 3.491 0 0 1-1.04-2.47H5A5.992 5.992 0 0 0 8.847 16l1.242-2.152a3.447 3.447 0 0 1-1.549-1.348zm6.92 0a3.447 3.447 0 0 1-1.549 1.348L15.153 16A5.992 5.992 0 0 0 19 11.03h-2.5a3.491 3.491 0 0 1-1.04 2.47zM12 10.5a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5z"/></svg>`;
+const FALLBACK_AVATAR = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
 
 function renderGame() {
     const world = globalState.world || {}; 
@@ -203,7 +202,7 @@ function renderGame() {
         return `
             <div class="player-item ${pData.kicked ? 'kicked' : ''} ${id === activePlayerId && logic.phase === 'reveal' ? 'active-turn' : ''}">
                 <div class="player-header-row">
-                    <img src="${globalState.playerAvatars?.[id]}">
+                    <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR}'">
                     <div>
                         <div class="font-header" style="font-size:1.6rem;color:${id===myUserId?'var(--accent-cyan)':'var(--text-main)'}">
                             ${name} ${id === myUserId ? '<span class="text-muted" style="font-size:0.8rem; vertical-align: middle;">(ВЫ)</span>' : ''} ${quarantineBadge}
@@ -230,8 +229,8 @@ function renderGame() {
                     <div class="card-content-wrapper">
                         <div class="type">${card.label}</div>
                         <div class="value">${card.value}</div>
+                        <div class="status-badge font-header">${card.isOpen ? SVG_EYE+' ОТКРЫТО' : SVG_LOCK+' СКРЫТО'}</div>
                     </div>
-                    <div class="status-badge font-header">${card.isOpen ? SVG_EYE+' ОТКРЫТО' : SVG_LOCK+' СКРЫТО'}</div>
                 </div>`;
         }).join('');
     }
@@ -310,12 +309,16 @@ function executeAction(targetId) {
     const targetName = globalState.playerNames?.[targetId];
     addLog(`${myName} применил спецпротокол на ${targetName}`, "warning");
 
+    // ИСПРАВЛЕНИЕ 1: Безопасное чтение старых значений (если цель none - избегаем ошибки)
+    const sourceCard = globalState.playersData[myUserId].cards[action.targetTrait];
+    const targetCard = globalState.playersData[targetId].cards[action.targetTrait];
+
     const activeAction = {
         sourceId: myUserId, targetId: targetId,
         cardLabel: action.label, cardText: action.value, 
         type: action.type, trait: action.targetTrait,
-        sourceOldVal: globalState.playersData[myUserId].cards[action.targetTrait]?.value,
-        targetOldVal: globalState.playersData[targetId].cards[action.targetTrait]?.value
+        sourceOldVal: sourceCard ? sourceCard.value : "—",
+        targetOldVal: targetCard ? targetCard.value : "—"
     };
 
     closeTargetSelection();
@@ -324,11 +327,11 @@ function executeAction(targetId) {
     updates['gameLogic/phase'] = 'action_animation'; 
     updates['gameLogic/activeAction'] = activeAction;
 
-    if (action.type === 'swap') {
+    if (action.type === 'swap' && sourceCard && targetCard) {
         updates[`playersData/${myUserId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal;
         updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = activeAction.sourceOldVal;
     } 
-    else if (action.type === 'reveal') {
+    else if (action.type === 'reveal' && targetCard) {
         updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true;
     }
     else if (action.type === 'quarantine') {

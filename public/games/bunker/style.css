@@ -725,3 +725,53 @@ body {
     padding: 12px !important;
     word-wrap: break-word;
 }
+/* --- ИСПРАВЛЕНИЯ ВНЕШНЕГО ВИДА ПО ЗАПРОСУ --- */
+
+/* ИСПРАВЛЕНИЕ 2: Бейдж "ОТКРЫТО" теперь не вылезает за рамки */
+.card-content-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Растягиваем контент на всю высоту карточки */
+}
+.bunker-card .value {
+    flex-grow: 1; /* Текст занимает всё свободное место... */
+}
+.status-badge {
+    margin-top: auto; /* ...а бейдж прижимается строго в самый низ! */
+    align-self: flex-start;
+    flex-shrink: 0; /* Запрещаем бейджу сжиматься */
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* ИСПРАВЛЕНИЕ 3: Раздел "Выжившие" для мобилок больше не вылезает за края */
+.survivor-traits-grid { 
+    /* Делаем сетку умной, минимальная ширина колонки 130px вместо 200px */
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); 
+}
+
+@media (max-width: 768px) {
+    /* На телефонах строго 2 колонки, отступы меньше */
+    .survivor-traits-grid { 
+        grid-template-columns: 1fr 1fr; 
+        gap: 8px; 
+    }
+    .survivor-trait {
+        padding: 8px;
+    }
+    .survivor-trait .trait-label {
+        font-size: 0.65rem;
+    }
+    .survivor-trait .trait-value {
+        font-size: 0.85rem; /* Слегка уменьшаем текст, чтобы влез */
+    }
+    .player-header-row {
+        /* Имя и аватарку на очень узких экранах ставим в колонку */
+        flex-direction: row; 
+        flex-wrap: wrap;
+    }
+    .player-item {
+        padding: 15px; /* Уменьшаем внутренние отступы у плашки игрока */
+    }
+}
