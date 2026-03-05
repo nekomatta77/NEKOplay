@@ -1,262 +1,218 @@
-function showScreen(screenId) { 
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); 
-    document.getElementById(screenId).classList.add('active'); 
-}
+// --- SVG ИКОНКИ ДЛЯ СПЕЦПРОТОКОЛОВ (Без эмодзи) ---
+const SVG_SWAP = `<svg viewBox="0 0 24 24"><path d="M12 2.75a9.25 9.25 0 1 0 4.737 17.197l-1.363-1.636A7.25 7.25 0 1 1 19.25 12h-2L20.5 8l3.25 4h-2.5a9.25 9.25 0 0 0-9.25-9.25z"/></svg>`;
+const SVG_REVEAL = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>`;
+const SVG_BIOHAZARD = `<svg viewBox="0 0 24 24"><path d="M12 2A10 10 0 1 0 22 12 10.011 10.011 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8.009 8.009 0 0 1-8 8zm0-14a5.98 5.98 0 0 0-4.665 2.24l2.131 1.23A3.491 3.491 0 0 1 12 8.5a3.491 3.491 0 0 1 2.534.97l2.131-1.23A5.98 5.98 0 0 0 12 6zm-3.46 7.5a3.491 3.491 0 0 1-1.04-2.47H5A5.992 5.992 0 0 0 8.847 16l1.242-2.152a3.447 3.447 0 0 1-1.549-1.348zm6.92 0a3.447 3.447 0 0 1-1.549 1.348L15.153 16A5.992 5.992 0 0 0 19 11.03h-2.5a3.491 3.491 0 0 1-1.04 2.47zM12 10.5a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5z"/></svg>`;
+const SVG_RAID = `<svg viewBox="0 0 24 24"><path d="M19.7 4.3a1 1 0 0 0-1.4 0L12 10.6 5.7 4.3a1 1 0 0 0-1.4 1.4l6.3 6.3-6.3 6.3a1 1 0 0 0 1.4 1.4l6.3-6.3 6.3 6.3a1 1 0 0 0 1.4-1.4l-6.3-6.3 6.3-6.3a1 1 0 0 0 0-1.4z"/></svg>`;
+const SVG_SCAVENGE = `<svg viewBox="0 0 24 24"><path d="M12 2C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm-1.5 9.5c-.83 0-1.5-.67-1.5-1.5S9.67 8.5 10.5 8.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3 0c-.83 0-1.5-.67-1.5-1.5S12.67 8.5 13.5 8.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM15 20h-6v2h6v-2z"/></svg>`;
 
-function switchTab(tabId) { 
-    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); 
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); 
-    document.getElementById(tabId).classList.add('active'); 
-    document.querySelector(`[onclick="switchTab('${tabId}')"]`).classList.add('active'); 
+// --- ФУНКЦИИ ИНТЕРФЕЙСА ---
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
 }
 
 function hideAllModals() {
-    document.getElementById('voting-modal').classList.remove('active');
-    document.getElementById('discussion-modal').classList.remove('active');
-    document.getElementById('target-selection-modal').classList.remove('active');
-    document.getElementById('world-detail-modal').classList.remove('active');
+    document.querySelectorAll('.modal-overlay').forEach(el => el.classList.remove('active'));
 }
 
-function toggleLogs() { 
-    const panel = document.getElementById('logs-panel'); 
-    panel.classList.toggle('active'); 
-    renderLogs(); 
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+}
+
+function showWorldDetail(type) {
+    const data = globalState.world?.[type];
+    if (!data) return;
+    document.getElementById('world-detail-title').innerText = data.title;
+    document.getElementById('world-detail-desc').innerText = data.description;
+    document.getElementById('world-detail-modal').classList.add('active');
+}
+function closeWorldDetail() { document.getElementById('world-detail-modal').classList.remove('active'); }
+
+function toggleLogs() {
+    const panel = document.getElementById('logs-panel');
+    panel.classList.toggle('active');
+    if(panel.classList.contains('active')) renderLogs();
 }
 
 function renderLogs() {
     const container = document.getElementById('logs-container');
-    const logs = globalState.logs || {};
-    const sortedLogs = Object.values(logs).sort((a,b) => a.time.localeCompare(b.time));
-    container.innerHTML = sortedLogs.map(l => `<div class="log-item ${l.type}"><div class="log-time">${l.time}</div><div>${l.text}</div></div>`).join('');
+    const logsObj = globalState.logs || {};
+    const logsArr = Object.values(logsObj).sort((a,b) => (a.time > b.time ? 1 : -1));
+    
+    container.innerHTML = logsArr.map(log => 
+        `<div class="log-entry log-${log.type}">
+            <span class="text-muted" style="font-size:0.8rem; margin-right:8px;">[${log.time}]</span>
+            ${log.text}
+        </div>`
+    ).join('') || '<div class="text-muted" style="text-align:center;">Журнал пуст.</div>';
     container.scrollTop = container.scrollHeight;
 }
 
-function showWorldDetail(type) {
-    const modal = document.getElementById('world-detail-modal');
-    const titleEl = document.getElementById('world-detail-title');
-    const descEl = document.getElementById('world-detail-desc');
-
-    if (type === 'catastrophe') {
-        titleEl.innerText = globalState.world.catastrophe.title;
-        titleEl.className = "font-header text-danger mb-15";
-        descEl.innerText = globalState.world.catastrophe.description;
-    } else {
-        titleEl.innerText = globalState.world.bunker.title;
-        titleEl.className = "font-header text-accent mb-15";
-        descEl.innerText = globalState.world.bunker.description;
+// Генерация блока характеристик для списков
+function getPlayerTraitsHTML(pData) {
+    let traitsHTML = '';
+    if (pData.cards) {
+        CARD_ORDER.forEach(key => { 
+            if (pData.cards[key]?.isOpen) {
+                traitsHTML += `<div class="survivor-trait"><span class="trait-label">${pData.cards[key].label}</span><span class="trait-value">${pData.cards[key].value}</span></div>`; 
+            }
+        });
     }
-    
-    modal.classList.add('active');
-}
-
-function closeWorldDetail() {
-    document.getElementById('world-detail-modal').classList.remove('active');
+    return traitsHTML ? `<div class="survivor-traits-grid" style="margin-top: 15px;">${traitsHTML}</div>` : `<div class="survivor-traits-grid" style="margin-top: 15px;"><div class="text-muted" style="grid-column:span 2">/// СКРЫТО ///</div></div>`;
 }
 
 function handleDiscussionUI() {
-    const logic = globalState.gameLogic || {};
-    const modal = document.getElementById('discussion-modal');
-    
-    if (logic.phase === 'discussion') {
-        modal.classList.add('active');
-        const alivePlayers = getAlivePlayers();
-        const readyMap = logic.readyPlayers || {};
-        const readyCount = Object.keys(readyMap).filter(id => readyMap[id] && alivePlayers.includes(id)).length;
-        
-        document.getElementById('ui-ready-count').innerText = readyCount;
-        document.getElementById('ui-alive-count').innerText = alivePlayers.length;
-        document.getElementById('ui-ready-bar-fill').style.width = `${(readyCount / alivePlayers.length) * 100}%`;
-        
-        const btnReady = document.getElementById('btn-ready');
-        if (readyMap[myUserId]) {
-            btnReady.classList.add('ready');
-            btnReady.innerHTML = `${SVG_CHECK} ВЫ ГОТОВЫ`;
-        } else {
-            btnReady.classList.remove('ready');
-            btnReady.innerText = "ПОДТВЕРДИТЬ ГОТОВНОСТЬ";
-        }
+    const logic = globalState.gameLogic;
+    if (logic.phase !== 'discussion') return;
 
-        const listContainer = document.getElementById('discussion-players-list');
-        listContainer.innerHTML = alivePlayers.map(id => {
-            const name = globalState.playerNames?.[id] || "Аноним";
-            const avatar = globalState.playerAvatars?.[id] || "";
-            const pData = globalState.playersData?.[id] || {};
-            
-            let openedCardsHTML = '';
-            if (pData.cards) {
-                CARD_ORDER.forEach(key => {
-                    const card = pData.cards[key];
-                    if (card && card.isOpen) openedCardsHTML += `<div class="disc-stat"><span>${card.label}</span>${card.value}</div>`;
-                });
-            }
-            if(!openedCardsHTML) openedCardsHTML = `<div class="text-muted" style="grid-column: span 2;">Нет открытых данных</div>`;
+    document.getElementById('discussion-modal').classList.add('active');
+    const alive = getAlivePlayers();
+    const readyMap = logic.readyPlayers || {};
+    let readyCount = 0;
 
-            return `
-                <div class="disc-player-item">
-                    <div class="disc-player-header" onclick="toggleDiscPlayer('${id}')">
-                        <div class="disc-player-info">
-                            <img src="${avatar}">
-                            <span class="font-header" style="font-size: 1.2rem; letter-spacing:1px">${name}</span>
+    document.getElementById('discussion-players-list').innerHTML = alive.map(id => {
+        const pData = globalState.playersData?.[id] || {}; 
+        const isReady = readyMap[id];
+        if (isReady) readyCount++;
+        
+        return `
+            <div class="player-item" style="${isReady ? 'border-color: rgba(0, 230, 118, 0.4); background: rgba(0, 230, 118, 0.05);' : ''} padding: 15px;">
+                <div class="player-header-row">
+                    <img src="${globalState.playerAvatars?.[id]}">
+                    <div style="flex-grow: 1;">
+                        <div class="font-header" style="font-size:1.4rem;color:${isReady ? 'var(--success)' : 'var(--text-main)'}">
+                            ${globalState.playerNames?.[id]}
                         </div>
-                        <div class="disc-chevron" id="disc-icon-${id}">▼</div>
                     </div>
-                    <div class="disc-player-content" id="disc-content-${id}">
-                        <div class="disc-content-inner">${openedCardsHTML}</div>
-                    </div>
-                </div>`;
-        }).join('');
+                    <div>${isReady ? SVG_CHECK : ''}</div>
+                </div>
+                ${getPlayerTraitsHTML(pData)}
+            </div>`;
+    }).join('');
+
+    document.getElementById('ui-ready-count').innerText = readyCount;
+    document.getElementById('ui-alive-count').innerText = alive.length;
+    document.getElementById('ui-ready-bar-fill').style.width = `${(readyCount / alive.length) * 100}%`;
+    
+    const btn = document.getElementById('btn-ready');
+    if (readyMap[myUserId]) {
+        btn.innerText = "ОТМЕНИТЬ ГОТОВНОСТЬ";
+        btn.classList.replace('btn-primary', 'btn-danger');
     } else {
-        modal.classList.remove('active');
+        btn.innerText = "ПОДТВЕРДИТЬ ГОТОВНОСТЬ";
+        btn.classList.replace('btn-danger', 'btn-primary');
     }
-}
-
-function toggleDiscPlayer(id) {
-    const content = document.getElementById(`disc-content-${id}`);
-    const icon = document.getElementById(`disc-icon-${id}`);
-    if (content.style.maxHeight) {
-        content.style.maxHeight = null;
-        icon.style.transform = 'rotate(0deg)';
-    } else {
-        content.style.maxHeight = content.scrollHeight + "px";
-        icon.style.transform = 'rotate(180deg)';
-    }
-}
-
-let isPlayingAnimation = false;
-
-function playActionCinema(actionData) {
-    if (isPlayingAnimation) return;
-    isPlayingAnimation = true;
-    
-    document.getElementById('cinema-card-phase').classList.add('active');
-    document.getElementById('cinema-effect-phase').classList.remove('active');
-    
-    const cardEl = document.getElementById('cinema-card');
-    cardEl.classList.remove('card-dissolve');
-    
-    const cardLabel = actionData.cardLabel || "СПЕЦПРОТОКОЛ";
-    document.getElementById('cinema-title').innerText = "ПРОТОКОЛ: " + cardLabel.toUpperCase();
-    document.getElementById('cinema-card-text').innerText = actionData.cardText;
-
-    setTimeout(() => {
-        cardEl.classList.add('card-dissolve');
-    }, 2000);
-
-    setTimeout(() => {
-        document.getElementById('cinema-card-phase').classList.remove('active');
-        document.getElementById('cinema-effect-phase').classList.add('active');
-
-        const p1 = document.getElementById('effect-p1'); 
-        const p2 = document.getElementById('effect-p2');
-        const trait1 = document.getElementById('ep1-trait'); 
-        const trait2 = document.getElementById('ep2-trait');
-        const icon = document.getElementById('effect-center-icon');
-
-        document.getElementById('ep1-avatar').src = globalState.playerAvatars?.[actionData.sourceId];
-        document.getElementById('ep1-name').innerText = globalState.playerNames?.[actionData.sourceId];
-        trait1.innerText = actionData.sourceOldVal;
-        
-        trait1.className = 'survivor-trait effect-trait mt-10';
-        trait1.style.color = '';
-        trait1.style.textShadow = '';
-
-        if (actionData.type === 'swap') {
-            p2.style.display = 'block';
-            document.getElementById('ep2-avatar').src = globalState.playerAvatars?.[actionData.targetId];
-            document.getElementById('ep2-name').innerText = globalState.playerNames?.[actionData.targetId];
-            trait2.innerText = actionData.targetOldVal;
-            trait2.className = 'survivor-trait effect-trait mt-10';
-            icon.innerText = '↔';
-
-            setTimeout(() => {
-                trait1.classList.add('anim-swap-left'); 
-                trait2.classList.add('anim-swap-right');
-            }, 1000);
-
-        } else if (actionData.type === 'heal' || actionData.type === 'destroy') {
-            p2.style.display = 'none'; 
-            document.getElementById('ep1-avatar').src = globalState.playerAvatars?.[actionData.targetId];
-            document.getElementById('ep1-name').innerText = globalState.playerNames?.[actionData.targetId];
-            trait1.innerText = actionData.targetOldVal;
-            icon.innerText = actionData.type === 'heal' ? '✚' : '☠';
-
-            setTimeout(() => {
-                if (actionData.type === 'heal') { 
-                    trait1.classList.add('anim-heal'); 
-                } else { 
-                    trait1.classList.add('anim-destroy'); 
-                }
-                
-                setTimeout(() => { 
-                    trait1.innerText = actionData.result; 
-                    if (actionData.type === 'destroy') {
-                        trait1.classList.remove('anim-destroy');
-                        trait1.classList.add('anim-recovered');
-                    }
-                }, 800);
-            }, 1000);
-        }
-
-        setTimeout(() => {
-            isPlayingAnimation = false;
-            if (isHost) window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/phase': globalState.gameLogic.nextPhase } }, '*');
-        }, 3800);
-    }, 3500);
 }
 
 let votingInterval;
 function handleVotingUI() {
-    const modal = document.getElementById('voting-modal');
-    if (globalState.voting?.active && globalState.gameLogic?.phase === 'voting') {
-        modal.classList.add('active');
-        renderVotingList();
+    const logic = globalState.gameLogic;
+    const isQuarantined = logic.quarantinedPlayers?.[myUserId];
+
+    if (logic.phase === 'voting' && globalState.voting?.active) {
+        document.getElementById('voting-modal').classList.add('active');
+        const alive = getAlivePlayers();
+        const results = globalState.voting.results || {};
+        const myVote = results[myUserId];
         
-        clearInterval(votingInterval);
-        votingInterval = setInterval(() => {
-            const timeLeft = Math.max(0, Math.ceil(((globalState.voting?.endTime || Date.now()) - Date.now()) / 1000));
-            document.getElementById('voting-timer').innerText = timeLeft;
+        let votedCount = Object.keys(results).length;
+        document.getElementById('voting-counter').innerText = `${votedCount} / ${alive.length}`;
+
+        document.getElementById('voting-players').innerHTML = alive.map(id => {
+            const pData = globalState.playersData?.[id] || {}; 
+            const isMe = id === myUserId;
+            const isSelected = myVote === id;
             
-            if (isHost && (timeLeft <= 0 || Object.keys(globalState.voting?.results || {}).length >= getAlivePlayers().length)) {
-                clearInterval(votingInterval); 
-                executeExile();
+            return `
+            <div class="vote-item ${isSelected ? 'selected' : ''}" style="display: block; padding: 15px; ${isMe ? 'opacity: 0.5; cursor: not-allowed;' : ''}" ${!isMe && !isQuarantined ? `onclick="submitVote('${id}')"` : ''}>
+                <div class="player-header-row">
+                    <img src="${globalState.playerAvatars?.[id]}">
+                    <div style="flex-grow: 1;">
+                        <span class="font-header" style="font-size: 1.4rem;">${globalState.playerNames?.[id]}</span>
+                    </div>
+                    <div>${isSelected ? SVG_TARGET : ''}</div>
+                </div>
+                ${getPlayerTraitsHTML(pData)}
+            </div>`;
+        }).join('');
+
+        if (isQuarantined) {
+            document.getElementById('voting-players').innerHTML += `<div class="text-danger font-header mt-15 text-center" style="font-size: 1.2rem; letter-spacing: 2px;">ВАШ ГОЛОС ЗАБЛОКИРОВАН КАРАНТИНОМ ${SVG_BIOHAZARD}</div>`;
+        }
+
+        clearInterval(votingInterval);
+        const endTime = globalState.voting.endTime;
+        votingInterval = setInterval(() => {
+            const left = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+            document.getElementById('voting-timer').innerText = left;
+            if (left <= 0) {
+                clearInterval(votingInterval);
+                if (isHost && globalState.voting.active) executeExile();
             }
         }, 1000);
-    } else { 
-        clearInterval(votingInterval); 
-        modal.classList.remove('active'); 
+    } else {
+        clearInterval(votingInterval);
+        document.getElementById('voting-modal').classList.remove('active');
     }
 }
 
-function renderVotingList() {
-    const container = document.getElementById('voting-players');
-    const alivePlayers = getAlivePlayers();
-    const myVote = globalState.voting?.results?.[myUserId]; 
+// --- КИНО-ЭКРАН АНИМАЦИИ ---
+function playActionCinema(actionData) {
+    if (!actionData) return;
     
-    const votesCount = Object.keys(globalState.voting?.results || {}).length;
-    const counterEl = document.getElementById('voting-counter');
-    if (counterEl) counterEl.innerText = `${votesCount} / ${alivePlayers.length}`;
+    document.getElementById('cinema-card-text').innerHTML = actionData.cardText;
+    document.getElementById('cinema-card-phase').classList.add('active');
+    document.getElementById('cinema-effect-phase').classList.remove('active');
+    
+    const effectPhase = document.getElementById('cinema-effect-phase');
+    effectPhase.className = 'cinema-phase'; 
 
-    container.innerHTML = alivePlayers.map(id => {
-        const name = globalState.playerNames?.[id] || "Аноним";
-        const isSelected = myVote === id;
-        const isDimmed = myVote && !isSelected;
-        const btnText = myVote ? (isSelected ? `${SVG_TARGET} ВЫБРАН` : '---') : 'УДАЛИТЬ';
+    setTimeout(() => {
+        document.getElementById('cinema-card-phase').classList.remove('active');
+        effectPhase.classList.add('active');
+        effectPhase.classList.add(`anim-${actionData.type}`);
+
+        document.getElementById('ep1-avatar').src = globalState.playerAvatars?.[actionData.sourceId] || '';
+        document.getElementById('ep1-name').innerText = globalState.playerNames?.[actionData.sourceId] || 'ИГРОК 1';
         
-        let itemClass = "vote-item";
-        if (isSelected) itemClass += " selected";
-        if (isDimmed) itemClass += " dimmed";
+        document.getElementById('ep2-avatar').src = globalState.playerAvatars?.[actionData.targetId] || '';
+        document.getElementById('ep2-name').innerText = globalState.playerNames?.[actionData.targetId] || 'ИГРОК 2';
 
-        const onClick = myVote ? '' : `onclick="submitVote('${id}')"`;
+        let svgIcon = "";
+        let text1 = "ИНИЦИАТОР";
+        let text2 = "ЦЕЛЬ";
 
-        return `
-            <div class="${itemClass}" ${onClick}>
-                <span class="font-header" style="font-size: 1.2rem; letter-spacing: 1px;">${name}</span>
-                <button class="btn-primary" style="width: auto; padding: 10px 18px;" ${myVote ? 'disabled' : ''}>${btnText}</button>
-            </div>`;
-    }).join('');
+        if (actionData.type === 'swap') {
+            svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
+        } else if (actionData.type === 'reveal') {
+            svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`;
+        } else if (actionData.type === 'quarantine') {
+            svgIcon = SVG_BIOHAZARD; text1 = "ИЗОЛЯЦИЯ"; text2 = "БЛОКИРОВКА ГОЛОСА";
+            document.getElementById('ep2-name').classList.add('text-danger');
+        } else if (actionData.type === 'raid') {
+            svgIcon = SVG_RAID; text1 = `ПОЛУЧЕНО: ${actionData.targetOldVal}`; text2 = "ПУСТО";
+        } else if (actionData.type === 'scavenge') {
+            svgIcon = SVG_SCAVENGE; text1 = `СЛУТАНО: ${actionData.targetOldVal}`; text2 = "МЕРТВ";
+        }
+
+        document.getElementById('effect-center-icon').innerHTML = svgIcon;
+        document.getElementById('ep1-trait').innerHTML = text1;
+        document.getElementById('ep2-trait').innerHTML = text2;
+        
+        document.getElementById('effect-p2').style.display = 'flex';
+
+        setTimeout(() => {
+            if (isHost && globalState.gameLogic.nextPhase) {
+                window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/phase': globalState.gameLogic.nextPhase } }, '*');
+            }
+        }, 4000); 
+    }, 2500);
 }
 
-// --- ИЗМЕНЕНА ДЛЯ СИНХРОНИЗАЦИИ КОНЦОВКИ У ВСЕХ ---
+// --- ФИНАЛЬНЫЙ ЭКРАН И ИИ ---
 let aiStoryGenerated = false;
 
 async function renderEndScreen() {
@@ -264,63 +220,45 @@ async function renderEndScreen() {
     
     document.getElementById('winners-list').innerHTML = aliveIds.map(id => `
         <div class="player-item mb-10" style="border-color:rgba(0,230,118,0.5);background:rgba(0, 230, 118, 0.05);padding:12px">
-            <img src="${globalState.playerAvatars?.[id]}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">
-            <div class="font-header" style="font-size:1.2rem;color:var(--success)">${globalState.playerNames?.[id]}</div>
+            <div class="player-header-row">
+                <img src="${globalState.playerAvatars?.[id]}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">
+                <div class="font-header" style="font-size:1.4rem;color:var(--success)">${globalState.playerNames?.[id]}</div>
+            </div>
         </div>`).join('');
         
-    if (isHost) {
-        document.getElementById('btn-exit-lobby').style.display = 'block';
-    }
+    if (isHost) document.getElementById('btn-exit-lobby').style.display = 'block';
 
     const storyEl = document.getElementById('ai-story-text');
 
-    // 1. Если история уже сгенерирована хостом и лежит в общей базе:
     if (globalState.gameLogic?.aiStory) {
         if (storyEl.getAttribute('data-loaded') !== 'true') {
             storyEl.setAttribute('data-loaded', 'true');
-            
-            // Если это гость — делаем красивую имитацию печати текста
             if (!isHost) {
                 storyEl.innerText = "";
                 let i = 0;
                 const text = globalState.gameLogic.aiStory;
                 const typeInterval = setInterval(() => {
-                    storyEl.innerText += text.charAt(i);
-                    i++;
-                    const screen = document.getElementById('end-screen');
-                    screen.scrollTop = screen.scrollHeight;
+                    storyEl.innerText += text.charAt(i); i++;
+                    const screen = document.getElementById('end-screen'); screen.scrollTop = screen.scrollHeight;
                     if (i >= text.length) clearInterval(typeInterval);
-                }, 15); // Скорость печати для гостей
+                }, 15);
             } else {
-                // Хост уже видел печать во время самой генерации
                 storyEl.innerText = globalState.gameLogic.aiStory;
             }
         }
         return;
     }
 
-    // 2. Если история еще НЕ сгенерирована (мы только попали на экран)
     if (!aiStoryGenerated) {
         aiStoryGenerated = true; 
-        
         if (isHost) {
             storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
-            
-            // ТОЛЬКО ХОСТ стучится в нейросеть
             const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, globalState.world, (newText) => {
                 storyEl.innerText = newText;
-                const screen = document.getElementById('end-screen');
-                screen.scrollTop = screen.scrollHeight;
+                const screen = document.getElementById('end-screen'); screen.scrollTop = screen.scrollHeight;
             });
-            
-            // Когда хост закончил, он сохраняет финал для всех остальных игроков
-            window.parent.postMessage({ 
-                type: 'update_state', 
-                updates: { 'gameLogic/aiStory': finalText } 
-            }, '*');
-            
+            window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStory': finalText } }, '*');
         } else {
-            // Гости просто сидят и ждут сигнала от хоста
             storyEl.innerHTML = `<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin-bottom: 10px;"></div> <br>Ожидание отчета от лидера...`;
         }
     }

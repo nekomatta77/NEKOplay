@@ -1,6 +1,6 @@
 // --- ИНИЦИАЛИЗАЦИЯ И СИНХРОНИЗАЦИЯ ---
 Promise.all([
-    fetch('cards.json').then(res => res.json()), // Здесь пока остались Карты Действий
+    fetch('actions.json').then(res => res.json()),
     fetch('bio.json').then(res => res.json()),
     fetch('professions.json').then(res => res.json()),
     fetch('health.json').then(res => res.json()),
@@ -10,8 +10,8 @@ Promise.all([
     fetch('traits.json').then(res => res.json()),
     fetch('catastrophes.json').then(res => res.json()),
     fetch('bunkers.json').then(res => res.json())
-]).then(([cardsData, bioData, profData, healthData, hobbiesData, phobiasData, baggagesData, traitsData, catastrophesData, bunkersData]) => { 
-    database = cardsData; 
+]).then(([actionsData, bioData, profData, healthData, hobbiesData, phobiasData, baggagesData, traitsData, catastrophesData, bunkersData]) => { 
+    database = { actionCards: actionsData }; 
     database.bio = bioData; 
     database.professions = profData; 
     database.healths = healthData;   
@@ -20,7 +20,6 @@ Promise.all([
     database.baggages = baggagesData;
     database.traits = traitsData;
     database.catastrophes = catastrophesData;
-    // ЗАГРУЖАЕМ БУНКЕРЫ:
     database.bunkers = bunkersData;
     
     if (isHost) window.parent.postMessage({ type: 'start_game', settings: { mode: 'bunker' } }, '*'); 
@@ -42,7 +41,14 @@ function handleStateChange() {
     
     if (globalState.status === 'playing') {
         if (!globalState.gameLogic) { 
-            if (isHost) showScreen('setup-screen'); 
+            if (isHost) {
+                // Автоподстановка ключа из памяти для хоста
+                const savedKey = localStorage.getItem('bunker_api_key');
+                if (savedKey && document.getElementById('setting-api-key')) {
+                    document.getElementById('setting-api-key').value = savedKey;
+                }
+                showScreen('setup-screen'); 
+            }
             else showScreen('guest-setup-screen'); 
             return; 
         }
@@ -75,6 +81,12 @@ function handleStateChange() {
 
 // --- ЛОГИКА ХОСТА ---
 function confirmSetup() {
+    // Сохраняем ключ нейросети в память браузера
+    const apiKeyInput = document.getElementById('setting-api-key')?.value.trim();
+    if (apiKeyInput) {
+        localStorage.setItem('bunker_api_key', apiKeyInput);
+    }
+
     const firstVoteRound = parseInt(document.getElementById('setting-first-vote-round').value) || 2;
     const doubleRound = parseInt(document.getElementById('setting-double-round').value) || 3;
     
@@ -110,6 +122,7 @@ function confirmSetup() {
             gameLogic: { 
                 round: 1, phase: 'reveal', activePlayerIndex: 0, 
                 revealedThisTurn: 0, readyPlayers: {}, 
+                quarantinedPlayers: {}, 
                 rules: { firstVoteRound: firstVoteRound, doubleRevealRound: doubleRound } 
             },
             voting: null 
@@ -146,6 +159,8 @@ function checkHostAutomations() {
 }
 
 // --- ОТРИСОВКА ИГРЫ ---
+const SVG_BIO_MINI = `<svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: currentColor;"><path d="M12 2A10 10 0 1 0 22 12 10.011 10.011 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8.009 8.009 0 0 1-8 8zm0-14a5.98 5.98 0 0 0-4.665 2.24l2.131 1.23A3.491 3.491 0 0 1 12 8.5a3.491 3.491 0 0 1 2.534.97l2.131-1.23A5.98 5.98 0 0 0 12 6zm-3.46 7.5a3.491 3.491 0 0 1-1.04-2.47H5A5.992 5.992 0 0 0 8.847 16l1.242-2.152a3.447 3.447 0 0 1-1.549-1.348zm6.92 0a3.447 3.447 0 0 1-1.549 1.348L15.153 16A5.992 5.992 0 0 0 19 11.03h-2.5a3.491 3.491 0 0 1-1.04 2.47zM12 10.5a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5z"/></svg>`;
+
 function renderGame() {
     const world = globalState.world || {}; 
     const logic = globalState.gameLogic || {}; 
@@ -183,13 +198,15 @@ function renderGame() {
         }
         if (!traitsHTML) traitsHTML = '<div class="text-muted" style="grid-column:span 2">/// СКРЫТО ///</div>';
         
+        let quarantineBadge = logic.quarantinedPlayers?.[id] ? `<span class="quarantine-badge">${SVG_BIO_MINI} КАРАНТИН</span>` : '';
+        
         return `
             <div class="player-item ${pData.kicked ? 'kicked' : ''} ${id === activePlayerId && logic.phase === 'reveal' ? 'active-turn' : ''}">
                 <div class="player-header-row">
                     <img src="${globalState.playerAvatars?.[id]}">
                     <div>
                         <div class="font-header" style="font-size:1.6rem;color:${id===myUserId?'var(--accent-cyan)':'var(--text-main)'}">
-                            ${name} ${id === myUserId ? '<span class="text-muted" style="font-size:0.8rem; vertical-align: middle;">(ВЫ)</span>' : ''}
+                            ${name} ${id === myUserId ? '<span class="text-muted" style="font-size:0.8rem; vertical-align: middle;">(ВЫ)</span>' : ''} ${quarantineBadge}
                         </div>
                         ${pData.kicked?'<div class="text-danger font-header">ИЗГНАН</div>':''}
                     </div>
@@ -214,7 +231,7 @@ function renderGame() {
                         <div class="type">${card.label}</div>
                         <div class="value">${card.value}</div>
                     </div>
-                    <div class="status-badge font-header">${card.isOpen?SVG_EYE+' ОТКРЫТО':SVG_LOCK+' СКРЫТО'}</div>
+                    <div class="status-badge font-header">${card.isOpen ? SVG_EYE+' ОТКРЫТО' : SVG_LOCK+' СКРЫТО'}</div>
                 </div>`;
         }).join('');
     }
@@ -259,14 +276,28 @@ function startActionTargeting() {
     currentActionTargeting = actionCard; 
     
     document.getElementById('target-action-name').innerText = actionCard.value;
-    document.getElementById('target-selection-modal').classList.add('active');
     
-    document.getElementById('target-players-list').innerHTML = getAlivePlayers().map(id => `
+    let availableTargets = [];
+    if (actionCard.type === 'scavenge') {
+        availableTargets = (globalState.players || []).filter(id => globalState.playersData[id].kicked);
+        if (availableTargets.length === 0) {
+            alert("Нет изгнанных игроков! Вы не можете применить Мародера сейчас.");
+            return;
+        }
+    } else {
+        availableTargets = getAlivePlayers().filter(id => id !== myUserId); 
+    }
+
+    document.getElementById('target-players-list').innerHTML = availableTargets.map(id => {
+        let namePrefix = actionCard.type === 'scavenge' ? "<span class='text-danger' style='margin-right:8px;'>[МЕРТВ]</span>" : "";
+        return `
         <div class="vote-item" onclick="executeAction('${id}')">
-            <span class="font-header" style="font-size: 1.2rem;">${globalState.playerNames?.[id]}</span>
+            <span class="font-header" style="font-size: 1.2rem;">${namePrefix}${globalState.playerNames?.[id]}</span>
             <button class="btn-primary" style="width: auto; padding: 10px;">ВЫБРАТЬ</button>
         </div>`
-    ).join('');
+    }).join('');
+    
+    document.getElementById('target-selection-modal').classList.add('active');
 }
 
 function closeTargetSelection() { 
@@ -282,23 +313,30 @@ function executeAction(targetId) {
     const activeAction = {
         sourceId: myUserId, targetId: targetId,
         cardLabel: action.label, cardText: action.value, 
-        type: action.type, trait: action.targetTrait, result: action.result,
+        type: action.type, trait: action.targetTrait,
         sourceOldVal: globalState.playersData[myUserId].cards[action.targetTrait]?.value,
         targetOldVal: globalState.playersData[targetId].cards[action.targetTrait]?.value
     };
 
     closeTargetSelection();
-
     const updates = {};
     updates[`playersData/${myUserId}/cards/action/isOpen`] = true; 
     updates['gameLogic/phase'] = 'action_animation'; 
     updates['gameLogic/activeAction'] = activeAction;
 
-    if (action.type === 'heal' || action.type === 'destroy') {
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = action.result;
-    } else if (action.type === 'swap') {
+    if (action.type === 'swap') {
         updates[`playersData/${myUserId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal;
         updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = activeAction.sourceOldVal;
+    } 
+    else if (action.type === 'reveal') {
+        updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true;
+    }
+    else if (action.type === 'quarantine') {
+        updates[`gameLogic/quarantinedPlayers/${targetId}`] = true;
+    }
+    else if (action.type === 'raid' || action.type === 'scavenge') {
+        updates[`playersData/${myUserId}/cards/baggage/value`] = activeAction.sourceOldVal + " <br><span class='text-accent'>+ [" + activeAction.targetOldVal + "]</span>";
+        updates[`playersData/${targetId}/cards/baggage/value`] = "ПУСТО (Ограблен)";
     }
 
     let logic = globalState.gameLogic;
@@ -317,6 +355,7 @@ function executeAction(targetId) {
 }
 
 function submitVote(targetId) {
+    if (globalState.gameLogic?.quarantinedPlayers?.[myUserId]) return; 
     const updates = {}; 
     updates[`voting/results/${myUserId}`] = targetId;
     window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -338,6 +377,8 @@ function executeExile() {
     updates['voting/active'] = false; 
     updates['gameLogic/phase'] = 'exile_animation'; 
     updates['gameLogic/exiledPlayer'] = targetToKick;
+    
+    updates['gameLogic/quarantinedPlayers'] = {}; 
     
     const capacity = globalState.world.capacity;
     updates['gameLogic/nextPhase'] = (getAlivePlayers().length - 1 <= capacity) ? 'ended' : 'reveal';

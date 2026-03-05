@@ -9,47 +9,42 @@
     
     <style>
         /* Фикс для карточек: растягиваются по высоте, текст не вылезает */
-        .bunker-card {
-            height: auto !important; 
-            min-height: 110px;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        .bunker-card .value {
-            font-size: clamp(0.85rem, 3.5vw, 1.1rem) !important; /* Умный размер шрифта */
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            word-break: break-word;
-            hyphens: auto;
-            line-height: 1.3;
-            white-space: normal !important; /* Запрещаем обрезать текст в одну строку */
-            margin-top: 5px;
-            flex-grow: 1;
-        }
-        /* Фикс для строк выживших (в фазе дебатов/голосования) */
-        .survivor-trait {
-            height: auto !important;
-            min-height: 32px;
-            white-space: normal !important;
-            align-items: flex-start !important;
-            padding: 8px 10px !important;
-        }
-        .survivor-trait .trait-value {
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            text-align: right;
-            max-width: 65%;
-            line-height: 1.25;
-            font-size: clamp(0.8rem, 3vw, 1rem);
-        }
-        .card-content-wrapper {
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            height: 100%;
-        }
+        .bunker-card { height: auto !important; min-height: 110px; padding: 15px; display: flex; flex-direction: column; justify-content: center; }
+        .bunker-card .value { font-size: clamp(0.85rem, 3.5vw, 1.1rem) !important; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; hyphens: auto; line-height: 1.3; white-space: normal !important; margin-top: 5px; flex-grow: 1; }
+        .survivor-trait { height: auto !important; min-height: 32px; white-space: normal !important; align-items: flex-start !important; padding: 8px 10px !important; }
+        .survivor-trait .trait-value { word-wrap: break-word; overflow-wrap: break-word; text-align: right; max-width: 65%; line-height: 1.25; font-size: clamp(0.8rem, 3vw, 1rem); }
+        .card-content-wrapper { display: flex; flex-direction: column; justify-content: flex-start; height: 100%; }
+
+        /* --- АНИМАЦИИ ДЛЯ СПЕЦПРОТОКОЛОВ (БЕЗ ЭМОДЗИ) --- */
+        .effect-center-icon svg { width: 4rem; height: 4rem; fill: currentColor; display: block; margin: 0 auto; }
+        .anim-swap .effect-center-icon { color: var(--accent-cyan); filter: drop-shadow(0 0 15px var(--accent-cyan)); }
+        .anim-swap .effect-center-icon svg { animation: spin-swap 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+        @keyframes spin-swap { 0% { transform: rotate(0deg); } 100% { transform: rotate(180deg); } }
+
+        .anim-reveal .effect-center-icon { color: #ffaa00; }
+        .anim-reveal .effect-center-icon svg { animation: scan-eye 2s ease-in-out infinite; }
+        @keyframes scan-eye { 0%, 100% { transform: translateY(-10px); opacity: 0.6; filter: drop-shadow(0 0 5px #ffaa00); } 50% { transform: translateY(10px); opacity: 1; filter: drop-shadow(0 0 25px #ffaa00); } }
+
+        .anim-quarantine .effect-container { background: repeating-linear-gradient(45deg, rgba(255,42,85,0.05), rgba(255,42,85,0.05) 20px, rgba(0,0,0,0.5) 20px, rgba(0,0,0,0.5) 40px); border: 2px solid var(--danger); animation: alert-flash 1.5s infinite; }
+        .anim-quarantine .effect-center-icon { color: var(--danger); filter: drop-shadow(0 0 20px var(--danger)); }
+        @keyframes alert-flash { 0%, 100% { box-shadow: inset 0 0 20px rgba(255,42,85,0.3); } 50% { box-shadow: inset 0 0 60px rgba(255,42,85,0.6); } }
+
+        .anim-raid .effect-center-icon { color: #ff2a55; }
+        .anim-raid .effect-center-icon svg { animation: slash-attack 0.6s ease-out forwards; }
+        @keyframes slash-attack { 0% { transform: translate(-30px, -30px) scale(1.5); opacity: 0; } 50% { opacity: 1; filter: drop-shadow(0 0 30px #ff2a55); } 100% { transform: translate(30px, 30px) scale(1); opacity: 0; } }
+
+        .anim-scavenge .effect-center-icon { color: #00e676; }
+        .anim-scavenge .effect-center-icon svg { animation: ghost-grab 2s ease-out forwards; }
+        @keyframes ghost-grab { 0% { transform: translateY(30px) scale(0.8); opacity: 0; } 50% { transform: translateY(-10px) scale(1.1); opacity: 1; filter: drop-shadow(0 0 20px #00e676); } 100% { transform: translateY(0); opacity: 0; } }
+
+        /* Фикс кривого отображения игроков в кино-экране */
+        .effect-player, #effect-p1, #effect-p2 { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; text-align: center !important; width: 100%; }
+        .effect-player img { display: block; margin: 0 auto 10px auto !important; border: 2px solid var(--accent-cyan); }
+        #effect-p2 img { border-color: var(--danger); }
+        .effect-trait { display: block !important; text-align: center !important; width: auto !important; min-width: 80%; margin: 10px auto 0 auto !important; padding: 12px !important; word-wrap: break-word; background: rgba(255, 255, 255, 0.05); border-radius: 6px; }
+
+        .quarantine-badge { background: var(--danger); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; letter-spacing: 1px; display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; animation: blink 2s infinite; vertical-align: middle; }
+        .quarantine-badge svg { width: 12px; height: 12px; fill: currentColor; }
     </style>
 </head>
 <body>
@@ -66,7 +61,7 @@
             <div class="panel-header mb-20" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">
                 <h2 class="font-header text-accent" style="font-size: 1.8rem;">ПАРАМЕТРЫ СИМУЛЯЦИИ</h2>
             </div>
-            
+
             <div class="form-group mb-20">
                 <label class="text-muted mb-10" style="display: block; font-size: 0.85rem; text-transform: uppercase;">Первое изгнание начиная с:</label>
                 <select id="setting-first-vote-round" class="cyber-select hover-sound">

@@ -587,3 +587,141 @@ body {
     /* Исправление текста протокола */
     #cinema-title { margin-bottom: 80px !important; margin-top: -60px !important; font-size: 2rem !important; }
 }
+/* --- АНИМАЦИИ ДЛЯ НОВЫХ СПЕЦПРОТОКОЛОВ --- */
+/* 1. Обмен (Swap) - Неоновые круговые стрелки */
+.anim-swap .effect-center-icon {
+    font-size: 4rem;
+    animation: spin-swap 1s ease-in-out infinite;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 20px var(--accent-cyan);
+}
+@keyframes spin-swap { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.3); } 100% { transform: rotate(360deg) scale(1); } }
+
+/* 2. Вскрытие (Reveal) - Сканирующий лазер */
+.anim-reveal .effect-center-icon {
+    font-size: 4rem;
+    color: #ffaa00;
+    animation: pulse-reveal 1.5s infinite;
+}
+@keyframes pulse-reveal { 0% { opacity: 0.5; transform: scale(0.8); text-shadow: 0 0 10px #ffaa00; } 50% { opacity: 1; transform: scale(1.5); text-shadow: 0 0 40px #ffaa00; } 100% { opacity: 0.5; transform: scale(0.8); } }
+
+/* 3. Карантин (Quarantine) - Значок Биохазарда и красные мигания */
+.anim-quarantine .effect-container {
+    background: repeating-linear-gradient(45deg, rgba(255,42,85,0.1), rgba(255,42,85,0.1) 20px, rgba(0,0,0,0.8) 20px, rgba(0,0,0,0.8) 40px);
+    border: 3px solid var(--danger);
+    box-shadow: inset 0 0 50px rgba(255,42,85,0.5);
+    animation: alert-flash 1s infinite;
+}
+.anim-quarantine .effect-center-icon { font-size: 5rem; color: var(--danger); text-shadow: 0 0 30px var(--danger); }
+@keyframes alert-flash { 0% { opacity: 0.8; } 50% { opacity: 1; box-shadow: inset 0 0 100px rgba(255,42,85,0.8); } 100% { opacity: 0.8; } }
+
+/* 4. Рейдерский захват (Raid) - Агрессивный красный слеш */
+.anim-raid .effect-center-icon {
+    font-size: 4rem; color: #ff2a55;
+    animation: slash-attack 0.5s ease-out forwards;
+}
+@keyframes slash-attack { 0% { transform: translate(-50px, -50px) scale(2) rotate(45deg); opacity: 0; } 50% { opacity: 1; text-shadow: 0 0 50px red; } 100% { transform: translate(50px, 50px) scale(1) rotate(45deg); opacity: 0; } }
+
+/* 5. Мародер (Scavenge) - Призрачное зеленое свечение */
+.anim-scavenge .effect-container { background: radial-gradient(circle, rgba(0,230,118,0.2) 0%, transparent 70%); }
+.anim-scavenge .effect-center-icon { font-size: 4rem; color: #00e676; animation: ghost-grab 2s forwards; }
+@keyframes ghost-grab { 0% { transform: translateY(50px); opacity: 0; } 50% { transform: translateY(-20px) scale(1.2); opacity: 1; text-shadow: 0 0 30px #00e676; } 100% { transform: translateY(0); opacity: 0; } }
+
+/* Метка карантина в списке игроков */
+.quarantine-badge {
+    background: var(--danger); color: white; padding: 2px 8px; border-radius: 4px;
+    font-size: 0.7rem; font-weight: bold; letter-spacing: 1px; animation: blink 2s infinite;
+    margin-left: 10px; display: inline-block;
+}
+/* --- АНИМАЦИИ ДЛЯ СПЕЦПРОТОКОЛОВ (БЕЗ ЭМОДЗИ) --- */
+.effect-center-icon svg { width: 4rem; height: 4rem; fill: currentColor; display: block; margin: 0 auto; }
+
+/* 1. Обмен (Swap) - Плавное вращение */
+.anim-swap .effect-center-icon { color: var(--accent-cyan); filter: drop-shadow(0 0 15px var(--accent-cyan)); }
+.anim-swap .effect-center-icon svg { animation: spin-swap 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes spin-swap { 0% { transform: rotate(0deg); } 100% { transform: rotate(180deg); } }
+
+/* 2. Вскрытие (Reveal) - Эстетичный сканер */
+.anim-reveal .effect-center-icon { color: #ffaa00; }
+.anim-reveal .effect-center-icon svg { animation: scan-eye 2s ease-in-out infinite; }
+@keyframes scan-eye {
+    0%, 100% { transform: translateY(-10px); opacity: 0.6; filter: drop-shadow(0 0 5px #ffaa00); }
+    50% { transform: translateY(10px); opacity: 1; filter: drop-shadow(0 0 25px #ffaa00); }
+}
+
+/* 3. Карантин (Quarantine) - Строгая пульсация */
+.anim-quarantine .effect-container {
+    background: repeating-linear-gradient(45deg, rgba(255,42,85,0.05), rgba(255,42,85,0.05) 20px, rgba(0,0,0,0.5) 20px, rgba(0,0,0,0.5) 40px);
+    border: 2px solid var(--danger);
+    animation: alert-flash 1.5s infinite;
+}
+.anim-quarantine .effect-center-icon { color: var(--danger); filter: drop-shadow(0 0 20px var(--danger)); }
+@keyframes alert-flash { 0%, 100% { box-shadow: inset 0 0 20px rgba(255,42,85,0.3); } 50% { box-shadow: inset 0 0 60px rgba(255,42,85,0.6); } }
+
+/* 4. Рейд (Raid) - Резкий рывок */
+.anim-raid .effect-center-icon { color: #ff2a55; }
+.anim-raid .effect-center-icon svg { animation: slash-attack 0.6s ease-out forwards; }
+@keyframes slash-attack {
+    0% { transform: translate(-30px, -30px) scale(1.5); opacity: 0; }
+    50% { opacity: 1; filter: drop-shadow(0 0 30px #ff2a55); }
+    100% { transform: translate(30px, 30px) scale(1); opacity: 0; }
+}
+
+/* 5. Мародер (Scavenge) - Призрачное появление */
+.anim-scavenge .effect-center-icon { color: #00e676; }
+.anim-scavenge .effect-center-icon svg { animation: ghost-grab 2s ease-out forwards; }
+@keyframes ghost-grab {
+    0% { transform: translateY(30px) scale(0.8); opacity: 0; }
+    50% { transform: translateY(-10px) scale(1.1); opacity: 1; filter: drop-shadow(0 0 20px #00e676); }
+    100% { transform: translateY(0); opacity: 0; }
+}
+
+/* Фикс текста характеристик (чтобы не уезжал вправо) */
+.effect-trait {
+    text-align: center !important;
+    justify-content: center !important;
+    width: 100%;
+    margin: 10px auto !important;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 10px !important;
+}
+
+/* Метка карантина */
+.quarantine-badge {
+    background: var(--danger); color: white; padding: 3px 8px; border-radius: 4px;
+    font-size: 0.7rem; font-weight: bold; letter-spacing: 1px;
+    display: inline-flex; align-items: center; gap: 5px; margin-left: 10px;
+    animation: blink 2s infinite; vertical-align: middle;
+}
+.quarantine-badge svg { width: 12px; height: 12px; fill: currentColor; }
+/* --- ФИКС КРИВОГО ОТОБРАЖЕНИЯ ИГРОКОВ В КИНО-ЭКРАНЕ --- */
+.effect-player, #effect-p1, #effect-p2 {
+    display: flex !important;
+    flex-direction: column !important; /* Жестко заставляем элементы идти сверху вниз */
+    align-items: center !important;    /* Центрируем по горизонтали */
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100%;
+}
+
+.effect-player img {
+    display: block;
+    margin: 0 auto 10px auto !important; /* Выравниваем аватарку ровно по центру */
+    border: 2px solid var(--accent-cyan);
+}
+
+#effect-p2 img {
+    border-color: var(--danger); /* Красная рамка для жертвы */
+}
+
+/* Отключаем стандартный растягивающий flex для плашки с характеристикой */
+.effect-trait {
+    display: block !important; 
+    text-align: center !important;
+    width: auto !important;
+    min-width: 80%;
+    margin: 10px auto 0 auto !important;
+    padding: 12px !important;
+    word-wrap: break-word;
+}
