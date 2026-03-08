@@ -1,6 +1,6 @@
 let animationFrameId = null; 
 
-// Добавляем динамические стили для эффектов Землетрясения (Тряски) и Лилипута (маленький холст)
+// Добавляем динамические стили для эффектов
 const extraStyles = document.createElement('style');
 extraStyles.innerHTML = `
 @keyframes earthquakeShake {
@@ -16,35 +16,18 @@ extraStyles.innerHTML = `
     90% { transform: translate(1px, 2px) rotate(0deg); }
     100% { transform: translate(1px, -2px) rotate(-1deg); }
 }
-.mode-earthquake .canvas-wrapper-outer { 
-    animation: earthquakeShake 0.4s infinite; 
-}
-.mode-tiny .canvas-wrapper-outer { 
-    transform: scale(0.25) !important; 
-    transform-origin: center center; 
-    border: 8px solid #d946ef; 
-    border-radius: 12px; 
-    box-shadow: 0 0 20px #d946ef; 
-}
+.mode-earthquake .canvas-wrapper-outer { animation: earthquakeShake 0.4s infinite; }
+.mode-tiny .canvas-wrapper-outer { transform: scale(0.25) !important; transform-origin: center center; border: 8px solid #d946ef; border-radius: 12px; box-shadow: 0 0 20px #d946ef; }
 `;
 document.head.appendChild(extraStyles);
 
-function getRandomHex() {
-    return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
-}
+function getRandomHex() { return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'); }
 
-// Вспомогательная функция для отрисовки стрелки
 function drawArrow(context, fromx, fromy, tox, toy) {
-    let headlen = 15; 
-    let dx = tox - fromx;
-    let dy = toy - fromy;
-    let angle = Math.atan2(dy, dx);
-    context.moveTo(fromx, fromy);
-    context.lineTo(tox, toy);
-    context.moveTo(tox, toy);
-    context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-    context.moveTo(tox, toy);
-    context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+    let headlen = 15; let dx = tox - fromx; let dy = toy - fromy; let angle = Math.atan2(dy, dx);
+    context.moveTo(fromx, fromy); context.lineTo(tox, toy);
+    context.moveTo(tox, toy); context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+    context.moveTo(tox, toy); context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
 }
 
 function setDisplay(id, display) { const el = document.getElementById(id); if (el) el.style.display = display; }
@@ -69,7 +52,6 @@ let globalState = {};
 let currentLocalRound = 0;
 let selectedMode = 'classic'; 
 let calculatedTotalRounds = 1; 
-
 let finishitBaseImg = new Image(); 
 
 setText('players-count-display', playersCountParam);
@@ -205,7 +187,6 @@ function startPhaseTimer(isDrawing) {
     if (globalState.settings?.mode === 'plagiarism' && currentLocalRound > 1) timeLimit = Math.max(15, timeLimit - (currentLocalRound - 1) * 15);
     if (globalState.settings?.mode === 'finishit' && currentLocalRound === 1) timeLimit = 10;
 
-    // Глобальная синхронизация с защитой от сворачивания вкладки
     expectedEndTime = Date.now() + (timeLimit * 1000);
     updateTimerUI(timeLimit, timeLimit);
 
@@ -222,7 +203,6 @@ function updateWaitingScreen() {
     const players = globalState.players || [];
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
     
-    // Обновляем счетчик готовых игроков на основном интерфейсе (для всех фаз)
     let activeReadyCount = players.filter(pid => typeof currentSubs[pid] === 'string' && currentSubs[pid].length > 0).length;
     setText('draw-ready-count', `${activeReadyCount}/${players.length} Готово`);
     setText('text-ready-count', `${activeReadyCount}/${players.length} Готово`);
@@ -276,7 +256,6 @@ function playAgain() {
   window.parent.postMessage({ type: 'play_again' }, '*');
 }
 
-// ==== ЛОГИКА ГИРОСКОПА ====
 let isGyroEnabled = false;
 let gyroX = 400, gyroY = 300;
 
@@ -307,36 +286,23 @@ function enableGyro() {
 
 function handleGyroMove(event) {
     if (!isGyroEnabled || globalState.settings?.mode !== 'nohands') return;
-    
-    let dx = event.gamma || 0; 
-    let dy = (event.beta || 0) - 45; 
-    
-    gyroX += dx * 0.3; 
-    gyroY += dy * 0.3;
-    
-    gyroX = Math.max(0, Math.min(canvas.width, gyroX));
-    gyroY = Math.max(0, Math.min(canvas.height, gyroY));
+    let dx = event.gamma || 0; let dy = (event.beta || 0) - 45; 
+    gyroX += dx * 0.3; gyroY += dy * 0.3;
+    gyroX = Math.max(0, Math.min(canvas.width, gyroX)); gyroY = Math.max(0, Math.min(canvas.height, gyroY));
     
     const cursor = document.getElementById('gyro-cursor');
-    if (cursor) {
-        cursor.style.left = (gyroX / canvas.width * 100) + '%';
-        cursor.style.top = (gyroY / canvas.height * 100) + '%';
-    }
+    if (cursor) { cursor.style.left = (gyroX / canvas.width * 100) + '%'; cursor.style.top = (gyroY / canvas.height * 100) + '%'; }
     
     let bsVal = document.getElementById('brush-size') ? document.getElementById('brush-size').value : 5;
     let opacity = 1; const bo = document.getElementById('brush-opacity'); if (bo) opacity = parseFloat(bo.value);
     ctx.lineWidth = bsVal; ctx.globalAlpha = isErasing ? 1 : opacity; ctx.filter = isBlur ? 'blur(5px)' : 'none'; ctx.globalCompositeOperation = isErasing ? 'destination-out' : 'source-over';
     if (isNeon && !isErasing) { ctx.shadowBlur = Math.max(10, bsVal * 2); ctx.shadowColor = currentColor; ctx.strokeStyle = '#ffffff'; } else { ctx.shadowBlur = 0; ctx.shadowColor = 'transparent'; ctx.strokeStyle = currentColor; }
     
-    if(!currentStroke) {
-         currentStroke = { c: currentColor, s: bsVal, e: isErasing?1:0, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [Math.round(gyroX), Math.round(gyroY)] };
-    }
+    if(!currentStroke) { currentStroke = { c: currentColor, s: bsVal, e: isErasing?1:0, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [Math.round(gyroX), Math.round(gyroY)] }; }
     currentStroke.p.push(Math.round(gyroX), Math.round(gyroY));
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(gyroX, gyroY); ctx.stroke();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(gyroX, gyroY); ctx.stroke();
     lastX = gyroX; lastY = gyroY;
 }
-// ==========================
 
 function resetLocalGameData() {
     currentLocalRound = 0;
@@ -482,7 +448,104 @@ function getReadNotebookId(round, players) {
     return getCurrentNotebookId(round, players);
 }
 
-function startRound(round, players) {
+
+// --- ИНТЕГРАЦИЯ ИИ ---
+async function fetchFromAI(systemPrompt, userText = "") {
+    try {
+        const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
+        const apiKey = atob(SECRET_KEY_BASE64);
+
+        console.log("=== ИИ: Отправляю запрос... ===");
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': window.location.href,
+                'X-Title': 'NekoPhone Local'
+            },
+            body: JSON.stringify({
+                model: "arcee-ai/trinity-large-preview:free", 
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    ...(userText ? [{ role: "user", content: userText }] : [])
+                ],
+                stream: false
+            })
+        });
+        
+        console.log("=== ИИ: Статус ответа ===", response.status);
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error("=== ИИ: Ошибка от OpenRouter ===", data.error);
+            return null;
+        }
+        
+        const resultText = data.choices[0].message.content.trim();
+        console.log("=== ИИ: Ответ получен ===", resultText);
+        return resultText;
+    } catch(e) {
+        console.error("=== ИИ: Ошибка сети/кода ===", e);
+        return null;
+    }
+}
+
+// Переводчик с помощью нейросети (ОБНОВЛЕН ПРОМПТ)
+async function getRealBabelTranslation(text) {
+    console.log("Запуск режима ПЕРЕВОДЧИК для слова:", text);
+    const prompt = `Ты — сумасшедший автопереводчик. Возьми фразу пользователя и сильно измени её значение. 
+ЗАМЕНИ большинство существительных, глаголов и прилагательных на совершенно другие, абсолютно не связанные по смыслу слова. 
+НО сохрани предлоги, союзы, местоимения и общую грамматическую структуру, чтобы предложение звучало связно и логично, но имело абсурдный смысл.
+Например: "Мальчик едет на велосипеде" -> "Дровосек варит на луне" или "Я люблю пить чай" -> "Он ненавидит красить асфальт".
+Выдай ТОЛЬКО результат, без кавычек, без объяснений и лишних слов.`;
+    
+    const aiResult = await fetchFromAI(prompt, text);
+    if (aiResult) return aiResult.replace(/"/g, '').trim(); 
+    
+    return `[Сбой ИИ] ${text}`;
+}
+
+// Генерация слов для предателя с помощью нейросети (ОБНОВЛЕН ПРОМПТ)
+async function getAIImpostorPair() {
+    console.log("Запуск режима ПРЕДАТЕЛЬ...");
+    
+    // Генерируем случайное число, чтобы заставить нейросеть выдать уникальный результат в каждом раунде
+    const randomSeed = Math.floor(Math.random() * 9999999);
+    
+    const prompt = `Сгенерируй ДВА РАЗНЫХ существительных для игры "Предатель". Одно слово для мирных, другое для предателя.
+Слова должны быть немного похожи визуально или по смыслу (например: Пельмени/Вареники, Озеро/Река, Орел/Ястреб).
+ВАЖНОЕ ПРАВИЛО: Выбирай слова из базы в 100,000 слов! Используй этот случайный сид для выбора категории и слов: ${randomSeed}. 
+Не используй банальные примеры! Придумывай редкие, интересные пары каждый раз (одежда, еда, инструменты, животные, здания, профессии).
+НЕ ИСПОЛЬЗУЙ однокоренные слова (Запрещено: Кот/Котик, Мармелад/Мармеладка).
+Выдай СТРОГО валидный JSON-массив из двух строк и больше ничего. Не пиши блок markdown, просто массив.`;
+    
+    const aiResult = await fetchFromAI(prompt);
+    
+    if (aiResult) {
+        try {
+            // Вырезаем блоки Markdown, если нейросеть их добавит
+            let cleanResult = aiResult.replace(/```json/gi, '').replace(/```/g, '').trim();
+            console.log("Очищенный от маркдауна ответ:", cleanResult);
+            
+            const parsed = JSON.parse(cleanResult);
+            
+            if (Array.isArray(parsed) && parsed.length >= 2) {
+                console.log("Успешно распарсили массив:", parsed);
+                return parsed;
+            } else {
+                console.error("ИИ вернул массив, но в нем не 2 элемента!", parsed);
+            }
+        } catch (e) {
+            console.error("Критическая ошибка парсинга JSON от ИИ:", e);
+        }
+    }
+    
+    // Безопасный фолбек на случай глобального сбоя ИИ
+    return ["Озеро", "Река"]; 
+}
+
+async function startRound(round, players) {
   currentLocalRound = round;
   const mode = globalState.settings?.mode;
   hasDrawnStrokeOneline = false; isGyroEnabled = false;
@@ -507,7 +570,6 @@ function startRound(round, players) {
   const bgRef = document.getElementById('bg-reference-img');
   if (bgRef) { bgRef.style.display = 'none'; bgRef.src = ''; }
 
-  // --- ХАРДКОР ЛОГИКА ИНТЕРФЕЙСА ---
   if (mode === 'hardcore') { 
       setDisplay('action-tools', 'none'); setDisplay('tool-divider-1', 'none'); 
       const eraser = document.querySelector('.eraser-tool'); if(eraser) eraser.style.display = 'none';
@@ -533,7 +595,6 @@ function startRound(round, players) {
       setDisplay('btn-gyro-start', 'none'); setDisplay('gyro-cursor', 'none');
       setDisplay('sidebar-tools', 'flex');
       
-      // --- ЗЕРКАЛО ЛОГИКА ---
       if (mode === 'mirror') {
           isSymmetry = true;
           const symBtn = document.querySelector('.sym-tool');
@@ -621,11 +682,35 @@ function startRound(round, players) {
           setDisplay('image-to-guess', 'none'); setDisplay('text-to-continue', 'none');
           
           if (mode === 'impostor') {
-              let p = ["Слово", "Слово"];
-              if (typeof getImpostorPair === 'function') p = getImpostorPair();
-              let impIndex = Math.floor(seededRandom(globalState.settings?.seed || 1) * players.length);
+              setText('text-instruction', "Синхронизация с ИИ...");
+              if(wi) wi.disabled = true;
+              
+              let p;
+              if (isHost) {
+                  if (globalState.impostorPairs?.[`round_${currentLocalRound}`]) {
+                      p = globalState.impostorPairs[`round_${currentLocalRound}`];
+                  } else {
+                      p = await getAIImpostorPair();
+                      const updates = {};
+                      updates[`impostorPairs/round_${currentLocalRound}`] = p;
+                      window.parent.postMessage({ type: 'update_state', updates }, '*');
+                  }
+              } else {
+                  let attempts = 0;
+                  while (!globalState.impostorPairs?.[`round_${currentLocalRound}`] && attempts < 30) {
+                      await new Promise(r => setTimeout(r, 500));
+                      attempts++;
+                  }
+                  p = globalState.impostorPairs?.[`round_${currentLocalRound}`] || ["Озеро", "Река"];
+              }
+
+              let impIndex = Math.floor(seededRandom((globalState.settings?.seed || 1) + currentLocalRound) * players.length);
               let isImpostorMatch = players.indexOf(myUserId) === impIndex;
-              if(wi) { wi.value = isImpostorMatch ? p[1] : p[0]; wi.disabled = true; }
+              
+              if(wi) { 
+                  wi.value = isImpostorMatch ? p[1] : p[0]; 
+                  wi.disabled = true; 
+              }
               setText('text-instruction', "Ваше слово:");
           } else { if(wi) wi.disabled = false; }
 
@@ -649,28 +734,10 @@ function startRound(round, players) {
   }
 }
 
-async function getRealBabelTranslation(text) {
-    const chain = ['zh-CN', 'sw', 'haw', 'is', 'ar', 'ru'];
-    let currentText = text;
-    try {
-        for (let i = 0; i < chain.length; i++) {
-            const sl = i === 0 ? 'ru' : chain[i-1];
-            const tl = chain[i];
-            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(currentText)}`);
-            const data = await res.json();
-            currentText = data[0].map(x => x[0]).join('');
-        }
-        return currentText;
-    } catch(e) {
-        console.error("Translate API error:", e);
-        return `[Сбой авто-перевода] ${text}`;
-    }
-}
-
 function submitWord(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
-  currentPhaseSubmitted = true; // Специально убрали clearInterval, чтобы таймер шел дальше!
+  currentPhaseSubmitted = true; 
   let word = "Секретик";
   const wi = document.getElementById('word-input');
   if (wi && wi.value.trim()) word = wi.value.trim();
@@ -700,7 +767,7 @@ function submitWord(isManual = false) {
 function submitDrawing(isManual = false) {
   if (currentPhaseSubmitted) return;
   if (isManual) { initAudio(); requestFullscreen(); }
-  currentPhaseSubmitted = true; // Специально убрали clearInterval, чтобы таймер шел дальше!
+  currentPhaseSubmitted = true; 
   
   if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; saveState(); }
   
@@ -794,7 +861,6 @@ function floodFillCore(startX, startY, fillColorHex) {
     ctx.putImageData(imgData, 0, 0);
 }
 
-// Новая универсальная функция для заливки на любом холсте (нужна для презентаций)
 function genericFloodFill(targetCtx, w, h, startX, startY, fillColorHex) {
     startX = Math.round(startX); startY = Math.round(startY);
     if (startX < 0 || startX >= w || startY < 0 || startY >= h) return;
@@ -837,7 +903,6 @@ function genericFloodFill(targetCtx, w, h, startX, startY, fillColorHex) {
     targetCtx.putImageData(imgData, 0, 0);
 }
 
-// ОБНОВЛЕНО: теперь Blur, Неон и ЗАЛИВКА правильно перерисовываются
 function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg = true) {
     if (clearBg) {
         targetCtx.globalAlpha = 1; targetCtx.filter = 'none'; targetCtx.shadowBlur = 0; targetCtx.globalCompositeOperation = 'source-over';
@@ -856,7 +921,6 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg
             continue;
         }
 
-        // Поддержка Неона (и для кисти, и для фигур)
         if (stroke.n && !stroke.e) { 
             targetCtx.shadowBlur = Math.max(10, stroke.s * 2); 
             targetCtx.shadowColor = stroke.c; 
@@ -871,9 +935,7 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg
         else if (stroke.type === 'circle') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; let r = Math.hypot(stroke.p[2]-stroke.p[0], stroke.p[3]-stroke.p[1]); targetCtx.arc(stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.arc(targetCanvas.width - stroke.p[0], stroke.p[1], r, 0, Math.PI*2); targetCtx.stroke(); } }
         else if (stroke.type === 'line') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.moveTo(stroke.p[0], stroke.p[1]); targetCtx.lineTo(stroke.p[2], stroke.p[3]); targetCtx.stroke(); if(stroke.sym) { targetCtx.beginPath(); targetCtx.moveTo(targetCanvas.width - stroke.p[0], stroke.p[1]); targetCtx.lineTo(targetCanvas.width - stroke.p[2], stroke.p[3]); targetCtx.stroke(); } }
         else if (stroke.type === 'arrow') { targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; drawArrow(targetCtx, stroke.p[0], stroke.p[1], stroke.p[2], stroke.p[3]); if(stroke.sym) { targetCtx.beginPath(); drawArrow(targetCtx, targetCanvas.width - stroke.p[0], stroke.p[1], targetCanvas.width - stroke.p[2], stroke.p[3]); } }
-        else if (stroke.type === 'fill') { 
-            genericFloodFill(targetCtx, targetCanvas.width, targetCanvas.height, stroke.p[0], stroke.p[1], stroke.c); 
-        } 
+        else if (stroke.type === 'fill') { genericFloodFill(targetCtx, targetCanvas.width, targetCanvas.height, stroke.p[0], stroke.p[1], stroke.c); } 
         else { 
             let pts = stroke.p; if (!pts || pts.length < 2) continue; 
             targetCtx.beginPath(); targetCtx.lineWidth = stroke.s; targetCtx.lineCap = 'round'; targetCtx.lineJoin = 'round'; 
@@ -883,22 +945,24 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg
     }
 }
 
-// ОБНОВЛЕНО: теперь анимация презентации учитывает Blur и правильный Неон
-function animateStrokes(strokes, canvasEl, isDark) {
+// ОБНОВЛЕНО: Поддержка фоновой картинки для прозрачной анимации
+function animateStrokes(strokes, canvasEl, isDark, hasBg = false) {
     const actx = canvasEl.getContext('2d');
-    const mode = globalState.settings?.mode;
-    actx.fillStyle = isDark ? '#000000' : '#ffffff';
-    actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
     
-    let strokeIndex = 0;
-    let pointIndex = 2; 
+    const clearCanvasFn = () => {
+        if (hasBg) actx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        else { actx.fillStyle = isDark ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height); }
+    };
+    clearCanvasFn();
+    
+    let strokeIndex = 0; let pointIndex = 2; 
     
     function drawNext() {
         if (strokeIndex >= strokes.length) return;
         let stroke = strokes[strokeIndex];
         
         if (stroke.type === 'clear') {
-            actx.fillStyle = isDark ? '#000000' : '#ffffff'; actx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+            clearCanvasFn();
             strokeIndex++; pointIndex = 2; requestAnimationFrame(drawNext); return;
         }
         
@@ -908,15 +972,8 @@ function animateStrokes(strokes, canvasEl, isDark) {
             actx.lineWidth = stroke.s; actx.lineCap = 'round'; actx.lineJoin = 'round';
             actx.filter = stroke.b ? 'blur(5px)' : 'none';
             
-            if (stroke.n && !stroke.e) { 
-                actx.shadowBlur = Math.max(10, stroke.s * 2); 
-                actx.shadowColor = stroke.c; 
-                actx.strokeStyle = '#ffffff'; 
-            } else { 
-                actx.shadowBlur = 0; 
-                actx.shadowColor = 'transparent'; 
-                actx.strokeStyle = stroke.c; 
-            }
+            if (stroke.n && !stroke.e) { actx.shadowBlur = Math.max(10, stroke.s * 2); actx.shadowColor = stroke.c; actx.strokeStyle = '#ffffff'; } 
+            else { actx.shadowBlur = 0; actx.shadowColor = 'transparent'; actx.strokeStyle = stroke.c; }
             
             let pts = stroke.p;
             if (pointIndex < pts.length) {
@@ -930,7 +987,6 @@ function animateStrokes(strokes, canvasEl, isDark) {
                 requestAnimationFrame(drawNext);
             } else { strokeIndex++; pointIndex = 2; drawNext(); }
         } else {
-            // Для фигур и заливки мы передаем false, чтобы не стирать весь холст!
             redrawFromStrokesSync([stroke], actx, canvasEl, isDark, false);
             strokeIndex++; pointIndex = 2; drawNext();
         }
@@ -1164,8 +1220,11 @@ function speakText(text) {
 
 function startPresentation() { if (!isHost) return; initAudio(); window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: true, bookIndex: 0, round: 1 } }}, '*'); }
 
+let impostorSlideTimeout = null;
+
 function startImpostorVoting() {
     if (!isHost) return;
+    clearTimeout(impostorSlideTimeout);
     window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: false }, voting: { active: true, results: {} } }}, '*');
 }
 
@@ -1294,7 +1353,7 @@ function syncPresentationView(players) {
     const side = pData.isText ? 'left' : 'right'; let visualContent = '';
 
     if (mode === 'impostor' && pData.isText) {
-        if (isHost) setTimeout(nextSlide, 500); 
+        if (isHost) { clearTimeout(impostorSlideTimeout); impostorSlideTimeout = setTimeout(nextSlide, 500); }
         renderedPresentationState = currentStateId; return;
     }
 
@@ -1329,10 +1388,27 @@ function syncPresentationView(players) {
             speakText(pData.textData);
         }
     } else {
-        if (mode === 'finishit' || mode === 'tagteam' || mode === 'plagiarism' || mode === 'impostor') {
-            visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img"></div>`;
+        // ОБНОВЛЕНИЕ: Теперь анимация работает во всех режимах
+        if (pData.strokes && pData.strokes.length > 0) {
+            let hasBg = false;
+            let bgHtml = '';
+            
+            // Если это режимы с дорисовыванием, вытаскиваем картинку из предыдущего раунда
+            if ((mode === 'finishit' || mode === 'tagteam') && pres.round > 1) {
+                let prevPData = extractData(globalState.submissions?.[`round_${pres.round - 1}`]?.[bookOwnerId]);
+                if (prevPData && prevPData.imgUrl) {
+                    hasBg = true;
+                    bgHtml = `<img src="${prevPData.imgUrl}" style="position:absolute; top:0; left:0; width:100%; height:100%; object-fit:contain; border-radius:12px;">`;
+                }
+            }
+            
+            visualContent = `<div style="position:relative; width:100%; aspect-ratio:4/3; border-radius:12px; border:2px solid rgba(255,255,255,0.1); background:${mode==='darkmode'?'#000':'#fff'}; overflow:hidden;">
+                ${bgHtml}
+                <canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}" data-hasbg="${hasBg}" style="position:relative; z-index:2; width:100%; height:100%; background:transparent; display:block;"></canvas>
+            </div>`;
         } else {
-            visualContent = `<div style="position:relative; width:100%;"><canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}" style="width:100%; border-radius:12px; border:2px solid rgba(255,255,255,0.1); background:${mode==='darkmode'?'#000':'#fff'}"></canvas></div>`;
+            // Резервный вариант, если массив мазков вдруг не сохранился
+            visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img"></div>`;
         }
     }
 
@@ -1347,7 +1423,8 @@ function syncPresentationView(players) {
         setTimeout(() => {
             const c = document.getElementById(`anim-canvas-${pres.round}-${bookOwnerId}`);
             if (c && pData.strokes) {
-                animateStrokes(pData.strokes, c, mode === 'darkmode');
+                const hasBg = c.getAttribute('data-hasbg') === 'true';
+                animateStrokes(pData.strokes, c, mode === 'darkmode', hasBg);
             }
         }, 100);
     }
@@ -1373,12 +1450,18 @@ function syncPresentationView(players) {
 
 function nextSlide() {
     if (!isHost) return;
-    const pres = globalState.presentation; const players = globalState.players || [];
+    const pres = globalState.presentation; 
+    
+    if (!pres || pres.bookIndex === undefined) return;
+
+    const players = globalState.players || [];
     let nextR = pres.round + 1; let nextB = pres.bookIndex;
+    
     if (nextR > calculatedTotalRounds) { 
         if (globalState.settings?.mode === 'coop') nextB += 2; 
         else nextB++; 
         nextR = 1; 
     }
+    
     window.parent.postMessage({ type: 'update_state', updates: { presentation: { active: true, bookIndex: nextB, round: nextR } }}, '*');
 }
