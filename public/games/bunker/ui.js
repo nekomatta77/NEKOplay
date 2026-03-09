@@ -4,6 +4,12 @@ const SVG_REVEAL = `<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 
 const SVG_BIOHAZARD = `<svg viewBox="0 0 24 24"><path d="M12 2A10 10 0 1 0 22 12 10.011 10.011 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8.009 8.009 0 0 1-8 8zm0-14a5.98 5.98 0 0 0-4.665 2.24l2.131 1.23A3.491 3.491 0 0 1 12 8.5a3.491 3.491 0 0 1 2.534.97l2.131-1.23A5.98 5.98 0 0 0 12 6zm-3.46 7.5a3.491 3.491 0 0 1-1.04-2.47H5A5.992 5.992 0 0 0 8.847 16l1.242-2.152a3.447 3.447 0 0 1-1.549-1.348zm6.92 0a3.447 3.447 0 0 1-1.549 1.348L15.153 16A5.992 5.992 0 0 0 19 11.03h-2.5a3.491 3.491 0 0 1-1.04 2.47zM12 10.5a1.5 1.5 0 1 0 1.5 1.5 1.5 1.5 0 0 0-1.5-1.5z"/></svg>`;
 const SVG_RAID = `<svg viewBox="0 0 24 24"><path d="M19.7 4.3a1 1 0 0 0-1.4 0L12 10.6 5.7 4.3a1 1 0 0 0-1.4 1.4l6.3 6.3-6.3 6.3a1 1 0 0 0 1.4 1.4l6.3-6.3 6.3 6.3a1 1 0 0 0 1.4-1.4l-6.3-6.3 6.3-6.3a1 1 0 0 0 0-1.4z"/></svg>`;
 const SVG_SCAVENGE = `<svg viewBox="0 0 24 24"><path d="M12 2C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm-1.5 9.5c-.83 0-1.5-.67-1.5-1.5S9.67 8.5 10.5 8.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3 0c-.83 0-1.5-.67-1.5-1.5S12.67 8.5 13.5 8.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM15 20h-6v2h6v-2z"/></svg>`;
+const SVG_REROLL = `<svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>`;
+const SVG_SHIELD = `<svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>`;
+const SVG_HEAL = `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-1.99.9-1.99 2L3 19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>`;
+const SVG_SABOTAGE = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
+const SVG_SHUFFLE = `<svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>`;
+const SVG_DICTATOR = `<svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 3.83L18.17 19H5.83L12 5.83zM11 10h2v5h-2v-5zm0 6h2v2h-2v-2z"/></svg>`;
 const FALLBACK_AVATAR_UI = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
 
 function showScreen(id) {
@@ -72,7 +78,6 @@ function generatePlayerTraitsList(pData) {
 
 window.getPlayerTraitsHTML = generatePlayerTraitsList;
 
-// Раскрывающийся аккордеон для Дебатов
 window.toggleAccordion = function(id) {
     const content = document.getElementById(`disc-content-${id}`);
     const chevron = document.getElementById(`disc-chevron-${id}`);
@@ -148,7 +153,6 @@ function handleVotingUI() {
 
         let votingHTML = "";
 
-        // Красивая плашка карантина поверх списка
         if (isQuarantined) {
             votingHTML += `
                 <div class="quarantine-lockdown-panel">
@@ -159,19 +163,19 @@ function handleVotingUI() {
             `;
         }
 
-        // Очищенный список только с именами и аватарками
         votingHTML += alive.map(id => {
             const isMe = id === myUserId;
             const isSelected = myVote === id;
+            const isShielded = logic.shieldedPlayers?.[id];
             
             return `
-            <div class="vote-item aesthetic-player-card ${isSelected ? 'selected' : ''} ${isMe ? 'dimmed' : ''}" ${!isMe && !isQuarantined ? `onclick="submitVote('${id}')"` : ''} style="margin-bottom: 12px; padding: 12px 18px;">
+            <div class="vote-item aesthetic-player-card ${isSelected ? 'selected' : ''} ${(isMe || isShielded) ? 'dimmed' : ''}" ${!isMe && !isQuarantined && !isShielded ? `onclick="submitVote('${id}')"` : ''} style="margin-bottom: 12px; padding: 12px 18px; ${isShielded ? 'border-color: var(--accent-cyan); box-shadow: inset 0 0 15px rgba(0, 229, 255, 0.2);' : ''}">
                 <div class="player-header-row" style="margin-bottom: 0;">
                     <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'" style="width: 48px; height: 48px;">
                     <div style="flex-grow: 1;">
-                        <span class="font-header" style="font-size: 1.4rem; line-height: 1;">${globalState.playerNames?.[id]}</span>
+                        <span class="font-header" style="font-size: 1.4rem; line-height: 1; ${isShielded ? 'color: var(--accent-cyan)' : ''}">${globalState.playerNames?.[id]}</span>
                     </div>
-                    <div>${isSelected ? SVG_TARGET : ''}</div>
+                    <div>${isShielded ? SVG_SHIELD : isSelected ? SVG_TARGET : ''}</div>
                 </div>
             </div>`;
         }).join('');
@@ -195,7 +199,7 @@ function handleVotingUI() {
     }
 }
 
-// --- КИНО-ЭКРАН АНИМАЦИИ (ИДЕАЛЬНАЯ МАТЕМАТИКА ОТ ЦЕНТРА ДО ЦЕНТРА) ---
+// --- КИНО-ЭКРАН АНИМАЦИИ ---
 function playActionCinema(actionData) {
     if (!actionData) return;
     
@@ -230,22 +234,14 @@ function playActionCinema(actionData) {
 
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
-            
             document.getElementById('effect-p2').style.display = 'flex';
-            
-            // Ждем 100мс, чтобы браузер точно отрендерил финальные размеры плашек
             setTimeout(() => {
                 const rect1 = box1.getBoundingClientRect();
                 const rect2 = box2.getBoundingClientRect();
-                
-                // Вычисляем ИДЕАЛЬНЫЙ центр каждого элемента
                 const center1X = rect1.left + (rect1.width / 2);
                 const center1Y = rect1.top + (rect1.height / 2);
-                
                 const center2X = rect2.left + (rect2.width / 2);
                 const center2Y = rect2.top + (rect2.height / 2);
-                
-                // Высчитываем разницу для перемещения от центра к центру
                 const dX = center2X - center1X;
                 const dY = center2Y - center1Y;
                 
@@ -264,15 +260,50 @@ function playActionCinema(actionData) {
         } else {
             if (actionData.type === 'reveal') {
                 svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`;
-            } else if (actionData.type === 'quarantine') {
+            } 
+            else if (actionData.type === 'quarantine') {
                 svgIcon = SVG_BIOHAZARD; text1 = "ИЗОЛЯЦИЯ"; text2 = "БЛОКИРОВКА ГОЛОСА";
                 document.getElementById('ep2-name').classList.add('text-danger');
-            } else if (actionData.type === 'raid') {
+            } 
+            else if (actionData.type === 'raid') {
                 svgIcon = SVG_RAID; text1 = `ПОЛУЧЕНО: ${actionData.targetOldVal}`; text2 = "ПУСТО";
-            } else if (actionData.type === 'scavenge') {
+            } 
+            else if (actionData.type === 'scavenge') {
                 svgIcon = SVG_SCAVENGE; text1 = `СЛУТАНО: ${actionData.targetOldVal}`; text2 = "МЕРТВ";
+            } 
+            else if (actionData.type === 'reroll') {
+                svgIcon = SVG_REROLL; text1 = `СБРОШЕНО: ${actionData.targetOldVal}`; text2 = `ОБНОВЛЕНИЕ: ${actionData.targetNewVal}`;
+                setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-swap-dynamic'); }, 100);
             }
-            document.getElementById('effect-p2').style.display = 'flex';
+            // НОВЫЕ ТИПЫ
+            else if (actionData.type === 'shield') { 
+                svgIcon = SVG_SHIELD; text1 = "АКТИВАЦИЯ"; text2 = "ИММУНИТЕТ ОТ ИЗГНАНИЯ"; 
+                setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-shield-pulse'); }, 100); 
+            }
+            else if (actionData.type === 'heal') { 
+                svgIcon = SVG_HEAL; text1 = "СИСТЕМА ЖИЗНЕОБЕСПЕЧЕНИЯ"; text2 = `ИЗЛЕЧЕН: ${actionData.targetNewVal}`; 
+                setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--success)'); box2.classList.add('anim-heal-pulse'); }, 100); 
+            }
+            else if (actionData.type === 'sabotage') { 
+                svgIcon = SVG_SABOTAGE; text1 = "ВИРУСНАЯ АТАКА"; text2 = `ДОБАВЛЕНО: ${actionData.targetNewVal}`; 
+                setTimeout(() => { box2.style.setProperty('--swap-color', '#aa00ff'); box2.classList.add('anim-sabotage-glitch'); }, 100); 
+            }
+            else if (actionData.type === 'shuffle') { 
+                svgIcon = SVG_SHUFFLE; text1 = "ИЗЪЯТИЕ ДАННЫХ"; text2 = "ПЕРЕРАСПРЕДЕЛЕНИЕ..."; 
+                document.getElementById('effect-p2').style.display = 'none'; 
+            }
+            else if (actionData.type === 'dictator_veto') { 
+                svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; 
+                document.getElementById('effect-p2').style.display = 'none'; 
+            }
+            else if (actionData.type === 'dictator_gag') { 
+                svgIcon = SVG_DICTATOR; text1 = "ЦЕНЗУРА"; text2 = "КЛЯП: БЛОКИРОВКА ДЕЙСТВИЙ"; 
+                document.getElementById('ep2-name').classList.add('text-danger'); 
+            }
+
+            if (!['shuffle', 'dictator_veto'].includes(actionData.type)) {
+                document.getElementById('effect-p2').style.display = 'flex';
+            }
         }
 
         document.getElementById('effect-center-icon').innerHTML = svgIcon;
