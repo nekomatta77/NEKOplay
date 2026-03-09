@@ -18,13 +18,20 @@ export const GAMES: Game[] = [
     maxPlayers: 12,
   },
   {
-    // Важно: id должен совпадать с названием папки в public/games/
     id: 'bunker', 
     name: 'Бункер',
     description: 'Постапокалиптическая игра на выживание. Докажи, что ты достоин места в бункере!',
-    // Картинка тоже генерируется случайно, но можешь потом заменить на свою
     image: 'https://picsum.photos/seed/bunker/400/300?blur=2',
-    minPlayers: 3, // Для бункера лучше минимум 3 игрока
-    maxPlayers: 16, // Максимум можно поставить побольше
+    minPlayers: 3,
+    maxPlayers: 16,
+  },
+
+  {
+    id: 'jokebattle', 
+    name: 'Смехлыст',
+    description: 'Хлесткие шутки, коварные вопросы и голосования! Кто в вашей компании самый остроумный?',
+    image: 'https://picsum.photos/seed/smekhlyst/400/300?blur=2',
+    minPlayers: 3,
+    maxPlayers: 16,
   }
 ];

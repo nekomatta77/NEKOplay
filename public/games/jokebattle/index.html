@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Смехлыст</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="screen-lobby" class="screen active">
+      <div class="logo-container">
+        <svg class="main-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
+          <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+          <line x1="9" y1="9" x2="9.01" y2="9"></line>
+          <line x1="15" y1="9" x2="15.01" y2="9"></line>
+        </svg>
+        <h1>СМЕХЛЫСТ</h1>
+      </div>
+      <p>Ожидаем игроков...</p>
+      <div id="players-list"></div>
+      <button id="btn-start" class="btn hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        Начать игру
+      </button>
+      <p id="host-wait-msg" class="hidden">Ждем, пока хост запустит игру...</p>
+    </div>
+
+    <div id="screen-answering" class="screen">
+      <h2>Придумай смешной ответ!</h2>
+      <div class="timer" id="timer-answering">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span id="answering-time">60</span>
+      </div>
+      
+      <div id="prompts-container"></div>
+      
+      <button id="btn-submit-answers" class="btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        Отправить
+      </button>
+      <p id="waiting-others-msg" class="hidden">Ждем остальных...</p>
+    </div>
+
+    <div id="screen-voting" class="screen">
+      <h2 id="vote-prompt-text">Вопрос...</h2>
+      <div class="timer" id="timer-voting">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span id="voting-time">15</span>
+      </div>
+      <div class="battle-container">
+        <button id="btn-vote-1" class="btn-vote">Ответ 1</button>
+        <span class="vs">VS</span>
+        <button id="btn-vote-2" class="btn-vote">Ответ 2</button>
+      </div>
+    </div>
+
+    <div id="screen-results" class="screen">
+      <h2>Итоги голосования</h2>
+      <div id="results-container"></div>
+    </div>
+
+    <div id="screen-end" class="screen">
+      <svg class="crown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="2 4 5 19 19 19 22 4 17 9 12 3 7 9 2 4"></polygon>
+      </svg>
+      <h1>ПОБЕДИТЕЛЬ!</h1>
+      <div id="final-podium"></div>
+      <button id="btn-play-again" class="btn hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+        Сыграть еще раз
+      </button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
