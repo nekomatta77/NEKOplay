@@ -24,14 +24,5 @@ export const GAMES: Game[] = [
     image: 'https://picsum.photos/seed/bunker/400/300?blur=2',
     minPlayers: 3,
     maxPlayers: 16,
-  },
-
-  {
-    id: 'jokebattle', 
-    name: 'Смехлыст',
-    description: 'Хлесткие шутки, коварные вопросы и голосования! Кто в вашей компании самый остроумный?',
-    image: 'https://picsum.photos/seed/smekhlyst/400/300?blur=2',
-    minPlayers: 3,
-    maxPlayers: 16,
   }
 ];
