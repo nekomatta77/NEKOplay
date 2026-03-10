@@ -13,6 +13,7 @@ const myName = urlParams.get('name') || 'Аноним';
 
 let isGeneratingRound = false;
 let currentTimerInterval = null;
+let currentTimerId = null; // Трекер текущего таймера, чтобы он не перезапускался
 let myPhaseStartTime = 0; 
 let spokenPhrases = new Set();
 let currentTTSAudio = null; 
@@ -52,7 +53,7 @@ function playSound(type) {
     } catch(e) {}
 }
 
-// --- СИНТЕЗАТОР РЕЧИ (ГЕНЕРАЦИЯ НА ЛЕТУ ЧЕРЕЗ API МОСТ) ---
+// --- СИНТЕЗАТОР РЕЧИ (УЛУЧШЕННЫЙ МУЖСКОЙ ГОЛОС) ---
 async function speakText(text) {
     if (!isHost) return;
 
@@ -61,36 +62,46 @@ async function speakText(text) {
         currentTTSAudio.currentTime = 0;
     }
 
-    // Очищаем текст от HTML-тегов и ограничиваем длину
-    const cleanText = text.replace(/<[^>]*>?/gm, ' ').trim().substring(0, 200);
+    // Жестко очищаем текст от мусора, чтобы не ломать сервера
+    const cleanText = text.replace(/<[^>]*>?/gm, ' ')
+                          .replace(/[^\w\sа-яА-ЯёЁ0-9.,!?\-:;]/g, '')
+                          .trim()
+                          .substring(0, 150);
     if (!cleanText) return;
 
-    const playAudioSafe = (url) => {
+    const playCloud = (url) => {
         return new Promise((resolve, reject) => {
             const audio = new Audio(url);
             currentTTSAudio = audio;
             audio.onended = resolve;
-            audio.onerror = () => reject(new Error('Ошибка загрузки аудио'));
+            audio.onerror = () => reject(new Error('Cloud TTS Error'));
             audio.play().catch(reject);
         });
     };
 
     try {
-        // Стучимся к нашему собственному серверу (файл api/tts.js), который обходит блокировки
-        const myApiUrl = `/api/tts?text=${encodeURIComponent(cleanText)}`;
-        await playAudioSafe(myApiUrl);
-    } catch (apiError) {
-        console.warn("[TTS] Наш API недоступен, включаю резервный системный голос...", apiError);
+        // Попытка 1: Идеальный низкий мужской голос Maxim
+        const maximUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Maxim&text=${encodeURIComponent(cleanText)}`;
+        await playCloud(maximUrl);
+        return;
+    } catch (e) {
+        console.warn("[TTS] Облачный мужской голос заблокирован. Ищем мужской бас в системе...");
+    }
+
+    // Попытка 2: Системный голос устройства (превращаем в мужской бас)
+    if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(cleanText);
+        u.lang = 'ru-RU';
+        u.pitch = 0.6; // Специально занижаем тон, чтобы звучало брутально!
+        u.rate = 1.0;
         
-        // Запасной план - встроенный системный голос устройства (без интернета)
-        if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(cleanText);
-            u.lang = 'ru-RU';
-            u.pitch = 0.8; // Делаем голос ниже (бас)
-            u.rate = 1.0;
-            window.speechSynthesis.speak(u);
-        }
+        // Пытаемся найти встроенного мужика
+        const voices = window.speechSynthesis.getVoices();
+        let deepMale = voices.find(v => v.lang.includes('ru') && (v.name.includes('Dmitry') || v.name.includes('Pavel') || v.name.includes('Maxim')));
+        if (deepMale) u.voice = deepMale;
+        
+        window.speechSynthesis.speak(u);
     }
 }
 
@@ -118,24 +129,40 @@ function setDisplay(id, display) { const el = document.getElementById(id); if (e
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
 window.leaveGame = function() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 
+// ИСПРАВЛЕНИЕ МИГАНИЯ №1: Окно перерисовывается ТОЛЬКО если оно еще не открыто
 function showPhase(phaseId) {
+    const target = document.getElementById(phaseId);
+    if (target && target.classList.contains('active')) return; // УЖЕ ОТКРЫТО - НИЧЕГО НЕ ДЕЛАЕМ!
+    
     playSound('whoosh');
     document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-    const target = document.getElementById(phaseId); if(target) target.classList.add('active');
+    if(target) target.classList.add('active');
 }
+
 function showLoading(show, message = "Загрузка...") { setText('loading-message', message); setDisplay('global-loading', show ? 'flex' : 'none'); }
+
+function updateDynamicBackground(phase, round) {
+    if (!phase || phase === 'waiting') document.body.className = 'bg-lobby';
+    else if (round === 1) document.body.className = 'bg-round1';
+    else if (round === 2) document.body.className = 'bg-round2';
+    else if (round === 3) document.body.className = 'bg-round3';
+}
 
 function sendUpdate(updates) {
     try { window.parent.postMessage({ type: 'update_state', updates: JSON.parse(JSON.stringify(updates)) }, '*'); } catch (e) {}
 }
 
-function startLocalTimer(deadlineMs, displayId, onExpireCallback) {
+// ИСПРАВЛЕНИЕ МИГАНИЯ №2: Таймер больше не перезапускается с рывками
+function startLocalTimer(deadlineMs, displayId, onExpireCallback, timerKey) {
+    if (currentTimerId === timerKey) return; // Таймер для этой фазы уже тикает!
+    currentTimerId = timerKey;
+    
     clearInterval(currentTimerInterval);
     function update() {
         const remaining = Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000));
         setText(displayId, remaining);
         if (remaining <= 10 && remaining > 0) playSound('tick');
-        if (remaining <= 0) { clearInterval(currentTimerInterval); if (isHost && onExpireCallback) onExpireCallback(); }
+        if (remaining <= 0) { clearInterval(currentTimerInterval); currentTimerId = null; if (isHost && onExpireCallback) onExpireCallback(); }
     }
     update(); currentTimerInterval = setInterval(update, 1000);
 }
@@ -143,7 +170,6 @@ function startLocalTimer(deadlineMs, displayId, onExpireCallback) {
 // --- ИИ ФУНКЦИИ ---
 async function fetchFromAI(systemPrompt) {
     try {
-        // Твой оригинальный API-ключ OpenRouter
         const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
         const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 8000);
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -216,26 +242,18 @@ window.addEventListener('message', (event) => {
 });
 
 function handleStateChange() {
-    const status = globalState.status; const phase = globalState.phase; 
-    
-    // Включаем радиальный фон только если мы в лобби
-    if (!status || status === 'waiting' || !phase) {
-        document.body.className = 'bg-lobby';
-    } else {
-        document.body.className = '';
-    }
-    
+    const status = globalState.status; const phase = globalState.phase; const round = globalState.round || 1;
+    updateDynamicBackground(phase, round);
     showLoading(false);
 
     if (!status || status === 'waiting') {
-        showPhase('lobby-screen'); isGeneratingRound = false; clearInterval(currentTimerInterval);
+        showPhase('lobby-screen'); isGeneratingRound = false; clearInterval(currentTimerInterval); currentTimerId = null;
         spokenPhrases.clear();
 
         const pList = globalState.roomPlayers || []; setText('players-count-display', pList.length > 0 ? pList.length : playersCountParam);
         
         const hostControls = document.getElementById('host-controls');
         if (isHost && !document.getElementById('toggle-theme')) {
-            // ДИЗАЙН КНОПОК И НАСТРОЕК ХОСТА В СТИЛЕ JACKBOX
             hostControls.innerHTML = `
                 <div class="jackbox-settings">
                     <div class="j-setting"><span>Задания (Бета)</span><input type="checkbox" id="toggle-missions" class="j-checkbox"></div>
@@ -246,15 +264,20 @@ function handleStateChange() {
         }
 
         const listContainer = document.getElementById('lobby-players-list');
-        if (pList.length > 0) {
-            // ДИЗАЙН КАРТОЧЕК ИГРОКОВ В СТИЛЕ JACKBOX
-            listContainer.innerHTML = pList.map(p => `
-                <div class="j-player-card ${p.id === myUserId ? 'is-me' : ''}">
-                    <img src="${p.avatar || 'https://picsum.photos/100'}">
-                    <div class="j-player-name">${p.name || "Аноним"}</div>
-                    ${p.isHost ? `<div class="j-host-crown">${SVGS.crown}</div>` : ''}
-                </div>
-            `).join('');
+        const pListStr = JSON.stringify(pList);
+        
+        // Перерисовываем игроков только если кто-то зашел/вышел
+        if (listContainer.getAttribute('data-plist') !== pListStr) {
+            listContainer.setAttribute('data-plist', pListStr);
+            if (pList.length > 0) {
+                listContainer.innerHTML = pList.map(p => `
+                    <div class="j-player-card ${p.id === myUserId ? 'is-me' : ''}">
+                        <img src="${p.avatar || 'https://picsum.photos/100'}">
+                        <div class="j-player-name">${p.name || "Аноним"}</div>
+                        ${p.isHost ? `<div class="j-host-crown">${SVGS.crown}</div>` : ''}
+                    </div>
+                `).join('');
+            }
         }
         
         setDisplay('host-controls', isHost ? 'block' : 'none'); setDisplay('guest-waiting', isHost ? 'none' : 'block');
@@ -344,14 +367,17 @@ function renderAnsweringPhase() {
     const gd = globalState.gameData || {};
     const assignments = gd.assignments || {};
     
-    if (gd.deadline) startLocalTimer(gd.deadline, 'answering-timer', () => { if (isHost && !globalState._transitioningToVoting) forceTransitionToVoting(); });
+    const container = document.getElementById('prompts-scroll-area');
+
+    if (gd.deadline && container.getAttribute('data-rendered-round') !== String(globalState.round)) {
+        startLocalTimer(gd.deadline, 'answering-timer', () => { if (isHost && !globalState._transitioningToVoting) forceTransitionToVoting(); }, 'answering_' + globalState.round);
+    }
 
     let myQuestions = [];
     for (let qIdx in assignments) { if (assignments[qIdx] && assignments[qIdx].includes(myUserId)) myQuestions.push({ idx: qIdx, text: (gd.prompts || [])[qIdx] || "" }); }
 
-    const container = document.getElementById('prompts-scroll-area');
-    if (!container.hasAttribute('data-rendered-round') || container.getAttribute('data-rendered-round') !== String(globalState.round)) {
-        
+    // Рендерим карточки только один раз за раунд
+    if (container.getAttribute('data-rendered-round') !== String(globalState.round)) {
         let missionHtml = '';
         if (globalState.settings?.useMissions && gd.missions && gd.missions[myUserId]) {
             missionHtml = `<div class="secret-mission-banner">${SVGS.target} Секретное задание: ${gd.missions[myUserId]}</div>`;
@@ -385,7 +411,7 @@ function renderAnsweringPhase() {
 }
 
 function forceTransitionToVoting() {
-    globalState._transitioningToVoting = true; clearInterval(currentTimerInterval);
+    globalState._transitioningToVoting = true; clearInterval(currentTimerInterval); currentTimerId = null;
     myPhaseStartTime = 0; 
     sendUpdate({ phase: 'voting', 'gameData/currentVoteIndex': 0, 'gameData/deadline': Date.now() + 20000 });
 }
@@ -420,20 +446,29 @@ function renderVotingPhase() {
     globalState._transitioningToResult = false; 
     const gd = globalState.gameData || {}; const vIdx = gd.currentVoteIndex || 0;
     
-    const promptText = gd.prompts[vIdx] || "...";
-    setText('voting-prompt', promptText);
+    setText('voting-prompt', gd.prompts[vIdx] || "...");
 
-    const voteKey = `vote_${globalState.round}_${vIdx}`;
-    if (!spokenPhrases.has(voteKey)) { speakText(promptText); spokenPhrases.add(voteKey); }
+    const grid = document.getElementById('voting-answers-grid');
 
-    if (gd.deadline) startLocalTimer(gd.deadline, 'voting-timer', () => {
-        if (isHost && !globalState._transitioningToResult) { globalState._transitioningToResult = true; sendUpdate({ phase: 'voting_result' }); }
-    });
+    // Настраиваем раунд голосования только если перешли к новому вопросу
+    if (grid.getAttribute('data-vote-idx') !== String(vIdx)) {
+        grid.setAttribute('data-vote-idx', String(vIdx));
+        
+        if (gd.deadline) {
+            startLocalTimer(gd.deadline, 'voting-timer', () => {
+                if (isHost && !globalState._transitioningToResult) { globalState._transitioningToResult = true; sendUpdate({ phase: 'voting_result' }); }
+            }, 'voting_' + vIdx);
+        }
+
+        const voteKey = `vote_${globalState.round}_${vIdx}`;
+        if (!spokenPhrases.has(voteKey)) { speakText(gd.prompts[vIdx]); spokenPhrases.add(voteKey); }
+    }
     
     const authors = gd.assignments[vIdx] || []; const currentAnswers = gd.answers?.[vIdx] || {}; const votes = gd.votes?.[vIdx] || {};
     const isAuthor = authors.includes(myUserId); const hasVoted = votes[myUserId];
 
-    document.getElementById('voting-answers-grid').innerHTML = authors.map(authorId => {
+    // Обновляем кнопки динамически
+    grid.innerHTML = authors.map(authorId => {
         const disabled = isAuthor || hasVoted;
         return `<div class="answer-btn ${disabled ? 'disabled' : ''} ${votes[myUserId] === authorId ? 'voted' : ''}" onclick="!${disabled} && submitVote('${authorId}')">${currentAnswers[authorId] || "(нет ответа)"}</div>`;
     }).join('');
@@ -454,7 +489,7 @@ function renderVotingPhase() {
 
         const expectedVotes = Math.max(0, (globalState.activePlayersList || []).length - authors.length);
         if (expectedVotes > 0 && Object.keys(votes).length >= expectedVotes && !globalState._transitioningToResult) {
-            clearInterval(currentTimerInterval);  globalState._transitioningToResult = true;
+            clearInterval(currentTimerInterval); currentTimerId = null;  globalState._transitioningToResult = true;
             setTimeout(() => sendUpdate({ phase: 'voting_result' }), 1000);
         }
     }
@@ -464,27 +499,21 @@ window.submitVote = function(targetId) { sendUpdate({ [`gameData/votes/${(global
 
 function renderVotingResultPhase() {
     showPhase('voting-result-phase');
-    setDisplay('btn-next-vote', 'none'); clearInterval(currentTimerInterval);
-
-    if (!document.getElementById('result-answers-grid').hasAttribute('data-played')) {
-        playSound('badum'); document.getElementById('result-answers-grid').setAttribute('data-played', 'true');
-    }
+    setDisplay('btn-next-vote', 'none'); 
+    clearInterval(currentTimerInterval); 
+    currentTimerId = null;
 
     const gd = globalState.gameData || {}; const vIdx = gd.currentVoteIndex || 0;
-    setText('result-prompt', gd.prompts[vIdx] || "Результаты");
-
     const authors = gd.assignments[vIdx] || []; const currentVotes = gd.votes?.[vIdx] || {};
     let voteCounts = {}; authors.forEach(a => voteCounts[a] = 0);
     let totalVotes = 0; for (let voter in currentVotes) { if (voteCounts[currentVotes[voter]] !== undefined) { voteCounts[currentVotes[voter]]++; totalVotes++; } }
 
     if (isHost && !gd.scoresCalculated?.[vIdx]) {
         let newScores = {...(gd.scores || {})}; let mult = globalState.round || 1; 
-        
         authors.forEach(a => {
             if (!newScores[a]) newScores[a] = 0;
             newScores[a] += (voteCounts[a] * 100 * mult);
             if (totalVotes > 0 && voteCounts[a] === totalVotes) newScores[a] += (250 * mult);
-
             let otherVotes = authors.find(o => o !== a) ? voteCounts[authors.find(o => o !== a)] : 0;
             if (voteCounts[a] > otherVotes) {
                 const secs = gd.answerTimes?.[a] || 30; 
@@ -497,7 +526,7 @@ function renderVotingResultPhase() {
         sendUpdate({'gameData/scores': newScores, [`gameData/scoresCalculated/${vIdx}`]: true});
 
         setTimeout(() => {
-            document.getElementById('result-answers-grid').removeAttribute('data-played');
+            document.getElementById('result-answers-grid').removeAttribute('data-rendered-idx');
             let nextIdx = vIdx + 1;
             if (nextIdx >= gd.prompts.length) {
                 const sorted = (globalState.activePlayersList || []).map(id => ({ name: globalState.playerNames?.[id] || "Бот", score: newScores[id] || 0 })).sort((a, b) => b.score - a.score);
@@ -508,6 +537,14 @@ function renderVotingResultPhase() {
     }
 
     const grid = document.getElementById('result-answers-grid');
+    
+    // Рендерим результаты и проигрываем звук ТОЛЬКО один раз! Иначе будет мигать
+    if (grid.getAttribute('data-rendered-idx') === String(vIdx)) return;
+    grid.setAttribute('data-rendered-idx', String(vIdx));
+
+    setText('result-prompt', gd.prompts[vIdx] || "Результаты");
+    playSound('badum');
+
     grid.innerHTML = authors.map(authorId => {
         let pct = totalVotes === 0 ? 0 : Math.round((voteCounts[authorId] / totalVotes) * 100);
         let otherVotes = authors.find(a => a !== authorId) ? voteCounts[authors.find(a => a !== authorId)] : 0;
@@ -536,12 +573,18 @@ function renderScoreboardPhase() {
     setDisplay('btn-next-round', isHost ? 'block' : 'none');
     document.getElementById('btn-next-round').disabled = false;
 
+    const list = document.getElementById('scoreboard-list');
+    
+    // Блокируем перезапись, чтобы список не мигал каждую секунду
+    if (list.getAttribute('data-round') === String(globalState.round)) return;
+    list.setAttribute('data-round', String(globalState.round));
+
     const scores = globalState.gameData?.scores || {};
     let sorted = (globalState.activePlayersList || []).map(id => ({
         name: globalState.playerNames?.[id] || "Бот", avatar: globalState.playerAvatars?.[id] || "https://picsum.photos/100", score: scores[id] || 0
     })).sort((a, b) => b.score - a.score);
 
-    document.getElementById('scoreboard-list').innerHTML = sorted.map((p, i) => `
+    list.innerHTML = sorted.map((p, i) => `
         <div class="score-row ${i === 0 ? 'rank-1' : ''}">
             <div class="score-left"><span class="rank-num">${i+1}</span><img src="${p.avatar}"><span class="score-name">${p.name} ${i === 0 && globalState.round === 3 ? `<div class="joke-man-badge">${SVGS.crown} ЧЕЛОВЕК-АНЕКДОТ</div>` : ''}</span></div>
             <div class="score-val">${p.score}</div>
@@ -565,6 +608,7 @@ window.nextRound = async function() {
     
     if (globalState.round >= 3) {
         document.getElementById('prompts-scroll-area').removeAttribute('data-rendered-round');
+        document.getElementById('scoreboard-list').removeAttribute('data-round');
         sendUpdate({ status: 'waiting', phase: null }); return;
     }
 
