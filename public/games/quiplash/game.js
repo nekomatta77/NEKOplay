@@ -53,7 +53,7 @@ function playSound(type) {
     } catch(e) {}
 }
 
-// --- СИНТЕЗАТОР РЕЧИ (ОБХОД БЛОКИРОВОК ADBLOCK И CORS) ---
+// --- СИНТЕЗАТОР РЕЧИ (АВТОНОМНЫЙ МУЖСКОЙ БАС) ---
 async function speakText(text) {
     if (!isHost) return;
 
@@ -69,53 +69,64 @@ async function speakText(text) {
                           .substring(0, 150);
     if (!cleanText) return;
 
-    // Функция безопасной загрузки аудио
+    // ПОПЫТКА 1: Используем встроенный синтезатор ОС (Без интернета, без блокировок)
+    if (window.speechSynthesis) {
+        const playLocal = () => {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(cleanText);
+            u.lang = 'ru-RU';
+            u.rate = 1.0;
+            
+            const voices = window.speechSynthesis.getVoices();
+            
+            // Ищем конкретно мужские голоса (Дмитрий, Павел и т.д.)
+            let maleVoice = voices.find(v => v.lang.includes('ru') && /(dmitry|pavel|maxim|male|муж)/i.test(v.name));
+            let anyRuVoice = voices.find(v => v.lang.includes('ru'));
+            
+            if (maleVoice) {
+                u.voice = maleVoice;
+                u.pitch = 0.8; // Легкое занижение для суровости
+            } else if (anyRuVoice) {
+                u.voice = anyRuVoice;
+                u.pitch = 0.5; // Экстремальный бас, если голос по умолчанию женский
+            } else {
+                u.pitch = 0.6; 
+            }
+            
+            window.speechSynthesis.speak(u);
+        };
+
+        // Голоса в браузере подгружаются асинхронно
+        if (window.speechSynthesis.getVoices().length === 0) {
+            window.speechSynthesis.onvoiceschanged = playLocal;
+            // Запасной вызов, если событие onvoiceschanged не отработает
+            setTimeout(playLocal, 300);
+        } else {
+            playLocal();
+        }
+        return; // Выходим из функции, чтобы не запускать облако
+    }
+
+    // ПОПЫТКА 2: Безотказный облачный Google (Если на устройстве вообще нет голосов)
     const playCloud = (url) => {
         return new Promise((resolve, reject) => {
             const audio = new Audio();
-            audio.crossOrigin = "anonymous"; // Разрешаем скачивание с других серверов
+            audio.crossOrigin = "anonymous"; 
             audio.src = url;
             currentTTSAudio = audio;
             
-            audio.oncanplaythrough = () => {
-                audio.play().catch(reject);
-            };
-            
+            audio.oncanplaythrough = () => audio.play().catch(reject);
             audio.onended = resolve;
-            audio.onerror = () => reject(new Error('Ошибка загрузки звука'));
+            audio.onerror = () => reject(new Error('Ошибка Google TTS'));
             audio.load();
         });
     };
 
-    const targetUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Maxim&text=${encodeURIComponent(cleanText)}`;
-
     try {
-        // ПОПЫТКА 1: Пробуем загрузить напрямую
-        await playCloud(targetUrl);
-    } catch (e1) {
-        console.warn("[TTS] Прямой доступ заблокирован, пробуем через прокси-мост...");
-        try {
-            // ПОПЫТКА 2: Если AdBlock заблокировал напрямую, используем прокси для обхода
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-            await playCloud(proxyUrl);
-        } catch (e2) {
-            console.warn("[TTS] Облачный голос недоступен. Запускаем встроенный бас...");
-            
-            // ПОПЫТКА 3: Локальный запасной бас (без интернета)
-            if (window.speechSynthesis) {
-                window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance(cleanText);
-                u.lang = 'ru-RU';
-                u.pitch = 0.6; // Делаем голос ниже
-                u.rate = 1.0;
-                
-                const voices = window.speechSynthesis.getVoices();
-                let deepMale = voices.find(v => v.lang.includes('ru') && (v.name.includes('Dmitry') || v.name.includes('Pavel') || v.name.includes('Maxim')));
-                if (deepMale) u.voice = deepMale;
-                
-                window.speechSynthesis.speak(u);
-            }
-        }
+        const googleUrl = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=ru&q=${encodeURIComponent(cleanText)}`;
+        await playCloud(googleUrl);
+    } catch (e) {
+        console.warn("[TTS] Все методы озвучки не сработали.");
     }
 }
 
