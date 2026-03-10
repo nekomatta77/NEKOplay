@@ -67,11 +67,11 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
         });
       }
 
-      // ИСПРАВЛЕНО: Возврат в лобби (корректная очистка состояния)
+      // Возврат в лобби (очистка состояния)
       if (event.data?.type === 'play_again') {
         const updates: any = {};
-        updates[`rooms/${room.id}/gameState`] = null; // Удаляем данные прошлой игры
-        updates[`rooms/${room.id}/status`] = 'waiting'; // Возвращаем комнату в ожидание
+        updates[`rooms/${room.id}/gameState`] = null; 
+        updates[`rooms/${room.id}/status`] = 'waiting'; 
         await update(ref(db), updates);
       }
 
@@ -103,18 +103,21 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     const unsubscribe = onValue(stateRef, (snapshot) => {
       const state = snapshot.val() || {};
       if (iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage({ type: 'sync_state', state: state }, '*');
+        iframeRef.current.contentWindow.postMessage({ 
+          type: 'sync_state', 
+          state: state,
+          roomPlayers: room.players // ИСПРАВЛЕНИЕ: Передаем актуальных игроков для лобби
+        }, '*');
       }
     });
     return () => unsubscribe();
-  }, [room.id]);
+  }, [room.id, room.players]); // ИСПРАВЛЕНИЕ: Добавили room.players в зависимости
 
   // Слушаем действия (game_action) из Firebase
   useEffect(() => {
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
       const actionData = snapshot.val();
-      // Отправляем в iframe только если ход сделали НЕ мы
       if (actionData && actionData.senderId !== user.id && iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({ type: 'game_action', action: actionData.action }, '*');
       }

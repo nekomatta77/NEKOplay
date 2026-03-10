@@ -1,13 +1,8 @@
 // --- ГЛОБАЛЬНЫЙ ПЕРЕХВАТ ОШИБОК ---
 window.onerror = function(message, source, lineno, colno, error) {
     console.error(`[CRITICAL ERROR] Строка: ${lineno}:${colno} | Ошибка: ${message}`);
-    console.error(error);
     return false;
 };
-
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('[PROMISE ERROR] Необработанная ошибка в Promise:', event.reason);
-});
 
 let globalState = {};
 const urlParams = new URLSearchParams(window.location.search);
@@ -16,520 +11,602 @@ const isHost = urlParams.get('isHost') === 'true';
 const playersCountParam = parseInt(urlParams.get('players')) || 1;
 const myName = urlParams.get('name') || 'Аноним';
 
-console.log(`[DEBUG] Инициализация игры. Мой ID: ${myUserId}, Хост: ${isHost}, Игроков из URL: ${playersCountParam}`);
-
 let isGeneratingRound = false;
+let currentTimerInterval = null;
+let myPhaseStartTime = 0; 
+let spokenPhrases = new Set();
+let currentTTSAudio = null; // Для управления качественным звуком
 
-// Утилиты интерфейса
+// --- ВСТРОЕННЫЙ ЗВУКОВОЙ ДВИЖОК (SFX) ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(type) {
+    if (!isHost) return; 
+    try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const t = audioCtx.currentTime;
+        if (type === 'tick') {
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(800, t); gain.gain.setValueAtTime(0.1, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.05); osc.start(t); osc.stop(t + 0.05);
+        } else if (type === 'whoosh') {
+            const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+            osc.type = 'sine'; osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.setValueAtTime(400, t); osc.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+            gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(0.2, t + 0.1);
+            gain.gain.linearRampToValueAtTime(0, t + 0.3); osc.start(t); osc.stop(t + 0.3);
+        } else if (type === 'badum') {
+            const kick = audioCtx.createOscillator(); const kg = audioCtx.createGain();
+            kick.connect(kg); kg.connect(audioCtx.destination);
+            kick.frequency.setValueAtTime(150, t); kick.frequency.exponentialRampToValueAtTime(0.01, t + 0.1);
+            kg.gain.setValueAtTime(0.5, t); kg.gain.exponentialRampToValueAtTime(0.01, t + 0.1); kick.start(t); kick.stop(t + 0.1);
+            const snare = audioCtx.createOscillator(); const sg = audioCtx.createGain();
+            snare.type = 'triangle'; snare.connect(sg); sg.connect(audioCtx.destination);
+            snare.frequency.setValueAtTime(250, t + 0.15); sg.gain.setValueAtTime(0.5, t + 0.15);
+            sg.gain.exponentialRampToValueAtTime(0.01, t + 0.25); snare.start(t + 0.15); snare.stop(t + 0.25);
+            const tss = audioCtx.createOscillator(); const tg = audioCtx.createGain();
+            tss.type = 'square'; tss.connect(tg); tg.connect(audioCtx.destination);
+            tss.frequency.setValueAtTime(6000, t + 0.3); tg.gain.setValueAtTime(0.1, t + 0.3);
+            tg.gain.exponentialRampToValueAtTime(0.01, t + 0.5); tss.start(t + 0.3); tss.stop(t + 0.5);
+        }
+    } catch(e) {}
+}
+
+// --- СИНТЕЗАТОР РЕЧИ (СЕКРЕТНЫЙ БЕСПЛАТНЫЙ API С КАЧЕСТВЕННЫМ ГОЛОСОМ) ---
+async function speakText(text) {
+    if (!isHost) return;
+
+    try {
+        // Останавливаем предыдущую фразу, если она еще звучит
+        if (currentTTSAudio) {
+            currentTTSAudio.pause();
+            currentTTSAudio.currentTime = 0;
+        }
+
+        // Используем открытый API StreamElements (движок Amazon Polly)
+        // Голос Maxim - шикарный мужской дикторский голос. (Альтернатива: Tatyana - женский)
+        const url = `https://api.streamelements.com/kappa/v2/speech?voice=Maxim&text=${encodeURIComponent(text)}`;
+        
+        currentTTSAudio = new Audio(url);
+        await currentTTSAudio.play();
+        return; // Успех! Выходим из функции.
+
+    } catch (e) {
+        console.warn("[DEBUG] StreamElements API недоступен, использую голос браузера:", e);
+    }
+
+    // ЗАПАСНОЙ ВАРИАНТ (Если нет интернета или API лег)
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ru-RU'; u.pitch = 0.8; u.rate = 1.05;
+    
+    const playWithBestVoice = () => {
+        const voices = window.speechSynthesis.getVoices();
+        let bestVoice = voices.find(v => v.lang.includes('ru') && v.name.includes('Google русский')); 
+        if (!bestVoice) bestVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('Yuri') || v.name.includes('Pavel') || v.name.includes('male')));
+        if (!bestVoice) bestVoice = voices.find(v => v.lang.includes('ru'));
+        if (bestVoice) u.voice = bestVoice;
+        window.speechSynthesis.speak(u);
+    };
+
+    if (window.speechSynthesis.getVoices().length === 0) window.speechSynthesis.onvoiceschanged = playWithBestVoice;
+    else playWithBestVoice();
+}
+
+// --- SVG ИКОНКИ ---
+const SVGS = {
+    crown: `<svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>`,
+    target: `<svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`,
+    lightning: `<svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`
+};
+
+function typeWriterEffectHTML(el, htmlString, speed=35) {
+    el.innerHTML = ''; el.classList.add('typewriter-cursor');
+    let i = 0; let text = ''; let isTag = false;
+    function type() {
+        if (i < htmlString.length) {
+            text += htmlString.charAt(i); el.innerHTML = text;
+            if (htmlString.charAt(i) === '<') isTag = true; if (htmlString.charAt(i) === '>') isTag = false;
+            i++; if (isTag) type(); else setTimeout(type, speed);
+        } else { el.classList.remove('typewriter-cursor'); }
+    }
+    type();
+}
+
 function setDisplay(id, display) { const el = document.getElementById(id); if (el) el.style.display = display; }
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
 window.leaveGame = function() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 
 function showPhase(phaseId) {
-    console.log(`[DEBUG] Переключение на экран: ${phaseId}`);
+    playSound('whoosh');
     document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
-    const target = document.getElementById(phaseId);
-    if(target) target.classList.add('active');
-    else console.warn(`[DEBUG] Экран ${phaseId} не найден!`);
+    const target = document.getElementById(phaseId); if(target) target.classList.add('active');
+}
+function showLoading(show, message = "Загрузка...") { setText('loading-message', message); setDisplay('global-loading', show ? 'flex' : 'none'); }
+function updateDynamicBackground(phase, round) {
+    document.body.className = ''; 
+    if (!phase || phase === 'waiting') document.body.classList.add('bg-lobby');
+    else if (round === 1) document.body.classList.add('bg-round1');
+    else if (round === 2) document.body.classList.add('bg-round2');
+    else if (round === 3) document.body.classList.add('bg-round3');
 }
 
-function showLoading(show, message = "Загрузка...") {
-    setText('loading-message', message);
-    setDisplay('global-loading', show ? 'flex' : 'none');
+function sendUpdate(updates) {
+    try { window.parent.postMessage({ type: 'update_state', updates: JSON.parse(JSON.stringify(updates)) }, '*'); } catch (e) {}
+}
+
+function startLocalTimer(deadlineMs, displayId, onExpireCallback) {
+    clearInterval(currentTimerInterval);
+    function update() {
+        const remaining = Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000));
+        setText(displayId, remaining);
+        if (remaining <= 10 && remaining > 0) playSound('tick');
+        if (remaining <= 0) { clearInterval(currentTimerInterval); if (isHost && onExpireCallback) onExpireCallback(); }
+    }
+    update(); currentTimerInterval = setInterval(update, 1000);
 }
 
 // --- ИИ ФУНКЦИИ ---
 async function fetchFromAI(systemPrompt) {
     try {
-        console.log("[DEBUG] Отправка запроса к AI...");
         const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
-        const apiKey = atob(SECRET_KEY_BASE64);
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-            console.warn("[DEBUG] AI запрос превысил лимит времени (10 сек) и был отменен!");
-            controller.abort();
-        }, 10000);
-
+        const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 8000);
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            signal: controller.signal,
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-            body: JSON.stringify({
-                model: "arcee-ai/trinity-large-preview:free", 
-                messages: [{ role: "system", content: systemPrompt }]
-            })
+            method: 'POST', signal: controller.signal,
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atob(SECRET_KEY_BASE64)}` },
+            body: JSON.stringify({ model: "arcee-ai/trinity-large-preview:free", messages: [{ role: "system", content: systemPrompt }] })
         });
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        console.log("[DEBUG] Ответ AI успешно получен:", data);
-        return data.choices[0].message.content.trim();
-    } catch(e) { 
-        console.error("[DEBUG] Ошибка при работе с AI:", e); 
-        return null; 
-    }
+        clearTimeout(timeoutId); const data = await response.json(); return data.choices[0].message.content.trim();
+    } catch(e) { return null; }
 }
 
-const FALLBACK_PROMPTS = [
-    "Самая странная причина для опоздания на работу?",
-    "Что не стоит говорить на первом свидании?",
-    "Худшее имя для домашнего попугая?",
-    "Если бы коты умели говорить, их первая фраза была бы...",
-    "Новая услуга в такси, которой никто не воспользуется:"
-];
+const FALLBACK_PROMPTS = ["Худшее, что можно крикнуть во время секса?", "Неожиданная находка в кармане старой куртки?", "Секретный ингредиент в бургерах?", "Самая тупая причина для развода:"];
 
-async function generatePrompts(round, count) {
-    console.log(`[DEBUG] Генерация вопросов. Раунд: ${round}, Количество: ${count}`);
-    let promptText = round === 1 
-        ? `Сгенерируй ${count} ПРОСТЫХ, коротких и смешных незаконченных фраз или вопросов для пати-игры. Выведи СТРОГО JSON массив строк и больше ничего.`
-        : `Сгенерируй ${count} СЛОЖНЫХ, абсурдных вопросов-ситуаций. Выведи СТРОГО JSON массив строк.`;
+async function generatePrompts(round, count, playerNamesList = [], theme = "") {
+    let namesStr = playerNamesList.length > 0 ? playerNamesList.join(', ') : "";
+    let themeStr = theme ? `ИГРА ИДЕТ НА ТЕМУ: "${theme}". ВСЕ ВОПРОСЫ СВЯЖИ С ЭТОЙ ТЕМОЙ! ` : "";
+    const strictRule = `ВАЖНО: Пиши ТОЛЬКО вопросы или начала фраз (сетапы). КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать сами ответы или варианты к ним!`;
+    const langRule = `ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ! НИКАКОГО АНГЛИЙСКОГО.`;
+
+    let promptText = "";
+    if (round === 1) promptText = `${themeStr}Сгенерируй ${count} забавных незаконченных фраз. ${strictRule} ${langRule} Микс: половина обычные, половина абсурдные. ${namesStr ? `Строго максимум в 1 вопросе используй случайное имя (${namesStr}).` : ''} Выведи СТРОГО JSON массив строк.`;
+    else if (round === 2) promptText = `${themeStr}Сгенерируй ${count} ситуационных вопросов. ${strictRule} ${langRule} Сделай их приземленными, но с простором для черного юмора. ${namesStr ? `Максимум 1 вопрос с именем (${namesStr}).` : ''} Выведи СТРОГО JSON массив строк.`;
+    else if (round === 3) promptText = `${themeStr}Сгенерируй ${count} уникальных финальных вопросов. ${langRule} Требование: КАЖДЫЙ вопрос должен требовать перечислить ровно ТРИ вещи. Выведи СТРОГО JSON массив из ${count} строк.`;
     
     let res = await fetchFromAI(promptText);
     try {
-        if (!res) throw new Error("Пустой ответ от AI");
-        res = res.replace(/```json/gi, '').replace(/```/g, '').trim();
-        let parsed = JSON.parse(res);
-        if (Array.isArray(parsed) && parsed.length >= count) {
-            console.log("[DEBUG] Вопросы успешно распарсены:", parsed);
-            return parsed.slice(0, count);
-        }
-        throw new Error("Неверный формат массива от AI");
-    } catch(e) {
-        console.error("[DEBUG] AI не справился с вопросами, используем запасные (Fallback). Ошибка:", e);
-        return Array(count).fill(0).map((_, i) => FALLBACK_PROMPTS[i % FALLBACK_PROMPTS.length]);
-    }
+        res = res.replace(/```json/gi, '').replace(/```/g, '').trim(); let parsed = JSON.parse(res);
+        if (Array.isArray(parsed) && parsed.length >= count) return parsed.slice(0, count); throw new Error("Format");
+    } catch(e) { return Array(count).fill(0).map((_, i) => (theme ? `[${theme}] ` : '') + FALLBACK_PROMPTS[i % FALLBACK_PROMPTS.length]); }
 }
 
-async function generateBotAnswer(promptText) {
-    const aiRes = await fetchFromAI(`Ты играешь в комедийную игру. Вопрос: "${promptText}". Напиши максимально смешной, абсурдный ответ из 2-5 слов. БЕЗ КАВЫЧЕК. Без пояснений.`);
-    return aiRes || "Секретный ингредиент";
+async function generateBotAnswer(promptText, isRound3) {
+    const sys = isRound3 ? `Вопрос: "${promptText}". Напиши 3 смешных ответа через <br> (1. [ответ]<br>2. [ответ]<br>3. [ответ]). БЕЗ КАВЫЧЕК. НА РУССКОМ.` : `Вопрос: "${promptText}". Напиши смешной ответ из 2-6 слов. БЕЗ КАВЫЧЕК. Без пояснений. НА РУССКОМ.`;
+    const aiRes = await fetchFromAI(sys); return aiRes || (isRound3 ? "1. Ничего<br>2. Эм...<br>3. Секрет" : "Секретный ингредиент");
 }
 
-// --- ЛОГИКА ИГРОКОВ ---
+async function generateMissions(count) {
+    const sys = `Сгенерируй ${count} уникальных, смешных секретных заданий для игроков в пати-игре.
+ЗАДАЧА: Игрок должен выполнить это условие при написании своего ответа (например, ограничение на слова, стиль речи, формат).
+ПРАВИЛА: Придумывай всё с нуля, прояви фантазию. ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ. СТРОЖАЙШЕ следи за грамматикой, текст должен быть на идеальном русском без ошибок.
+Выведи СТРОГО JSON массив строк. Больше ничего не пиши.`;
+    const res = await fetchFromAI(sys);
+    try {
+        let parsed = JSON.parse(res.replace(/```json/gi, '').replace(/```/g, '').trim());
+        if (Array.isArray(parsed) && parsed.length >= count) return parsed.slice(0, count); throw new Error();
+    } catch(e) { return Array(count).fill("Обязательно используй в ответе название животного"); }
+}
+
+async function generateRoast(sortedPlayers) {
+    const loser = sortedPlayers[sortedPlayers.length - 1]?.name || "Кто-то";
+    const sys = `Ты — безжалостный, токсичный ИИ-ведущий комедийного шоу.
+Игрок на последнем месте: "${loser}".
+Задача: Сгенерируй ОДНО короткое (5-10 слов), но МАКСИМАЛЬНО ЖЕСТКОЕ, хлесткое и унизительное оскорбление (без мата) в адрес "${loser}" за его отвратительное чувство юмора. Без кавычек, без приветствий. Только панчлайн. НА РУССКОМ ЯЗЫКЕ.`;
+    const res = await fetchFromAI(sys); return res || `${loser}, твои шутки вызывают только жалость.`;
+}
+
 function getActivePlayers() {
-    let players = [...(globalState.players || [])];
-    console.log("[DEBUG] Изначальный список игроков из globalState:", players);
-    
-    let botIndex = 1;
-    while (players.length < 3) {
-        players.push(`ai_bot_${botIndex}`);
-        botIndex++;
-    }
-
-    if (players.length % 2 === 0) {
-        players.push(`ai_bot_odd`);
-    }
-
-    console.log("[DEBUG] Итоговый список игроков (с ботами):", players);
+    let players = [...(globalState.players || [])]; let botIndex = 1;
+    while (players.length < 3) { players.push(`ai_bot_${botIndex}`); botIndex++; }
+    if (players.length % 2 === 0) players.push(`ai_bot_odd`);
     return players;
 }
 
 // --- СИНХРОНИЗАЦИЯ СОСТОЯНИЯ ---
 window.addEventListener('message', (event) => {
     if (event.data?.type === 'sync_state') {
-        console.log("[DEBUG] --- Входящий SYNC_STATE от React ---", event.data.state);
-        globalState = event.data.state || {}; 
+        globalState = event.data.state || {}; globalState.roomPlayers = event.data.roomPlayers || []; 
         handleStateChange();
     }
 });
 
 function handleStateChange() {
-    const status = globalState.status;
-    const phase = globalState.phase;
-    console.log(`[DEBUG] Обработка состояния: status = ${status}, phase = ${phase}`);
-    
+    const status = globalState.status; const phase = globalState.phase; const round = globalState.round || 1;
+    updateDynamicBackground(status === 'waiting' ? 'waiting' : phase, round);
     showLoading(false);
 
-    // 1. ЛОББИ ДО СТАРТА
     if (!status || status === 'waiting') {
-        showPhase('lobby-screen');
-        isGeneratingRound = false; 
+        showPhase('lobby-screen'); isGeneratingRound = false; clearInterval(currentTimerInterval);
+        spokenPhrases.clear();
+
+        const pList = globalState.roomPlayers || []; setText('players-count-display', pList.length > 0 ? pList.length : playersCountParam);
         
-        const pList = globalState.players || [];
-        console.log(`[DEBUG] Отрисовка лобби. Игроков в массиве: ${pList.length}`);
-        
-        // Берем количество из URL, если база еще пустая
-        setText('players-count-display', pList.length > 0 ? pList.length : playersCountParam);
-        
-        const listContainer = document.getElementById('lobby-players-list');
-        
-        if (pList.length > 0) {
-            // Если данные пришли из базы
-            listContainer.innerHTML = pList.map(id => {
-                const name = globalState.playerNames?.[id] || "Аноним";
-                const avatar = globalState.playerAvatars?.[id] || "https://picsum.photos/100";
-                return `<div class="player-avatar-wrap"><img src="${avatar}"><div class="player-name-mini">${name}</div></div>`;
-            }).join('');
-        } else {
-            // ЗАГЛУШКА ДО СТАРТА: показываем себя и текст
-            listContainer.innerHTML = `
-                <div class="player-avatar-wrap">
-                    <img src="https://api.dicebear.com/7.x/bottts/png?seed=${myUserId}&backgroundColor=b6e3f4" style="border-color: #facc15;">
-                    <div class="player-name-mini">${myName} (Вы)</div>
+        const hostControls = document.getElementById('host-controls');
+        if (isHost && !document.getElementById('toggle-theme')) {
+            hostControls.innerHTML = `
+                <div class="settings-panel">
+                    <div class="setting-item"><span>Секретные задания (Бета)</span><label class="switch"><input type="checkbox" id="toggle-missions"><span class="slider"></span></label></div>
+                    <div class="setting-item"><span>Тематическая игра</span><label class="switch"><input type="checkbox" id="toggle-theme"><span class="slider"></span></label></div>
                 </div>
-                <div style="width: 100%; text-align: center; color: #64748b; font-size: 0.85rem; margin-top: 15px;">
-                    Остальные игроки появятся здесь<br>сразу после старта игры
-                </div>
+                <button id="btn-start-game" class="btn-primary" onclick="startGame()">НАЧАТЬ ИГРУ</button>
             `;
         }
-        
-        if (isHost) {
-            setDisplay('host-controls', 'block');
-            document.getElementById('btn-start-game').disabled = false;
-        } else {
-            setDisplay('guest-waiting', 'block');
+
+        const listContainer = document.getElementById('lobby-players-list');
+        if (pList.length > 0) {
+            listContainer.innerHTML = pList.map(p => `<div class="player-avatar-wrap"><img src="${p.avatar || 'https://picsum.photos/100'}"><div class="player-name-mini">${p.name || "Аноним"} ${p.id === myUserId ? '(Вы)' : ''}${p.isHost ? SVGS.crown : ''}</div></div>`).join('');
         }
+        
+        setDisplay('host-controls', isHost ? 'block' : 'none'); setDisplay('guest-waiting', isHost ? 'none' : 'block');
         return;
     }
 
-    // 2. ИГРА ЗАПУЩЕНА REACT-ОМ, НО ФАЗА НЕ УСТАНОВЛЕНА
     if (status === 'playing' && !phase) {
-        console.log("[DEBUG] Статус 'playing', но фазы нет. Хост начинает генерацию раунда.");
-        showPhase('lobby-screen');
-        showLoading(true, "Нейросеть генерирует вопросы...");
-        
-        if (isHost && !isGeneratingRound) {
-            isGeneratingRound = true;
-            initFirstRound(); 
-        }
+        showPhase('lobby-screen'); showLoading(true, "Нейросеть генерирует вопросы...");
+        if (isHost && !isGeneratingRound) { if(audioCtx.state === 'suspended') audioCtx.resume(); isGeneratingRound = true; initFirstRound(); }
         return;
     }
 
-    // 3. ИГРОВЫЕ ФАЗЫ
     if (phase === 'answering') renderAnsweringPhase();
     if (phase === 'voting') renderVotingPhase();
     if (phase === 'voting_result') renderVotingResultPhase();
     if (phase === 'scoreboard') renderScoreboardPhase();
 }
 
-// --- ЛОГИКА ХОСТА (СТАРТ ИГРЫ) ---
 window.startGame = function() {
-    console.log("[DEBUG] Нажата кнопка СТАРТ. Являюсь ли я хостом?", isHost);
     if (!isHost) return;
+    const useTheme = document.getElementById('toggle-theme')?.checked || false;
+    const useMissions = document.getElementById('toggle-missions')?.checked || false;
+    let themeText = "";
+    if (useTheme) {
+        themeText = prompt("Включена 'Тематическая игра'!\nВведите тему (Например: Аниме, Офис, 90-е):", "");
+        if (themeText === null) return; 
+    }
     document.getElementById('btn-start-game').disabled = true;
-    
-    console.log("[DEBUG] Отправка POST MESSAGE: start_game в React");
-    window.parent.postMessage({ 
-        type: 'start_game', 
-        settings: { mode: 'quiplash' } 
-    }, '*');
+    window.parent.postMessage({ type: 'start_game', settings: { mode: 'quiplash', theme: themeText, useMissions: useMissions } }, '*');
 };
 
 async function initFirstRound() {
-    console.log("[DEBUG] Инициализация первого раунда (initFirstRound)...");
-    const players = getActivePlayers();
-    
-    let names = {...(globalState.playerNames || {})};
-    let avatars = {...(globalState.playerAvatars || {})};
-    players.forEach((p, i) => {
-        if (p.includes('ai_bot')) {
-            names[p] = `НейроБот v${i+1}`;
-            avatars[p] = `https://api.dicebear.com/7.x/bottts/png?seed=${p}&backgroundColor=b6e3f4`;
+    try {
+        if (!spokenPhrases.has('start_game')) { speakText("Начинаем игру! Готовьте свои шутки."); spokenPhrases.add('start_game'); }
+
+        const players = getActivePlayers();
+        let names = {...(globalState.playerNames || {})}; let avatars = {...(globalState.playerAvatars || {})};
+        players.forEach((p, i) => { if (p.includes('ai_bot')) { names[p] = `НейроБот v${i+1}`; avatars[p] = `https://picsum.photos/100`; } });
+        
+        const theme = globalState.settings?.theme || "";
+        const prompts = await generatePrompts(1, players.length, players.map(p => names[p] || "Аноним"), theme);
+        
+        let assignments = {};
+        players.forEach((p, i) => {
+            let q1 = i; let q2 = (i + 1) % players.length;
+            if (!assignments[q1]) assignments[q1] = []; if (!assignments[q2]) assignments[q2] = [];
+            assignments[q1].push(p); assignments[q2].push(p);
+        });
+
+        let missions = null;
+        if (globalState.settings?.useMissions) {
+            const aiMissions = await generateMissions(players.length);
+            missions = {}; players.forEach((p, i) => { missions[p] = aiMissions[i]; });
         }
-    });
 
-    const promptCount = players.length; 
-    const prompts = await generatePrompts(1, promptCount);
-    
-    let assignments = {};
-    players.forEach((p, i) => {
-        let q1 = i;
-        let q2 = (i + 1) % promptCount;
-        if (!assignments[q1]) assignments[q1] = [];
-        if (!assignments[q2]) assignments[q2] = [];
-        assignments[q1].push(p);
-        assignments[q2].push(p);
-    });
-
-    console.log("[DEBUG] Вопросы распределены:", assignments);
-    console.log("[DEBUG] Отправка обновления в базу (первый раунд начался).");
-
-    window.parent.postMessage({ 
-        type: 'update_state', 
-        updates: { 
-            phase: 'answering', round: 1, 
-            playerNames: names, playerAvatars: avatars,
-            activePlayersList: players, 
-            gameData: { prompts, assignments, answers: {}, votes: {}, scores: {} }
-        } 
-    }, '*');
-    
-    setTimeout(() => handleBotAnswers(prompts, assignments), 1000);
+        sendUpdate({ phase: 'answering', round: 1, playerNames: names, playerAvatars: avatars, activePlayersList: players, gameData: { prompts, assignments, missions, deadline: Date.now() + 60000 } });
+        setTimeout(() => handleBotAnswers(prompts, assignments, false), 1000);
+    } catch (err) { isGeneratingRound = false; }
 }
 
-async function handleBotAnswers(prompts, assignments) {
-    console.log("[DEBUG] Запуск ответов для ботов...");
-    let botAnswers = {};
+async function handleBotAnswers(prompts, assignments, isRound3) {
+    let botAnswers = {}; let promises = [];
     for (let qIdx in assignments) {
         let aiPlayers = assignments[qIdx].filter(p => p.includes('ai_bot'));
         for (let botId of aiPlayers) {
             if (!botAnswers[qIdx]) botAnswers[qIdx] = {};
-            botAnswers[qIdx][botId] = await generateBotAnswer(prompts[qIdx]);
+            promises.push(generateBotAnswer(prompts[qIdx] || "", isRound3).then(ans => botAnswers[qIdx][botId] = ans));
         }
     }
-    console.log("[DEBUG] Боты ответили:", botAnswers);
-    
+    await Promise.all(promises);
     const currentAnswers = globalState.gameData?.answers || {};
     for (let qIdx in botAnswers) {
         if (!currentAnswers[qIdx]) currentAnswers[qIdx] = {};
-        for (let botId in botAnswers[qIdx]) {
-            currentAnswers[qIdx][botId] = botAnswers[qIdx][botId];
-        }
+        for (let botId in botAnswers[qIdx]) currentAnswers[qIdx][botId] = botAnswers[qIdx][botId];
     }
-    window.parent.postMessage({ type: 'update_state', updates: { 'gameData/answers': currentAnswers }}, '*');
+    sendUpdate({ 'gameData/answers': currentAnswers });
 }
 
-// --- ФАЗА: ВВОД ОТВЕТОВ ---
 function renderAnsweringPhase() {
     showPhase('answering-phase');
-    setText('answering-round-badge', `РАУНД ${globalState.round}`);
+    globalState._transitioningToVoting = false; 
+    if (!myPhaseStartTime) myPhaseStartTime = Date.now(); 
+
+    const isRound3 = globalState.round === 3;
+    setText('answering-round-badge', isRound3 ? "ФИНАЛ: 3 ОТВЕТА" : `РАУНД ${globalState.round || 1}`);
     
-    const gd = globalState.gameData;
+    const gd = globalState.gameData || {};
+    const assignments = gd.assignments || {};
+    
+    if (gd.deadline) startLocalTimer(gd.deadline, 'answering-timer', () => { if (isHost && !globalState._transitioningToVoting) forceTransitionToVoting(); });
+
     let myQuestions = [];
-    for (let qIdx in gd.assignments) {
-        if (gd.assignments[qIdx].includes(myUserId)) {
-            myQuestions.push({ idx: qIdx, text: gd.prompts[qIdx] });
-        }
-    }
-    console.log("[DEBUG] Мои вопросы для ответов:", myQuestions);
+    for (let qIdx in assignments) { if (assignments[qIdx] && assignments[qIdx].includes(myUserId)) myQuestions.push({ idx: qIdx, text: (gd.prompts || [])[qIdx] || "" }); }
 
     const container = document.getElementById('prompts-scroll-area');
-    container.innerHTML = myQuestions.map((q, i) => `
-        <div class="question-card">
-            <div class="q-text">${q.text}</div>
-            <input type="text" id="answer-input-${q.idx}" class="modern-input" placeholder="Введите смешной ответ..." oninput="checkAnswersFilled()">
-        </div>
-    `).join('');
-    
-    const myAns = gd.answers || {};
-    let allFilled = myQuestions.length > 0 && myQuestions.every(q => myAns[q.idx] && myAns[q.idx][myUserId]);
-    
-    if (myQuestions.length === 0) {
-        setDisplay('prompts-scroll-area', 'none');
-        setDisplay('answering-footer', 'none');
-        setDisplay('answering-waiting', 'flex');
-        document.querySelector('#answering-waiting h3').innerText = "Вы зритель!";
-    } else if (allFilled) {
-        setDisplay('prompts-scroll-area', 'none');
-        setDisplay('answering-footer', 'none');
-        setDisplay('answering-waiting', 'flex');
-    } else {
-        setDisplay('prompts-scroll-area', 'flex');
-        setDisplay('answering-footer', 'block');
-        setDisplay('answering-waiting', 'none');
+    if (!container.hasAttribute('data-rendered-round') || container.getAttribute('data-rendered-round') !== String(globalState.round)) {
+        
+        let missionHtml = '';
+        if (globalState.settings?.useMissions && gd.missions && gd.missions[myUserId]) {
+            missionHtml = `<div class="secret-mission-banner">${SVGS.target} Секретное задание: ${gd.missions[myUserId]}</div>`;
+        }
+
+        container.innerHTML = missionHtml + myQuestions.map((q) => `
+            <div class="question-card">
+                <div class="q-text">${q.text}</div>
+                ${isRound3 ? `
+                    <input type="text" id="answer-input-${q.idx}-1" maxlength="150" class="modern-input" placeholder="1..." oninput="checkAnswersFilled()">
+                    <input type="text" id="answer-input-${q.idx}-2" maxlength="150" class="modern-input" placeholder="2..." style="margin-top:5px;" oninput="checkAnswersFilled()">
+                    <input type="text" id="answer-input-${q.idx}-3" maxlength="150" class="modern-input" placeholder="3..." style="margin-top:5px;" oninput="checkAnswersFilled()">
+                ` : `<input type="text" id="answer-input-${q.idx}" maxlength="150" class="modern-input" placeholder="Введите смешной ответ..." oninput="checkAnswersFilled()">`}
+            </div>
+        `).join('');
+        container.setAttribute('data-rendered-round', globalState.round);
     }
+    
+    let allFilled = myQuestions.length > 0 && myQuestions.every(q => (gd.answers || {})[q.idx]?.[myUserId]);
+    
+    setDisplay('prompts-scroll-area', myQuestions.length === 0 || allFilled ? 'none' : 'block');
+    setDisplay('answering-footer', myQuestions.length === 0 || allFilled ? 'none' : 'block');
+    setDisplay('answering-waiting', myQuestions.length === 0 || allFilled ? 'flex' : 'none');
+    if (myQuestions.length === 0) document.querySelector('#answering-waiting h3').innerText = "Вы зритель!";
 
     if (isHost) {
-        let totalNeeded = Object.keys(gd.assignments).length * 2;
-        let totalGiven = 0;
-        for (let q in gd.answers) totalGiven += Object.keys(gd.answers[q]).length;
-        
-        if (totalGiven >= totalNeeded) {
-            console.log("[DEBUG] Все ответы получены. Переход к голосованию.");
-            window.parent.postMessage({ 
-                type: 'update_state', 
-                updates: { phase: 'voting', 'gameData/currentVoteIndex': 0, 'gameData/votes': {} }
-            }, '*');
-        }
+        let totalNeeded = 0; for(let q in assignments) totalNeeded += assignments[q].length;
+        let totalGiven = 0; for (let q in (gd.answers || {})) if (gd.answers[q]) totalGiven += Object.keys(gd.answers[q]).length;
+        if (totalNeeded > 0 && totalGiven >= totalNeeded && !globalState._transitioningToVoting) forceTransitionToVoting();
     }
+}
+
+function forceTransitionToVoting() {
+    globalState._transitioningToVoting = true; clearInterval(currentTimerInterval);
+    myPhaseStartTime = 0; 
+    sendUpdate({ phase: 'voting', 'gameData/currentVoteIndex': 0, 'gameData/deadline': Date.now() + 20000 });
 }
 
 window.checkAnswersFilled = function() {
     const inputs = document.querySelectorAll('input[id^="answer-input-"]');
-    let allFilled = Array.from(inputs).every(inp => inp.value.trim().length > 0);
-    document.getElementById('btn-submit-answers').disabled = !allFilled;
+    document.getElementById('btn-submit-answers').disabled = !Array.from(inputs).every(inp => inp.value.trim().length > 0);
 };
 
 window.submitAnswers = function() {
-    const inputs = document.querySelectorAll('input[id^="answer-input-"]');
-    const updates = {};
-    inputs.forEach(inp => {
-        const qIdx = inp.id.split('-')[2];
-        updates[`gameData/answers/${qIdx}/${myUserId}`] = inp.value.trim();
-    });
-    console.log("[DEBUG] Отправка моих ответов:", updates);
-    window.parent.postMessage({ type: 'update_state', updates }, '*');
+    const gd = globalState.gameData || {}; const updates = {};
+    const timeTakes = Math.floor((Date.now() - myPhaseStartTime) / 1000); 
+    
+    for (let qIdx in gd.assignments) {
+        if (gd.assignments[qIdx].includes(myUserId)) {
+            if (globalState.round === 3) {
+                const v1 = document.getElementById(`answer-input-${qIdx}-1`)?.value.trim();
+                const v2 = document.getElementById(`answer-input-${qIdx}-2`)?.value.trim();
+                const v3 = document.getElementById(`answer-input-${qIdx}-3`)?.value.trim();
+                updates[`gameData/answers/${qIdx}/${myUserId}`] = `1. ${v1}<br>2. ${v2}<br>3. ${v3}`;
+            } else {
+                updates[`gameData/answers/${qIdx}/${myUserId}`] = document.getElementById(`answer-input-${qIdx}`)?.value.trim() || "Без ответа";
+            }
+        }
+    }
+    updates[`gameData/answerTimes/${myUserId}`] = timeTakes; 
+    sendUpdate(updates);
 };
 
-// --- ФАЗА: ГОЛОСОВАНИЕ ---
 function renderVotingPhase() {
     showPhase('voting-phase');
-    const gd = globalState.gameData;
-    const vIdx = gd.currentVoteIndex || 0;
+    globalState._transitioningToResult = false; 
+    const gd = globalState.gameData || {}; const vIdx = gd.currentVoteIndex || 0;
     
-    setText('voting-prompt', gd.prompts[vIdx]);
-    
-    const authors = gd.assignments[vIdx];
-    const answers = gd.answers[vIdx] || {};
-    
-    const isAuthor = authors.includes(myUserId);
-    const hasVoted = gd.votes[vIdx] && gd.votes[vIdx][myUserId];
+    const promptText = gd.prompts[vIdx] || "...";
+    setText('voting-prompt', promptText);
 
-    const grid = document.getElementById('voting-answers-grid');
-    grid.innerHTML = authors.map(authorId => {
-        const ansText = answers[authorId] || "(нет ответа)";
+    const voteKey = `vote_${globalState.round}_${vIdx}`;
+    if (!spokenPhrases.has(voteKey)) { speakText(promptText); spokenPhrases.add(voteKey); }
+
+    if (gd.deadline) startLocalTimer(gd.deadline, 'voting-timer', () => {
+        if (isHost && !globalState._transitioningToResult) { globalState._transitioningToResult = true; sendUpdate({ phase: 'voting_result' }); }
+    });
+    
+    const authors = gd.assignments[vIdx] || []; const currentAnswers = gd.answers?.[vIdx] || {}; const votes = gd.votes?.[vIdx] || {};
+    const isAuthor = authors.includes(myUserId); const hasVoted = votes[myUserId];
+
+    document.getElementById('voting-answers-grid').innerHTML = authors.map(authorId => {
         const disabled = isAuthor || hasVoted;
-        const votedClass = gd.votes[vIdx]?.[myUserId] === authorId ? 'voted' : '';
-        
-        return `
-            <div class="answer-btn ${disabled ? 'disabled' : ''} ${votedClass}" 
-                 onclick="!${disabled} && submitVote('${authorId}')">
-                ${ansText}
-            </div>
-        `;
+        return `<div class="answer-btn ${disabled ? 'disabled' : ''} ${votes[myUserId] === authorId ? 'voted' : ''}" onclick="!${disabled} && submitVote('${authorId}')">${currentAnswers[authorId] || "(нет ответа)"}</div>`;
     }).join('');
 
-    if (isAuthor) setText('voting-status', "Вы не можете голосовать за свой ответ.");
-    else if (hasVoted) setText('voting-status', "Голос принят!");
-    else setText('voting-status', "Голосуйте за лучший!");
+    setText('voting-status', isAuthor ? "Вы не можете голосовать за свой ответ." : (hasVoted ? "Голос принят!" : "Голосуйте за лучший!"));
 
     if (isHost) {
-        const totalPlayers = globalState.activePlayersList.length;
-        const expectedVotes = totalPlayers - 2; 
-        const currentVotes = gd.votes[vIdx] ? Object.keys(gd.votes[vIdx]).length : 0;
-        
-        if (currentVotes >= expectedVotes) {
-            console.log(`[DEBUG] Голосование завершено для вопроса ${vIdx}. Переход к результатам.`);
-            setTimeout(() => {
-                window.parent.postMessage({ type: 'update_state', updates: { phase: 'voting_result' } }, '*');
-            }, 1500);
+        if (!gd.botVotesSubmitted?.[vIdx]) {
+            const aiPlayers = (globalState.activePlayersList || []).filter(p => p.includes('ai_bot'));
+            let botUpdates = {}; let botsVoted = false;
+            aiPlayers.forEach(botId => {
+                if (!authors.includes(botId) && authors.length > 0) {
+                    botUpdates[`gameData/votes/${vIdx}/${botId}`] = authors[Math.floor(Math.random() * authors.length)]; botsVoted = true;
+                }
+            });
+            if (botsVoted) { botUpdates[`gameData/botVotesSubmitted/${vIdx}`] = true; sendUpdate(botUpdates); }
+        }
+
+        const expectedVotes = Math.max(0, (globalState.activePlayersList || []).length - authors.length);
+        if (expectedVotes > 0 && Object.keys(votes).length >= expectedVotes && !globalState._transitioningToResult) {
+            clearInterval(currentTimerInterval);  globalState._transitioningToResult = true;
+            setTimeout(() => sendUpdate({ phase: 'voting_result' }), 1000);
         }
     }
 }
 
-window.submitVote = function(targetId) {
-    const vIdx = globalState.gameData.currentVoteIndex;
-    const updates = {};
-    updates[`gameData/votes/${vIdx}/${myUserId}`] = targetId;
-    console.log(`[DEBUG] Отправка голоса за ${targetId}`);
-    window.parent.postMessage({ type: 'update_state', updates }, '*');
-};
+window.submitVote = function(targetId) { sendUpdate({ [`gameData/votes/${(globalState.gameData || {}).currentVoteIndex || 0}/${myUserId}`]: targetId }); };
 
-// --- ФАЗА: РЕЗУЛЬТАТЫ ГОЛОСОВАНИЯ ---
 function renderVotingResultPhase() {
     showPhase('voting-result-phase');
-    setDisplay('btn-next-vote', isHost ? 'block' : 'none');
+    setDisplay('btn-next-vote', 'none'); clearInterval(currentTimerInterval);
 
-    const gd = globalState.gameData;
-    const vIdx = gd.currentVoteIndex;
-    setText('result-prompt', gd.prompts[vIdx]);
+    if (!document.getElementById('result-answers-grid').hasAttribute('data-played')) {
+        playSound('badum'); document.getElementById('result-answers-grid').setAttribute('data-played', 'true');
+    }
 
-    const authors = gd.assignments[vIdx];
-    const answers = gd.answers[vIdx];
-    const votes = gd.votes[vIdx] || {};
-    
-    let voteCounts = { [authors[0]]: 0, [authors[1]]: 0 };
-    let totalVotes = 0;
-    for (let voter in votes) { voteCounts[votes[voter]]++; totalVotes++; }
+    const gd = globalState.gameData || {}; const vIdx = gd.currentVoteIndex || 0;
+    setText('result-prompt', gd.prompts[vIdx] || "Результаты");
+
+    const authors = gd.assignments[vIdx] || []; const currentVotes = gd.votes?.[vIdx] || {};
+    let voteCounts = {}; authors.forEach(a => voteCounts[a] = 0);
+    let totalVotes = 0; for (let voter in currentVotes) { if (voteCounts[currentVotes[voter]] !== undefined) { voteCounts[currentVotes[voter]]++; totalVotes++; } }
 
     if (isHost && !gd.scoresCalculated?.[vIdx]) {
-        let newScores = {...gd.scores};
-        let mult = globalState.round === 2 ? 2 : 1;
+        let newScores = {...(gd.scores || {})}; let mult = globalState.round || 1; 
+        
         authors.forEach(a => {
             if (!newScores[a]) newScores[a] = 0;
             newScores[a] += (voteCounts[a] * 100 * mult);
-            if (totalVotes > 0 && voteCounts[a] === totalVotes) newScores[a] += (250 * mult); 
+            if (totalVotes > 0 && voteCounts[a] === totalVotes) newScores[a] += (250 * mult);
+
+            let otherVotes = authors.find(o => o !== a) ? voteCounts[authors.find(o => o !== a)] : 0;
+            if (voteCounts[a] > otherVotes) {
+                const secs = gd.answerTimes?.[a] || 30; 
+                const timeBonus = Math.max(0, 30 - secs) * 10;
+                newScores[a] += timeBonus;
+                sendUpdate({ [`gameData/timeBonusesAwarded/${vIdx}/${a}`]: timeBonus });
+            }
         });
-        const updates = { 'gameData/scores': newScores };
-        updates[`gameData/scoresCalculated/${vIdx}`] = true;
-        window.parent.postMessage({ type: 'update_state', updates }, '*');
+        
+        sendUpdate({'gameData/scores': newScores, [`gameData/scoresCalculated/${vIdx}`]: true});
+
+        setTimeout(() => {
+            document.getElementById('result-answers-grid').removeAttribute('data-played');
+            let nextIdx = vIdx + 1;
+            if (nextIdx >= gd.prompts.length) {
+                const sorted = (globalState.activePlayersList || []).map(id => ({ name: globalState.playerNames?.[id] || "Бот", score: newScores[id] || 0 })).sort((a, b) => b.score - a.score);
+                generateRoast(sorted).then(r => sendUpdate({ phase: 'scoreboard', 'gameData/roast': r }));
+            }
+            else sendUpdate({ phase: 'voting', 'gameData/currentVoteIndex': nextIdx, 'gameData/deadline': Date.now() + 20000 });
+        }, 7000);
     }
 
     const grid = document.getElementById('result-answers-grid');
     grid.innerHTML = authors.map(authorId => {
         let pct = totalVotes === 0 ? 0 : Math.round((voteCounts[authorId] / totalVotes) * 100);
-        let isWinner = voteCounts[authorId] > voteCounts[authors.find(a => a !== authorId)];
-        let isLoser = voteCounts[authorId] < voteCounts[authors.find(a => a !== authorId)];
-        if (voteCounts[authors[0]] === voteCounts[authors[1]]) { isWinner = true; isLoser = false; }
-        
-        let authorName = globalState.playerNames?.[authorId] || "Бот";
-        let authorAva = globalState.playerAvatars?.[authorId] || "https://picsum.photos/100";
+        let otherVotes = authors.find(a => a !== authorId) ? voteCounts[authors.find(a => a !== authorId)] : 0;
+        let isWinner = voteCounts[authorId] > otherVotes; let isLoser = voteCounts[authorId] < otherVotes;
+        if (voteCounts[authorId] === otherVotes) { isWinner = true; isLoser = false; }
+
+        const ansHtml = gd.answers?.[vIdx]?.[authorId] || "(нет ответа)";
+        const tBonus = gd.timeBonusesAwarded?.[vIdx]?.[authorId];
+        const bonusBadge = tBonus ? `<div class="time-bonus-badge">${SVGS.lightning} +${tBonus} за скорость!</div>` : '';
 
         return `
-            <div class="answer-btn ${isWinner ? 'winner' : ''} ${isLoser ? 'loser' : ''}" style="cursor:default;">
-                <div>${answers[authorId]}</div>
+            <div class="answer-btn ${isWinner ? 'winner' : ''} ${isLoser ? 'loser' : ''}" style="cursor:default; display:flex; flex-direction:column; align-items:center;">
+                ${bonusBadge}
+                <div class="result-text-container" data-text="${ansHtml.replace(/"/g, '&quot;')}"></div>
                 <div class="vote-stats">${pct}%</div>
-                <div class="author-info">
-                    <img src="${authorAva}">
-                    <span>${authorName}</span>
-                </div>
+                <div class="author-info"><img src="${globalState.playerAvatars?.[authorId] || 'https://picsum.photos/100'}"><span>${globalState.playerNames?.[authorId] || "Бот"}</span></div>
             </div>
         `;
     }).join('');
+
+    document.querySelectorAll('.result-text-container').forEach(el => typeWriterEffectHTML(el, el.getAttribute('data-text')));
 }
 
-window.nextVote = function() {
-    if (!isHost) return;
-    const gd = globalState.gameData;
-    let nextIdx = gd.currentVoteIndex + 1;
-    if (nextIdx >= Object.keys(gd.prompts).length) {
-        window.parent.postMessage({ type: 'update_state', updates: { phase: 'scoreboard' } }, '*');
-    } else {
-        window.parent.postMessage({ type: 'update_state', updates: { phase: 'voting', 'gameData/currentVoteIndex': nextIdx } }, '*');
-    }
-};
-
-// --- ФАЗА: ТАБЛИЦА ЛИДЕРОВ ---
 function renderScoreboardPhase() {
     showPhase('scoreboard-phase');
     setDisplay('btn-next-round', isHost ? 'block' : 'none');
+    document.getElementById('btn-next-round').disabled = false;
 
     const scores = globalState.gameData?.scores || {};
-    const players = globalState.activePlayersList || [];
-    
-    let sorted = players.map(id => ({
-        name: globalState.playerNames?.[id] || "Бот",
-        avatar: globalState.playerAvatars?.[id] || "https://picsum.photos/100",
-        score: scores[id] || 0
+    let sorted = (globalState.activePlayersList || []).map(id => ({
+        name: globalState.playerNames?.[id] || "Бот", avatar: globalState.playerAvatars?.[id] || "https://picsum.photos/100", score: scores[id] || 0
     })).sort((a, b) => b.score - a.score);
 
-    const list = document.getElementById('scoreboard-list');
-    list.innerHTML = sorted.map((p, i) => `
+    document.getElementById('scoreboard-list').innerHTML = sorted.map((p, i) => `
         <div class="score-row ${i === 0 ? 'rank-1' : ''}">
-            <div class="score-left">
-                <span class="rank-num">${i+1}</span>
-                <img src="${p.avatar}">
-                <span class="score-name">${p.name}</span>
-            </div>
+            <div class="score-left"><span class="rank-num">${i+1}</span><img src="${p.avatar}"><span class="score-name">${p.name} ${i === 0 && globalState.round === 3 ? `<div class="joke-man-badge">${SVGS.crown} ЧЕЛОВЕК-АНЕКДОТ</div>` : ''}</span></div>
             <div class="score-val">${p.score}</div>
         </div>
     `).join('');
     
-    if (globalState.round >= 2) {
-        setText('btn-next-round', "ВЕРНУТЬСЯ В ЛОББИ");
+    if (globalState.gameData?.roast) {
+        const roastKey = `roast_audio_${globalState.round}`;
+        if (!spokenPhrases.has(roastKey)) {
+            speakText(globalState.gameData.roast); 
+            spokenPhrases.add(roastKey);
+        }
     }
+
+    setText('btn-next-round', globalState.round >= 3 ? "ВЕРНУТЬСЯ В ЛОББИ" : (globalState.round === 2 ? "К ФИНАЛУ!" : "СЛЕДУЮЩИЙ РАУНД"));
 }
 
 window.nextRound = async function() {
     if (!isHost) return;
-    if (globalState.round >= 2) {
-        window.parent.postMessage({ type: 'update_state', updates: { status: 'waiting', phase: null } }, '*');
-        return;
+    document.getElementById('btn-next-round').disabled = true; 
+    
+    if (globalState.round >= 3) {
+        document.getElementById('prompts-scroll-area').removeAttribute('data-rendered-round');
+        sendUpdate({ status: 'waiting', phase: null }); return;
     }
 
-    showLoading(true, "Генерация раунда х2...");
-    
-    const players = globalState.activePlayersList;
-    const promptCount = players.length;
-    const prompts = await generatePrompts(2, promptCount);
-    
-    let assignments = {};
-    players.forEach((p, i) => {
-        let q1 = i; let q2 = (i + 1) % promptCount;
-        if (!assignments[q1]) assignments[q1] = []; if (!assignments[q2]) assignments[q2] = [];
-        assignments[q1].push(p); assignments[q2].push(p);
-    });
+    try {
+        const nextRoundNum = globalState.round + 1;
+        
+        const roundSpeechKey = `round_speech_${nextRoundNum}`;
+        if (!spokenPhrases.has(roundSpeechKey)) {
+            speakText(nextRoundNum === 3 ? "Финал! Назовите три вещи." : "Раунд два. Ставки повышаются.");
+            spokenPhrases.add(roundSpeechKey);
+        }
 
-    window.parent.postMessage({ 
-        type: 'update_state', 
-        updates: { 
-            phase: 'answering', round: 2, 
-            'gameData/prompts': prompts, 'gameData/assignments': assignments, 
-            'gameData/answers': {}, 'gameData/votes': {}, 'gameData/scoresCalculated': {}
-        } 
-    }, '*');
-    
-    setTimeout(() => handleBotAnswers(prompts, assignments), 1000);
-    handleStateChange();
+        showLoading(true, nextRoundNum === 3 ? "Подготовка финала..." : "Генерация раунда х2...");
+        
+        const players = globalState.activePlayersList || [];
+        const theme = globalState.settings?.theme || "";
+        
+        let activeP = [...players];
+        if (nextRoundNum === 3 && activeP.length % 2 !== 0) activeP.push('ai_bot_thriplash');
+        
+        const pairsCount = nextRoundNum === 3 ? (activeP.length / 2) : players.length;
+        const aiPrompts = await generatePrompts(nextRoundNum, pairsCount, players.map(p => globalState.playerNames?.[p] || "Аноним"), theme);
+        
+        let prompts = []; let assignments = {};
+        if (nextRoundNum === 3) {
+            for(let i=0; i < activeP.length; i+=2) { 
+                let pairIdx = i/2;
+                prompts[pairIdx] = aiPrompts[pairIdx] || FALLBACK_PROMPTS[0]; 
+                assignments[pairIdx] = [activeP[i], activeP[i+1]]; 
+            }
+        } else {
+            prompts = aiPrompts;
+            players.forEach((p, i) => {
+                let q1 = i; let q2 = (i + 1) % pairsCount;
+                if (!assignments[q1]) assignments[q1] = []; if (!assignments[q2]) assignments[q2] = [];
+                assignments[q1].push(p); assignments[q2].push(p);
+            });
+        }
+
+        let missions = null;
+        if (globalState.settings?.useMissions && nextRoundNum !== 3) {
+            const aiMissions = await generateMissions(players.length);
+            missions = {}; players.forEach((p, i) => { missions[p] = aiMissions[i]; });
+        }
+
+        sendUpdate({ 
+            phase: 'answering', round: nextRoundNum, 'gameData/prompts': prompts, 'gameData/assignments': assignments, 'gameData/missions': missions,
+            'gameData/deadline': Date.now() + (nextRoundNum === 3 ? 90000 : 60000), 'gameData/roast': null,
+            'gameData/answers': null, 'gameData/votes': null, 'gameData/botVotesSubmitted': null, 'gameData/scoresCalculated': null, 'gameData/timeBonusesAwarded': null
+        });
+        myPhaseStartTime = 0;
+        setTimeout(() => handleBotAnswers(prompts, assignments, nextRoundNum === 3), 1000);
+    } catch (err) { document.getElementById('btn-next-round').disabled = false; showLoading(false); }
 };
