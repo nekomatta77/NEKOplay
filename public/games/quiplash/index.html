@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>NEKO Quiplash</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-shapes">
+    <div class="shape shape-1"></div>
+    <div class="shape shape-2"></div>
+  </div>
+
+  <button id="leave-btn" class="leave-btn" onclick="leaveGame()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+  </button>
+
+  <div id="global-loading" class="fullscreen-overlay" style="display: none;">
+    <div class="spinner-xl"></div>
+    <h2 class="loading-text" id="loading-message">Нейросеть придумывает вопросы...</h2>
+  </div>
+
+  <div class="mobile-container">
+    
+    <div id="lobby-screen" class="screen active">
+      <div class="hero-section">
+        <h1 class="game-title">СМЕХ<span>ЛЫСТ</span></h1>
+        <p class="game-subtitle">Битва шуток, где ИИ задает тон.</p>
+      </div>
+
+      <div class="players-board">
+        <div class="board-header">
+          <span id="players-count-display">0</span> игроков в лобби
+        </div>
+        <div id="lobby-players-list" class="players-grid"></div>
+      </div>
+
+      <div id="host-controls" class="action-footer" style="display: none;">
+        <button id="btn-start-game" class="btn-mega" onclick="startGame()">НАЧАТЬ ИГРУ</button>
+      </div>
+      <div id="guest-waiting" class="action-footer" style="display: none;">
+        <div class="waiting-badge">Ожидание хоста...</div>
+      </div>
+    </div>
+
+    <div id="answering-phase" class="screen">
+      <div class="top-bar">
+        <div class="round-indicator" id="answering-round-badge">РАУНД 1</div>
+        <div class="timer-ring"><span id="answering-timer">60</span></div>
+      </div>
+
+      <div id="prompts-scroll-area" class="scroll-area">
+        </div>
+      
+      <div id="answering-waiting" class="waiting-center" style="display: none;">
+        <div class="spinner-md"></div>
+        <h3>Отличные шутки!</h3>
+        <p>Ждем, пока остальные (и нейросеть) допишут...</p>
+      </div>
+
+      <div class="action-footer" id="answering-footer">
+        <button id="btn-submit-answers" class="btn-mega" disabled onclick="submitAnswers()">ГОТОВО</button>
+      </div>
+    </div>
+
+    <div id="voting-phase" class="screen">
+      <div class="top-bar">
+        <div class="timer-ring"><span id="voting-timer">20</span></div>
+      </div>
+
+      <div class="prompt-display">
+        <h2 id="voting-prompt">Вопрос?</h2>
+      </div>
+
+      <div class="voting-stack" id="voting-answers-grid">
+        </div>
+
+      <div id="voting-status" class="status-msg"></div>
+    </div>
+
+    <div id="voting-result-phase" class="screen">
+      <div class="prompt-display small">
+        <h2 id="result-prompt">Вопрос?</h2>
+      </div>
+
+      <div class="voting-stack" id="result-answers-grid">
+        </div>
+
+      <div class="action-footer">
+        <button id="btn-next-vote" class="btn-mega" style="display:none;" onclick="nextVote()">СЛЕДУЮЩИЙ ВОПРОС</button>
+      </div>
+    </div>
+
+    <div id="scoreboard-phase" class="screen">
+      <h2 class="phase-title">РЕЗУЛЬТАТЫ</h2>
+      
+      <div id="scoreboard-list" class="scoreboard-scroll"></div>
+
+      <div class="action-footer">
+        <button id="btn-next-round" class="btn-mega" style="display:none;" onclick="nextRound()">СЛЕДУЮЩИЙ РАУНД</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

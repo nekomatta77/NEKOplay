@@ -1,3 +1,4 @@
+// src/lib/games.ts
 import { Game } from '../types';
 
 export const GAMES: Game[] = [
@@ -24,5 +25,13 @@ export const GAMES: Game[] = [
     image: 'https://picsum.photos/seed/bunker/400/300?blur=2',
     minPlayers: 3,
     maxPlayers: 16,
+  },
+  {
+    id: 'quiplash', 
+    name: 'Смехлыст',
+    description: 'Битва шуток! Придумай самый смешной ответ на каверзный вопрос. Нейросеть генерирует уникальные вопросы каждую игру!',
+    image: 'https://picsum.photos/seed/quiplash/400/300?blur=2',
+    minPlayers: 3, // Минимум 3, чтобы было кому голосовать
+    maxPlayers: 8,
   }
 ];
