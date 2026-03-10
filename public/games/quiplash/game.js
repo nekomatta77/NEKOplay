@@ -53,7 +53,7 @@ function playSound(type) {
     } catch(e) {}
 }
 
-// --- СИНТЕЗАТОР РЕЧИ (УЛУЧШЕННЫЙ МУЖСКОЙ ГОЛОС) ---
+// --- СИНТЕЗАТОР РЕЧИ (ОБХОД БЛОКИРОВОК ADBLOCK И CORS) ---
 async function speakText(text) {
     if (!isHost) return;
 
@@ -62,46 +62,60 @@ async function speakText(text) {
         currentTTSAudio.currentTime = 0;
     }
 
-    // Жестко очищаем текст от мусора, чтобы не ломать сервера
+    // Очищаем текст от спецсимволов и HTML
     const cleanText = text.replace(/<[^>]*>?/gm, ' ')
                           .replace(/[^\w\sа-яА-ЯёЁ0-9.,!?\-:;]/g, '')
                           .trim()
                           .substring(0, 150);
     if (!cleanText) return;
 
+    // Функция безопасной загрузки аудио
     const playCloud = (url) => {
         return new Promise((resolve, reject) => {
-            const audio = new Audio(url);
+            const audio = new Audio();
+            audio.crossOrigin = "anonymous"; // Разрешаем скачивание с других серверов
+            audio.src = url;
             currentTTSAudio = audio;
+            
+            audio.oncanplaythrough = () => {
+                audio.play().catch(reject);
+            };
+            
             audio.onended = resolve;
-            audio.onerror = () => reject(new Error('Cloud TTS Error'));
-            audio.play().catch(reject);
+            audio.onerror = () => reject(new Error('Ошибка загрузки звука'));
+            audio.load();
         });
     };
 
-    try {
-        // Попытка 1: Идеальный низкий мужской голос Maxim
-        const maximUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Maxim&text=${encodeURIComponent(cleanText)}`;
-        await playCloud(maximUrl);
-        return;
-    } catch (e) {
-        console.warn("[TTS] Облачный мужской голос заблокирован. Ищем мужской бас в системе...");
-    }
+    const targetUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Maxim&text=${encodeURIComponent(cleanText)}`;
 
-    // Попытка 2: Системный голос устройства (превращаем в мужской бас)
-    if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(cleanText);
-        u.lang = 'ru-RU';
-        u.pitch = 0.6; // Специально занижаем тон, чтобы звучало брутально!
-        u.rate = 1.0;
-        
-        // Пытаемся найти встроенного мужика
-        const voices = window.speechSynthesis.getVoices();
-        let deepMale = voices.find(v => v.lang.includes('ru') && (v.name.includes('Dmitry') || v.name.includes('Pavel') || v.name.includes('Maxim')));
-        if (deepMale) u.voice = deepMale;
-        
-        window.speechSynthesis.speak(u);
+    try {
+        // ПОПЫТКА 1: Пробуем загрузить напрямую
+        await playCloud(targetUrl);
+    } catch (e1) {
+        console.warn("[TTS] Прямой доступ заблокирован, пробуем через прокси-мост...");
+        try {
+            // ПОПЫТКА 2: Если AdBlock заблокировал напрямую, используем прокси для обхода
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+            await playCloud(proxyUrl);
+        } catch (e2) {
+            console.warn("[TTS] Облачный голос недоступен. Запускаем встроенный бас...");
+            
+            // ПОПЫТКА 3: Локальный запасной бас (без интернета)
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(cleanText);
+                u.lang = 'ru-RU';
+                u.pitch = 0.6; // Делаем голос ниже
+                u.rate = 1.0;
+                
+                const voices = window.speechSynthesis.getVoices();
+                let deepMale = voices.find(v => v.lang.includes('ru') && (v.name.includes('Dmitry') || v.name.includes('Pavel') || v.name.includes('Maxim')));
+                if (deepMale) u.voice = deepMale;
+                
+                window.speechSynthesis.speak(u);
+            }
+        }
     }
 }
 
