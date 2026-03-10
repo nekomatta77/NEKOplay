@@ -13,7 +13,7 @@ const myName = urlParams.get('name') || 'Аноним';
 
 let isGeneratingRound = false;
 let currentTimerInterval = null;
-let currentTimerId = null; // Трекер текущего таймера, чтобы он не перезапускался
+let currentTimerId = null; 
 let myPhaseStartTime = 0; 
 let spokenPhrases = new Set();
 let currentTTSAudio = null; 
@@ -62,72 +62,41 @@ async function speakText(text) {
         currentTTSAudio.currentTime = 0;
     }
 
-    // Очищаем текст от спецсимволов и HTML
-    const cleanText = text.replace(/<[^>]*>?/gm, ' ')
-                          .replace(/[^\w\sа-яА-ЯёЁ0-9.,!?\-:;]/g, '')
-                          .trim()
-                          .substring(0, 150);
+    const cleanText = text.replace(/<[^>]*>?/gm, ' ').replace(/[^\w\sа-яА-ЯёЁ0-9.,!?\-:;]/g, '').trim().substring(0, 150);
     if (!cleanText) return;
 
-    // ПОПЫТКА 1: Используем встроенный синтезатор ОС (Без интернета, без блокировок)
     if (window.speechSynthesis) {
         const playLocal = () => {
             window.speechSynthesis.cancel();
             const u = new SpeechSynthesisUtterance(cleanText);
             u.lang = 'ru-RU';
             u.rate = 1.0;
-            
             const voices = window.speechSynthesis.getVoices();
-            
-            // Ищем конкретно мужские голоса (Дмитрий, Павел и т.д.)
             let maleVoice = voices.find(v => v.lang.includes('ru') && /(dmitry|pavel|maxim|male|муж)/i.test(v.name));
             let anyRuVoice = voices.find(v => v.lang.includes('ru'));
-            
-            if (maleVoice) {
-                u.voice = maleVoice;
-                u.pitch = 0.8; // Легкое занижение для суровости
-            } else if (anyRuVoice) {
-                u.voice = anyRuVoice;
-                u.pitch = 0.5; // Экстремальный бас, если голос по умолчанию женский
-            } else {
-                u.pitch = 0.6; 
-            }
-            
+            if (maleVoice) { u.voice = maleVoice; u.pitch = 0.8; } 
+            else if (anyRuVoice) { u.voice = anyRuVoice; u.pitch = 0.5; } 
+            else { u.pitch = 0.6; }
             window.speechSynthesis.speak(u);
         };
-
-        // Голоса в браузере подгружаются асинхронно
         if (window.speechSynthesis.getVoices().length === 0) {
             window.speechSynthesis.onvoiceschanged = playLocal;
-            // Запасной вызов, если событие onvoiceschanged не отработает
             setTimeout(playLocal, 300);
-        } else {
-            playLocal();
-        }
-        return; // Выходим из функции, чтобы не запускать облако
+        } else { playLocal(); }
+        return; 
     }
 
-    // ПОПЫТКА 2: Безотказный облачный Google (Если на устройстве вообще нет голосов)
     const playCloud = (url) => {
         return new Promise((resolve, reject) => {
-            const audio = new Audio();
-            audio.crossOrigin = "anonymous"; 
-            audio.src = url;
-            currentTTSAudio = audio;
-            
+            const audio = new Audio(); audio.crossOrigin = "anonymous"; audio.src = url; currentTTSAudio = audio;
             audio.oncanplaythrough = () => audio.play().catch(reject);
-            audio.onended = resolve;
-            audio.onerror = () => reject(new Error('Ошибка Google TTS'));
-            audio.load();
+            audio.onended = resolve; audio.onerror = () => reject(new Error('Ошибка Google TTS')); audio.load();
         });
     };
-
     try {
         const googleUrl = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=ru&q=${encodeURIComponent(cleanText)}`;
         await playCloud(googleUrl);
-    } catch (e) {
-        console.warn("[TTS] Все методы озвучки не сработали.");
-    }
+    } catch (e) {}
 }
 
 // --- SVG ИКОНКИ ---
@@ -154,18 +123,15 @@ function setDisplay(id, display) { const el = document.getElementById(id); if (e
 function setText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
 window.leaveGame = function() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 
-// ИСПРАВЛЕНИЕ МИГАНИЯ №1: Окно перерисовывается ТОЛЬКО если оно еще не открыто
 function showPhase(phaseId) {
     const target = document.getElementById(phaseId);
-    if (target && target.classList.contains('active')) return; // УЖЕ ОТКРЫТО - НИЧЕГО НЕ ДЕЛАЕМ!
-    
+    if (target && target.classList.contains('active')) return; 
     playSound('whoosh');
     document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
     if(target) target.classList.add('active');
 }
 
 function showLoading(show, message = "Загрузка...") { setText('loading-message', message); setDisplay('global-loading', show ? 'flex' : 'none'); }
-
 function updateDynamicBackground(phase, round) {
     if (!phase || phase === 'waiting') document.body.className = 'bg-lobby';
     else if (round === 1) document.body.className = 'bg-round1';
@@ -177,11 +143,9 @@ function sendUpdate(updates) {
     try { window.parent.postMessage({ type: 'update_state', updates: JSON.parse(JSON.stringify(updates)) }, '*'); } catch (e) {}
 }
 
-// ИСПРАВЛЕНИЕ МИГАНИЯ №2: Таймер больше не перезапускается с рывками
 function startLocalTimer(deadlineMs, displayId, onExpireCallback, timerKey) {
-    if (currentTimerId === timerKey) return; // Таймер для этой фазы уже тикает!
+    if (currentTimerId === timerKey) return; 
     currentTimerId = timerKey;
-    
     clearInterval(currentTimerInterval);
     function update() {
         const remaining = Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000));
@@ -192,7 +156,7 @@ function startLocalTimer(deadlineMs, displayId, onExpireCallback, timerKey) {
     update(); currentTimerInterval = setInterval(update, 1000);
 }
 
-// --- ИИ ФУНКЦИИ ---
+// --- ИИ ФУНКЦИИ (ОБНОВЛЕННЫЕ JACKBOX ПРОМПТЫ) ---
 async function fetchFromAI(systemPrompt) {
     try {
         const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
@@ -206,20 +170,33 @@ async function fetchFromAI(systemPrompt) {
     } catch(e) { return null; }
 }
 
-const FALLBACK_PROMPTS = ["Худшее, что можно крикнуть во время секса?", "Неожиданная находка в кармане старой куртки?", "Секретный ингредиент в бургерах?", "Самая тупая причина для развода:"];
+const FALLBACK_PROMPTS = ["Худшее, что можно крикнуть во время застолья?", "Неожиданная находка в кармане старой куртки?", "Секретный ингредиент в бургерах?", "Самая тупая причина для развода:"];
 
 async function generatePrompts(round, count, playerNamesList = [], theme = "") {
     let namesStr = playerNamesList.length > 0 ? playerNamesList.join(', ') : "";
     let themeStr = theme ? `ИГРА ИДЕТ НА ТЕМУ: "${theme}". ВСЕ ВОПРОСЫ СВЯЖИ С ЭТОЙ ТЕМОЙ! ` : "";
-    const strictRule = `ВАЖНО: Пиши ТОЛЬКО вопросы или начала фраз (сетапы). КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО писать сами ответы или варианты к ним!`;
-    const langRule = `ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ! НИКАКОГО АНГЛИЙСКОГО.`;
-
-    let promptText = "";
-    if (round === 1) promptText = `${themeStr}Сгенерируй ${count} забавных незаконченных фраз. ${strictRule} ${langRule} Микс: половина обычные, половина абсурдные. ${namesStr ? `Строго максимум в 1 вопросе используй случайное имя (${namesStr}).` : ''} Выведи СТРОГО JSON массив строк.`;
-    else if (round === 2) promptText = `${themeStr}Сгенерируй ${count} ситуационных вопросов. ${strictRule} ${langRule} Сделай их приземленными, но с простором для черного юмора. ${namesStr ? `Максимум 1 вопрос с именем (${namesStr}).` : ''} Выведи СТРОГО JSON массив строк.`;
-    else if (round === 3) promptText = `${themeStr}Сгенерируй ${count} уникальных финальных вопросов. ${langRule} Требование: КАЖДЫЙ вопрос должен требовать перечислить ровно ТРИ вещи. Выведи СТРОГО JSON массив из ${count} строк.`;
     
-    let res = await fetchFromAI(promptText);
+    // ТВОЙ НОВЫЙ СУПЕР-ПРОМПТ ДЛЯ ВОПРОСОВ
+    let basePrompt = `Твоя роль: Ты — ведущий комедийный сценарист студии Jackbox Games. Твоя задача — придумать вопросы и заходы (промпты) для игры в стиле «Смехлыст» (Quiplash).
+Вайб и тональность: Абсурдный, дерзкий, слегка циничный, очень жизненный, иногда на грани фола (но без откровенной жести, запрещенной правилами). Вопросы должны провоцировать игроков на смешные, неожиданные или пошлые ответы.
+Правило анти-повторов: Ты строго не должен повторяться ни в темах, ни в структуре вопросов. Чтобы избежать зацикливания, используй разные формулы генерации. Запрещено использовать заезженные клише (инопланетяне, зомби, первое свидание, собеседование).
+Форматы вопросов (чередуй их):
+- «Худший/Лучший…» (Пример: Худшее, что можно сказать, выходя из чужого туалета в гостях.)
+- «Закончи фразу / Заполни пропуск» (Пример: Новый слоган Почты России: «Мы не теряем посылки, мы ___».)
+- «Названия и бренды» (Пример: Название самого депрессивного парка аттракционов.)
+- «Странные ситуации» (Пример: О чем на самом деле думает голубь, когда смотрит на тебя одним глазом?)
+- «Альтернативная история/наука» (Пример: Секретный 11-й пункт в клятве Гиппократа.)
+Используй колорит стран СНГ и узнаваемые бытовые ситуации (поликлиники, маршрутки, чаты дома, застолья, дачи).
+${themeStr}
+Требования к генерации: Сгенерируй ровно ${count} уникальных вопросов. Вопросы должны быть лаконичными (не больше 1-2 предложений) и оставлять игроку огромное пространство для шутки. НЕ задавай вопросы, на которые можно ответить «да» или «нет». `;
+
+    if (namesStr) basePrompt += `Строго максимум в 1 вопросе используй случайное имя игрока (${namesStr}). `;
+    
+    if (round === 3) basePrompt += `ВАЖНО: Это ФИНАЛЬНЫЙ раунд. КАЖДЫЙ вопрос должен требовать перечислить ровно ТРИ вещи. `;
+    
+    basePrompt += `Выведи СТРОГО JSON массив строк (["вопрос 1", "вопрос 2"]). Больше ничего не пиши. Включи режим максимальной креативности. Поехали!`;
+
+    let res = await fetchFromAI(basePrompt);
     try {
         res = res.replace(/```json/gi, '').replace(/```/g, '').trim(); let parsed = JSON.parse(res);
         if (Array.isArray(parsed) && parsed.length >= count) return parsed.slice(0, count); throw new Error("Format");
@@ -245,9 +222,19 @@ async function generateMissions(count) {
 
 async function generateRoast(sortedPlayers) {
     const loser = sortedPlayers[sortedPlayers.length - 1]?.name || "Кто-то";
-    const sys = `Ты — безжалостный, токсичный ИИ-ведущий комедийного шоу.
-Игрок на последнем месте: "${loser}".
-Задача: Сгенерируй ОДНО короткое (5-10 слов), но МАКСИМАЛЬНО ЖЕСТКОЕ, хлесткое и унизительное оскорбление (без мата) в адрес "${loser}" за его отвратительное чувство юмора. Без кавычек, без приветствий. Только панчлайн. НА РУССКОМ ЯЗЫКЕ.`;
+    
+    // ТВОЙ НОВЫЙ СУПЕР-ПРОМПТ ДЛЯ ПРОЖАРКИ
+    const sys = `Твоя роль: Ты — максимально язвительный, циничный и высокомерный закадровый голос комедийной игры для вечеринок. Твоя задача — коротко и жестоко «прожарить» (зароустить) игрока, который занял абсолютное последнее место по очкам.
+Имя этого неудачника: "${loser}".
+Вайб и тональность: Пассивная агрессия, черный юмор, сарказм и хлесткие панчлайны. Это дружеская игра, так что избегай запрещенных тем (расизм, сексизм, реальные трагедии), но бей прямо по эго проигравшего. Игрок на последнем месте должен почувствовать себя интеллектуально беспомощным.
+Используй один из углов для унижения (выбери случайно):
+- «Ложная эмпатия» (Пример: Оу, ${loser} решил играть сердцем, а не мозгом. Очень зря.)
+- «Сравнение с предметами» (Пример: Даже комнатный фикус набрал бы больше очков, чем ${loser}, если бы просто упал на клавиатуру.)
+- «Техническая ошибка» (Пример: ${loser}, моргни дважды, если тебя держат в заложниках и не дают нормально отвечать.)
+- «Прямое оскорбление чувства юмора» (Пример: Шутки от ${loser} настолько плохи, что где-то сейчас заплакал один Петросян.)
+Задача: Сгенерируй ровно ОДНУ короткую реплику (максимум 1-2 предложения). Она должна звучать так, будто ведущий вздыхает от разочарования или искренне не понимает, как можно быть таким не смешным. 
+Выдай только саму реплику, без кавычек, без лишних вступлений и извинений. Сделай это максимально обидно и смешно. НА РУССКОМ ЯЗЫКЕ.`;
+    
     const res = await fetchFromAI(sys); return res || `${loser}, твои шутки вызывают только жалость.`;
 }
 
@@ -291,7 +278,6 @@ function handleStateChange() {
         const listContainer = document.getElementById('lobby-players-list');
         const pListStr = JSON.stringify(pList);
         
-        // Перерисовываем игроков только если кто-то зашел/вышел
         if (listContainer.getAttribute('data-plist') !== pListStr) {
             listContainer.setAttribute('data-plist', pListStr);
             if (pList.length > 0) {
@@ -401,7 +387,6 @@ function renderAnsweringPhase() {
     let myQuestions = [];
     for (let qIdx in assignments) { if (assignments[qIdx] && assignments[qIdx].includes(myUserId)) myQuestions.push({ idx: qIdx, text: (gd.prompts || [])[qIdx] || "" }); }
 
-    // Рендерим карточки только один раз за раунд
     if (container.getAttribute('data-rendered-round') !== String(globalState.round)) {
         let missionHtml = '';
         if (globalState.settings?.useMissions && gd.missions && gd.missions[myUserId]) {
@@ -475,7 +460,6 @@ function renderVotingPhase() {
 
     const grid = document.getElementById('voting-answers-grid');
 
-    // Настраиваем раунд голосования только если перешли к новому вопросу
     if (grid.getAttribute('data-vote-idx') !== String(vIdx)) {
         grid.setAttribute('data-vote-idx', String(vIdx));
         
@@ -492,7 +476,6 @@ function renderVotingPhase() {
     const authors = gd.assignments[vIdx] || []; const currentAnswers = gd.answers?.[vIdx] || {}; const votes = gd.votes?.[vIdx] || {};
     const isAuthor = authors.includes(myUserId); const hasVoted = votes[myUserId];
 
-    // Обновляем кнопки динамически
     grid.innerHTML = authors.map(authorId => {
         const disabled = isAuthor || hasVoted;
         return `<div class="answer-btn ${disabled ? 'disabled' : ''} ${votes[myUserId] === authorId ? 'voted' : ''}" onclick="!${disabled} && submitVote('${authorId}')">${currentAnswers[authorId] || "(нет ответа)"}</div>`;
@@ -563,7 +546,6 @@ function renderVotingResultPhase() {
 
     const grid = document.getElementById('result-answers-grid');
     
-    // Рендерим результаты и проигрываем звук ТОЛЬКО один раз! Иначе будет мигать
     if (grid.getAttribute('data-rendered-idx') === String(vIdx)) return;
     grid.setAttribute('data-rendered-idx', String(vIdx));
 
@@ -600,7 +582,6 @@ function renderScoreboardPhase() {
 
     const list = document.getElementById('scoreboard-list');
     
-    // Блокируем перезапись, чтобы список не мигал каждую секунду
     if (list.getAttribute('data-round') === String(globalState.round)) return;
     list.setAttribute('data-round', String(globalState.round));
 
