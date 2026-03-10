@@ -316,3 +316,453 @@ input:checked + .slider:before { transform: translateX(20px); }
     display: inline-block;
     vertical-align: text-bottom;
 }
+/* --- СУПЕР-ДИЗАЙН ГЛАВНОГО ЛОББИ --- */
+.lobby-header {
+    text-align: center;
+    margin-bottom: 25px;
+    animation: fadeInDown 0.8s ease;
+}
+.game-title {
+    font-size: 3.5rem;
+    font-weight: 900;
+    color: #fff;
+    margin: 0;
+    text-shadow: 0 0 20px rgba(250, 204, 21, 0.8);
+    letter-spacing: 2px;
+}
+.title-badge { color: #facc15; }
+.game-subtitle {
+    color: #cbd5e1;
+    font-size: 1.1rem;
+    margin-top: 5px;
+}
+.glass-panel {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+.settings-panel {
+    max-width: 550px;
+    margin: 0 auto 30px auto;
+}
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.setting-item:last-child { border-bottom: none; }
+.setting-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+}
+.setting-title { font-size: 1.05rem; font-weight: bold; color: #fff; }
+.setting-desc { font-size: 0.8rem; color: #94a3b8; margin-top: 4px; }
+.btn-start-massive {
+    background: linear-gradient(135deg, #facc15, #eab308);
+    color: #000;
+    font-size: 1.3rem;
+    font-weight: 900;
+    padding: 18px 45px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 0 25px rgba(250, 204, 21, 0.5);
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: block;
+    margin: 0 auto;
+}
+.btn-start-massive:hover {
+    transform: scale(1.05) translateY(-3px);
+    box-shadow: 0 0 40px rgba(250, 204, 21, 0.8);
+}
+.btn-start-massive:disabled {
+    background: #475569; box-shadow: none; transform: none; cursor: not-allowed;
+}
+.players-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+.player-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    transition: transform 0.2s;
+}
+.player-card:hover { transform: translateY(-5px); }
+.player-card img {
+    width: 75px; height: 75px;
+    border-radius: 50%;
+    border: 3px solid #facc15;
+    margin-bottom: 10px;
+    background: #fff;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+.player-name {
+    font-weight: bold; color: #fff; font-size: 0.95rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.player-badges { display: flex; gap: 5px; margin-top: 8px; }
+.badge { font-size: 0.65rem; padding: 4px 8px; border-radius: 8px; font-weight: bold; }
+.me-badge { background: #3b82f6; color: white; box-shadow: 0 0 10px rgba(59,130,246,0.5); }
+.host-badge { background: #facc15; color: black; display: flex; align-items: center; gap: 4px; box-shadow: 0 0 10px rgba(250,204,21,0.5); }
+.host-badge svg { width: 12px; height: 12px; }
+/* --- JACKBOX STYLE MOBILE LOBBY --- */
+body.bg-lobby {
+    background: radial-gradient(circle at top, #9333ea, #4c1d95, #0f172a);
+    overflow: hidden;
+}
+
+.j-header {
+    text-align: center;
+    margin-bottom: 15px;
+    flex-shrink: 0;
+    animation: popIn 0.5s ease;
+}
+
+.j-title {
+    font-family: 'Arial Black', Impact, sans-serif;
+    font-size: 3rem;
+    color: #fde047;
+    text-transform: uppercase;
+    margin: 0;
+    line-height: 1;
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    transform: rotate(-2deg);
+}
+
+.j-subtitle {
+    font-size: 1rem;
+    color: #fff;
+    background: #000;
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    margin-top: 15px;
+    font-weight: 900;
+    border: 2px solid #fff;
+}
+
+.j-players-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.j-player-card {
+    background: #fff;
+    border: 4px solid #000;
+    border-radius: 16px;
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    box-shadow: 4px 4px 0 #000;
+    animation: popIn 0.3s ease forwards;
+}
+
+.j-player-card.is-me {
+    background: #bbf7d0;
+}
+
+.j-player-card img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 3px solid #000;
+    margin-right: 15px;
+    background: #e2e8f0;
+}
+
+.j-player-name {
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: #000;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-grow: 1;
+}
+
+.j-host-crown {
+    color: #eab308;
+    background: #000;
+    border-radius: 50%;
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.j-host-crown svg { width: 18px; height: 18px; }
+
+.j-host-panel {
+    flex-shrink: 0;
+    background: #000;
+    padding: 20px;
+    border-radius: 20px;
+    border: 4px solid #fff;
+    margin-top: 10px;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+}
+
+.jackbox-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.j-setting {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #fff;
+    font-weight: 900;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+}
+
+.j-checkbox {
+    width: 24px;
+    height: 24px;
+    accent-color: #fde047;
+    cursor: pointer;
+}
+
+.j-start-btn {
+    width: 100%;
+    background: #22c55e;
+    color: #fff;
+    border: 4px solid #000;
+    font-size: 1.8rem;
+    font-weight: 900;
+    padding: 15px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    box-shadow: 0 6px 0 #000;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.j-start-btn:active:not(:disabled) {
+    transform: translateY(6px);
+    box-shadow: 0 0 0 #000;
+}
+
+.j-start-btn:disabled {
+    background: #64748b;
+    cursor: not-allowed;
+    box-shadow: 0 6px 0 #334155;
+}
+
+.j-guest-panel {
+    background: #000;
+    color: #fff;
+    border: 4px solid #fff;
+    border-radius: 20px;
+    padding: 20px;
+    text-align: center;
+    margin-top: 10px;
+    flex-shrink: 0;
+}
+.j-guest-panel h3 { margin: 0 0 10px 0; color: #fde047; font-size: 1.5rem; text-transform: uppercase; font-weight: 900;}
+.j-guest-panel p { margin: 0; font-size: 1rem; font-weight: bold;}
+/* --- JACKBOX STYLE IN-GAME PHASES --- */
+
+/* Карточка вопроса */
+.question-card {
+    background: #fff;
+    border: 4px solid #000;
+    border-radius: 16px;
+    box-shadow: 4px 4px 0 #000;
+    padding: 20px;
+    margin-bottom: 20px;
+    color: #000;
+    animation: popIn 0.4s ease forwards;
+}
+
+.q-text {
+    font-family: 'Arial Black', Impact, sans-serif;
+    font-size: 1.4rem;
+    line-height: 1.2;
+    text-transform: uppercase;
+    margin-bottom: 15px;
+    color: #000;
+}
+
+/* Поля ввода (Инпуты) */
+.modern-input {
+    width: 100%;
+    border: 4px solid #000;
+    border-radius: 12px;
+    padding: 15px;
+    font-size: 1.2rem;
+    font-weight: 900;
+    background: #f8fafc;
+    color: #000;
+    box-shadow: inset 2px 2px 0 rgba(0,0,0,0.1);
+    transition: all 0.2s;
+}
+
+.modern-input:focus {
+    outline: none;
+    background: #fff;
+    border-color: #3b82f6;
+    box-shadow: inset 4px 4px 0 rgba(59, 130, 246, 0.2);
+}
+
+/* Кнопки ответов (Голосование) */
+.answer-btn {
+    background: #fff;
+    border: 4px solid #000;
+    border-radius: 16px;
+    box-shadow: 4px 4px 0 #000;
+    color: #000;
+    font-weight: 900;
+    font-size: 1.2rem;
+    padding: 15px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative;
+}
+
+.answer-btn:active:not(.disabled) {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #000;
+}
+
+.answer-btn.voted {
+    background: #22c55e;
+    color: #fff;
+    border-color: #000;
+}
+
+.answer-btn.winner {
+    background: #facc15;
+    transform: scale(1.02);
+    box-shadow: 6px 6px 0 #000;
+    z-index: 2;
+}
+
+.answer-btn.loser {
+    background: #cbd5e1;
+    color: #64748b;
+    box-shadow: 2px 2px 0 #000;
+    opacity: 0.8;
+}
+
+/* Таблица лидеров */
+.score-row {
+    background: #fff;
+    border: 4px solid #000;
+    border-radius: 16px;
+    box-shadow: 4px 4px 0 #000;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    color: #000;
+}
+
+.score-row.rank-1 {
+    background: #facc15;
+}
+
+.score-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.rank-num {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 1.5rem;
+    background: #000;
+    color: #fff;
+    width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.score-row img {
+    width: 45px; height: 45px;
+    border-radius: 50%;
+    border: 3px solid #000;
+}
+
+.score-name {
+    font-weight: 900;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+}
+
+.score-val {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 1.8rem;
+    color: #000;
+}
+
+/* Баннеры и Прожарка */
+.secret-mission-banner {
+    background: #facc15;
+    color: #000;
+    border: 4px solid #000;
+    border-radius: 12px;
+    padding: 15px;
+    font-weight: 900;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    box-shadow: 4px 4px 0 #000;
+    animation: missionPulse 2s infinite;
+}
+
+.roast-box {
+    background: #ef4444;
+    color: #fff;
+    border: 4px solid #000;
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 25px;
+    font-weight: 900;
+    font-size: 1.1rem;
+    box-shadow: 4px 4px 0 #000;
+    text-transform: uppercase;
+}
+
+/* Заголовки экранов */
+#voting-prompt, #result-prompt {
+    font-family: 'Arial Black', Impact, sans-serif;
+    font-size: 2rem;
+    color: #fff;
+    text-transform: uppercase;
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    margin-bottom: 25px;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.time-bonus-badge {
+    background: #facc15;
+    color: #000;
+    border: 3px solid #000;
+    box-shadow: 2px 2px 0 #000;
+}
