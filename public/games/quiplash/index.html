@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>NEKO Quiplash</title>
-  <link rel="stylesheet" href="style.css?v=2.0">
+  <link rel="stylesheet" href="style.css?v=3.0">
 </head>
 <body>
   <div class="bg-gradient"></div>
@@ -25,23 +25,19 @@
   <div class="mobile-container">
     
     <div id="lobby-screen" class="screen active">
-      <div class="hero-section">
-        <h1 class="game-title">СМЕХ<span>ЛЫСТ</span></h1>
-        <p class="game-subtitle">Битва шуток, где ИИ задает тон.</p>
+      <div class="j-header">
+        <h1 class="j-title">СМЕХЛЫСТ</h1>
+        <div class="j-subtitle"><span id="players-count-display">0</span> ИГРОКОВ В ЛОББИ</div>
       </div>
 
-      <div class="players-board">
-        <div class="board-header">
-          <span id="players-count-display">0</span> игроков в лобби
-        </div>
-        <div id="lobby-players-list" class="players-grid"></div>
+      <div id="lobby-players-list" class="j-players-container"></div>
+
+      <div id="host-controls" class="j-host-panel" style="display: none;">
       </div>
 
-      <div id="host-controls" class="action-footer" style="display: none;">
-        <button id="btn-start-game" class="btn-mega" onclick="startGame()">НАЧАТЬ ИГРУ</button>
-      </div>
-      <div id="guest-waiting" class="action-footer" style="display: none;">
-        <div class="waiting-badge">Ожидание хоста...</div>
+      <div id="guest-waiting" class="j-guest-panel" style="display: none;">
+        <h3>ВЫ В ИГРЕ!</h3>
+        <p>Ожидайте, пока VIP запустит игру...</p>
       </div>
     </div>
 
@@ -51,8 +47,7 @@
         <div class="timer-ring"><span id="answering-timer">60</span></div>
       </div>
 
-      <div id="prompts-scroll-area" class="scroll-area">
-        </div>
+      <div id="prompts-scroll-area" class="scroll-area"></div>
       
       <div id="answering-waiting" class="waiting-center" style="display: none;">
         <div class="spinner-md"></div>
@@ -74,8 +69,7 @@
         <h2 id="voting-prompt">Вопрос?</h2>
       </div>
 
-      <div class="voting-stack" id="voting-answers-grid">
-        </div>
+      <div class="voting-stack" id="voting-answers-grid"></div>
 
       <div id="voting-status" class="status-msg"></div>
     </div>
@@ -85,8 +79,7 @@
         <h2 id="result-prompt">Вопрос?</h2>
       </div>
 
-      <div class="voting-stack" id="result-answers-grid">
-        </div>
+      <div class="voting-stack" id="result-answers-grid"></div>
 
       <div class="action-footer">
         <button id="btn-next-vote" class="btn-mega" style="display:none;" onclick="nextVote()">СЛЕДУЮЩИЙ ВОПРОС</button>

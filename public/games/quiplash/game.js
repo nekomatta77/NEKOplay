@@ -52,7 +52,7 @@ function playSound(type) {
     } catch(e) {}
 }
 
-// --- СИНТЕЗАТОР РЕЧИ (Самый надежный метод без CORS ошибок) ---
+// --- СИНТЕЗАТОР РЕЧИ (ГЕНЕРАЦИЯ НА ЛЕТУ ЧЕРЕЗ API МОСТ) ---
 async function speakText(text) {
     if (!isHost) return;
 
@@ -61,63 +61,36 @@ async function speakText(text) {
         currentTTSAudio.currentTime = 0;
     }
 
-    const cleanText = text.replace(/<[^>]*>?/gm, ' ').trim().substring(0, 150);
+    // Очищаем текст от HTML-тегов и ограничиваем длину
+    const cleanText = text.replace(/<[^>]*>?/gm, ' ').trim().substring(0, 200);
     if (!cleanText) return;
 
     const playAudioSafe = (url) => {
         return new Promise((resolve, reject) => {
-            const audio = new Audio();
-            audio.src = url;
+            const audio = new Audio(url);
             currentTTSAudio = audio;
-            
             audio.onended = resolve;
-            audio.onerror = () => reject(new Error('Network or CORS error on audio load'));
-            
+            audio.onerror = () => reject(new Error('Ошибка загрузки аудио'));
             audio.play().catch(reject);
         });
     };
 
     try {
-        // ПОПЫТКА 1: Надежный скрытый клиент (gtx), который Google использует для своих расширений. 
-        // Он не требует сложной авторизации и игнорирует большинство CORS блокировок.
-        const googleUrl = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=ru&q=${encodeURIComponent(cleanText)}`;
-        await playAudioSafe(googleUrl);
-        return;
-    } catch (e1) {
-        console.warn("[TTS] Google (gtx) не сработал:", e1);
+        // Стучимся к нашему собственному серверу (файл api/tts.js), который обходит блокировки
+        const myApiUrl = `/api/tts?text=${encodeURIComponent(cleanText)}`;
+        await playAudioSafe(myApiUrl);
+    } catch (apiError) {
+        console.warn("[TTS] Наш API недоступен, включаю резервный системный голос...", apiError);
         
-        try {
-            // ПОПЫТКА 2: StreamElements
-            const seUrl = `https://api.streamelements.com/kappa/v2/speech?voice=Maxim&text=${encodeURIComponent(cleanText)}`;
-            await playAudioSafe(seUrl);
-            return;
-        } catch (e2) {
-            console.warn("[TTS] StreamElements недоступен:", e2);
+        // Запасной план - встроенный системный голос устройства (без интернета)
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(cleanText);
+            u.lang = 'ru-RU';
+            u.pitch = 0.8; // Делаем голос ниже (бас)
+            u.rate = 1.0;
+            window.speechSynthesis.speak(u);
         }
-    }
-
-    // ПОПЫТКА 3: Встроенный системный голос браузера
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    
-    const u = new SpeechSynthesisUtterance(cleanText);
-    u.lang = 'ru-RU'; u.pitch = 0.9; u.rate = 1.0;
-    
-    const playWithBestVoice = () => {
-        const voices = window.speechSynthesis.getVoices();
-        let bestVoice = voices.find(v => v.lang.includes('ru') && v.name.includes('Google русский')); 
-        if (!bestVoice) bestVoice = voices.find(v => v.lang.includes('ru') && v.name.includes('Microsoft'));
-        if (!bestVoice) bestVoice = voices.find(v => v.lang.includes('ru') && (v.name.includes('Yuri') || v.name.includes('Pavel')));
-        if (!bestVoice) bestVoice = voices.find(v => v.lang.includes('ru'));
-        
-        if (bestVoice) u.voice = bestVoice;
-        window.speechSynthesis.speak(u);
-    };
-
-    if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = playWithBestVoice;
-    } else {
-        playWithBestVoice();
     }
 }
 
@@ -170,6 +143,7 @@ function startLocalTimer(deadlineMs, displayId, onExpireCallback) {
 // --- ИИ ФУНКЦИИ ---
 async function fetchFromAI(systemPrompt) {
     try {
+        // Твой оригинальный API-ключ OpenRouter
         const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
         const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 8000);
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -243,6 +217,14 @@ window.addEventListener('message', (event) => {
 
 function handleStateChange() {
     const status = globalState.status; const phase = globalState.phase; 
+    
+    // Включаем радиальный фон только если мы в лобби
+    if (!status || status === 'waiting' || !phase) {
+        document.body.className = 'bg-lobby';
+    } else {
+        document.body.className = '';
+    }
+    
     showLoading(false);
 
     if (!status || status === 'waiting') {
@@ -253,18 +235,26 @@ function handleStateChange() {
         
         const hostControls = document.getElementById('host-controls');
         if (isHost && !document.getElementById('toggle-theme')) {
+            // ДИЗАЙН КНОПОК И НАСТРОЕК ХОСТА В СТИЛЕ JACKBOX
             hostControls.innerHTML = `
-                <div class="settings-panel">
-                    <div class="setting-item"><span>Секретные задания (Бета)</span><label class="switch"><input type="checkbox" id="toggle-missions"><span class="slider"></span></label></div>
-                    <div class="setting-item"><span>Тематическая игра</span><label class="switch"><input type="checkbox" id="toggle-theme"><span class="slider"></span></label></div>
+                <div class="jackbox-settings">
+                    <div class="j-setting"><span>Задания (Бета)</span><input type="checkbox" id="toggle-missions" class="j-checkbox"></div>
+                    <div class="j-setting"><span>Тематическая игра</span><input type="checkbox" id="toggle-theme" class="j-checkbox"></div>
                 </div>
-                <button id="btn-start-game" class="btn-primary" onclick="startGame()">НАЧАТЬ ИГРУ</button>
+                <button id="btn-start-game" class="j-start-btn" onclick="startGame()">НАЧАТЬ</button>
             `;
         }
 
         const listContainer = document.getElementById('lobby-players-list');
         if (pList.length > 0) {
-            listContainer.innerHTML = pList.map(p => `<div class="player-avatar-wrap"><img src="${p.avatar || 'https://picsum.photos/100'}"><div class="player-name-mini">${p.name || "Аноним"} ${p.id === myUserId ? '(Вы)' : ''}${p.isHost ? SVGS.crown : ''}</div></div>`).join('');
+            // ДИЗАЙН КАРТОЧЕК ИГРОКОВ В СТИЛЕ JACKBOX
+            listContainer.innerHTML = pList.map(p => `
+                <div class="j-player-card ${p.id === myUserId ? 'is-me' : ''}">
+                    <img src="${p.avatar || 'https://picsum.photos/100'}">
+                    <div class="j-player-name">${p.name || "Аноним"}</div>
+                    ${p.isHost ? `<div class="j-host-crown">${SVGS.crown}</div>` : ''}
+                </div>
+            `).join('');
         }
         
         setDisplay('host-controls', isHost ? 'block' : 'none'); setDisplay('guest-waiting', isHost ? 'none' : 'block');
