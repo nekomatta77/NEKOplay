@@ -38,16 +38,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
         const validRooms: Room[] = [];
         
         Object.entries(data).forEach(([roomId, roomData]: [string, any]) => {
+          if (!roomData) {
+            remove(ref(db, `rooms/${roomId}`));
+            return;
+          }
+
+          // Firebase иногда возвращает массивы как объекты, страхуемся:
           const players = roomData.players || [];
+          const playersCount = Array.isArray(players) ? players.length : Object.keys(players).length;
           
-          // ИСПРАВЛЕНО 2: Мгновенное удаление пустых "неизвестных" комнат
-          if (players.length === 0) {
+          // Проверяем, существует ли вообще такая игра в нашем списке
+          const isValidGame = GAMES.some(g => g.id === roomData.gameType);
+
+          // АГРЕССИВНАЯ ОЧИСТКА: Убиваем комнату, если:
+          // 1. В ней 0 игроков
+          // 2. Она старше 30 минут (1800000 мс)
+          // 3. У нее сломанный/неизвестный gameType
+          if (
+            playersCount === 0 || 
+            (roomData.lastActive && (now - roomData.lastActive > 1800000)) ||
+            !isValidGame
+          ) {
             remove(ref(db, `rooms/${roomId}`)).catch(console.error);
-          } 
-          else if (roomData.lastActive && (now - roomData.lastActive > 1800000)) {
-            remove(ref(db, `rooms/${roomId}`)).catch(console.error);
-          } 
-          else {
+          } else {
             validRooms.push(roomData as Room);
           }
         });
@@ -80,7 +93,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
         isReady: false
       }],
       status: "waiting",
-      lastActive: Date.now()
+      lastActive: Date.now() 
     };
 
     await set(newRoomRef, {
