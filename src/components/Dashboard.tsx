@@ -18,7 +18,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
   const [selectedGameId, setSelectedGameId] = useState(GAMES[0].id); 
   const [maxPlayers, setMaxPlayers] = useState(GAMES[0].maxPlayers);
   
-  // ИСПРАВЛЕНО 1: Флаг процесса входа (блокирует показ баннера во время перехода)
+  // Флаг процесса входа (блокирует показ баннера во время перехода)
   const [isJoining, setIsJoining] = useState(false);
 
   const handleGameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -41,16 +41,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
         const validRooms: Room[] = [];
         
         Object.entries(data).forEach(([roomId, roomData]: [string, any]) => {
-          if (!roomData) { remove(ref(db, `rooms/${roomId}`)); return; }
+          if (!roomData) { 
+            remove(ref(db, `rooms/${roomId}`)); 
+            return; 
+          }
 
           const players = roomData.players || [];
           const playersCount = Array.isArray(players) ? players.length : Object.keys(players).length;
-          const isValidGame = GAMES.some(g => g.id === roomData.gameType);
+          
+          // Строгая проверка на корректность режима игры
+          const isValidGame = roomData.gameType && GAMES.some(g => g.id === roomData.gameType);
 
+          // АГРЕССИВНАЯ ОЧИСТКА: убиваем сломанные, пустые и старые комнаты
           if (
             playersCount === 0 || 
-            (roomData.lastActive && (now - roomData.lastActive > 1800000)) ||
-            !isValidGame
+            !isValidGame ||
+            (roomData.lastActive && (now - roomData.lastActive > 1800000))
           ) {
             remove(ref(db, `rooms/${roomId}`)).catch(console.error);
           } else {
@@ -85,7 +91,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
 
     await set(newRoomRef, { ...newRoom, timestamp: serverTimestamp() });
     setShowModal(false);
-    setIsJoining(true); // Блокируем показ баннера
+    setIsJoining(true); // Блокируем показ баннера возврата
     onJoinRoom(newRoom);
   };
 
@@ -94,13 +100,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
     const isAlreadyInRoom = currentPlayers.find(p => p.id === user.id);
     
     if (!isAlreadyInRoom) {
-      if (currentPlayers.length >= room.maxPlayers) { alert('Эта комната уже заполнена!'); return; }
+      if (currentPlayers.length >= room.maxPlayers) { 
+        alert('Эта комната уже заполнена!'); 
+        return; 
+      }
       const updatedPlayers = [...currentPlayers, { ...user, socketId: user.id, isHost: false, isReady: false }];
       await set(ref(db, `rooms/${room.id}/players`), updatedPlayers);
       await set(ref(db, `rooms/${room.id}/lastActive`), Date.now());
     }
 
-    setIsJoining(true); // Блокируем показ баннера
+    setIsJoining(true); // Блокируем показ баннера возврата
     onJoinRoom(room);
   };
 
@@ -148,7 +157,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
       </header>
 
       <div className="max-w-6xl mx-auto">
-        {/* ИСПРАВЛЕНО 1: Показываем баннер только если мы НЕ находимся в процессе входа */}
         {activeRoom && !isJoining && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}

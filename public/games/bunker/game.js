@@ -81,7 +81,6 @@ function handleStateChange() {
     }
 }
 
-// --- ЛОГИКА ХОСТА ---
 function confirmSetup() {
     const firstVoteRound = parseInt(document.getElementById('setting-first-vote-round').value) || 2;
     const doubleRound = parseInt(document.getElementById('setting-double-round').value) || 3;
@@ -154,7 +153,6 @@ function checkHostAutomations() {
     }
 }
 
-// --- ОТРИСОВКА ИГРЫ ---
 function renderGame() {
     const world = globalState.world || {}; 
     const logic = globalState.gameLogic || {}; 
@@ -205,9 +203,8 @@ function renderGame() {
     const hintEl = document.getElementById('ui-my-turn-hint');
     const cardsContainer = document.getElementById('my-cards-container');
 
-    // ИСПРАВЛЕНО 1: Полноценный интерфейс изоляции вместо простого текста
     if (myData?.kicked) {
-        hintEl.style.display = 'none'; // Скрываем надпись с подсказкой хода
+        hintEl.style.display = 'none'; 
         cardsContainer.innerHTML = `
             <div class="isolation-panel">
                 <div class="isolation-icon">
@@ -242,7 +239,6 @@ function renderGame() {
     }
 }
 
-// --- ХОДЫ И ДЕЙСТВИЯ ---
 function revealCard(cardKey) {
     const logic = globalState.gameLogic; 
     const required = getRoundRules(logic.round).revealsRequired;
@@ -269,6 +265,7 @@ function revealCard(cardKey) {
 }
 
 function toggleReady() {
+    if (globalState.playersData?.[myUserId]?.kicked) return; 
     const updates = {};
     updates[`gameLogic/readyPlayers/${myUserId}`] = !(globalState.gameLogic?.readyPlayers?.[myUserId]);
     window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -433,7 +430,9 @@ function executeAction(targetId) {
 }
 
 function submitVote(targetId) {
+    if (globalState.playersData?.[myUserId]?.kicked) return; 
     if (globalState.gameLogic?.quarantinedPlayers?.[myUserId]) return; 
+    
     const updates = {}; 
     updates[`voting/results/${myUserId}`] = targetId;
     window.parent.postMessage({ type: 'update_state', updates }, '*');

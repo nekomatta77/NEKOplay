@@ -57,7 +57,6 @@ function renderLogs() {
     container.scrollTop = container.scrollHeight;
 }
 
-// === НОВЫЙ ДИЗАЙН ХАРАКТЕРИСТИК ===
 function generatePlayerTraitsList(pData) {
     let traitsHTML = '';
     if (pData.cards) {
@@ -90,6 +89,9 @@ window.toggleAccordion = function(id) {
 function handleDiscussionUI() {
     const logic = globalState.gameLogic;
     if (logic.phase !== 'discussion') return;
+
+    const myData = globalState.playersData?.[myUserId] || {};
+    const isKicked = myData.kicked;
 
     document.getElementById('discussion-modal').classList.add('active');
     const alive = getAlivePlayers();
@@ -127,18 +129,29 @@ function handleDiscussionUI() {
     document.getElementById('ui-ready-bar-fill').style.width = `${(readyCount / alive.length) * 100}%`;
     
     const btn = document.getElementById('btn-ready');
-    if (readyMap[myUserId]) {
-        btn.innerText = "ОТМЕНИТЬ ГОТОВНОСТЬ";
-        btn.classList.replace('btn-primary', 'btn-danger');
+    if (isKicked) {
+        btn.innerText = "ОТКЛЮЧЕНО (РЕЖИМ НАБЛЮДЕНИЯ)";
+        btn.className = 'btn-danger full-width';
+        btn.style.opacity = '0.5';
+        btn.style.pointerEvents = 'none';
     } else {
-        btn.innerText = "ПОДТВЕРДИТЬ ГОТОВНОСТЬ";
-        btn.classList.replace('btn-danger', 'btn-primary');
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+        if (readyMap[myUserId]) {
+            btn.innerText = "ОТМЕНИТЬ ГОТОВНОСТЬ";
+            btn.className = 'btn-danger full-width';
+        } else {
+            btn.innerText = "ПОДТВЕРДИТЬ ГОТОВНОСТЬ";
+            btn.className = 'btn-primary full-width glow-hover';
+        }
     }
 }
 
 let votingInterval;
 function handleVotingUI() {
     const logic = globalState.gameLogic;
+    const myData = globalState.playersData?.[myUserId] || {};
+    const isKicked = myData.kicked;
     const isQuarantined = logic.quarantinedPlayers?.[myUserId];
 
     if (logic.phase === 'voting' && globalState.voting?.active) {
@@ -155,7 +168,20 @@ function handleVotingUI() {
 
         let votingHTML = "";
 
-        if (isQuarantined) {
+        if (isKicked) {
+            votingHTML += `
+                <div class="isolation-panel" style="margin-bottom: 20px; padding: 30px 15px; min-height: 250px;">
+                    <div class="isolation-icon" style="width: 60px; height: 60px; margin-bottom: 15px;">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C7.58 2 4 5.58 4 10v4.58c0 1.25.75 2.37 1.89 2.83l1.84.74c1.17.47 1.94 1.62 1.94 2.89V21a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-.96c0-1.27.77-2.42 1.94-2.89l1.84-.74C21.25 16.95 22 15.83 22 14.58V10c0-4.42-3.58-8-8-8zm-3 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm6 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM9 16h6v2H9v-2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="isolation-title glitch-text" style="font-size: clamp(1.2rem, 4vw, 1.8rem); letter-spacing: 2px;">СВЯЗЬ ПОТЕРЯНА</h3>
+                    <p class="isolation-desc" style="font-size: 0.95rem;">Вы изгнаны. Право голоса аннулировано.<br>Ожидайте решения выживших.</p>
+                    <div class="isolation-scanline"></div>
+                </div>
+            `;
+        } else if (isQuarantined) {
             votingHTML += `
                 <div class="quarantine-lockdown-panel">
                     <div class="effect-center-icon" style="margin: 0 auto 10px auto; width: 50px; color: var(--danger);">${SVG_BIOHAZARD}</div>
@@ -165,22 +191,24 @@ function handleVotingUI() {
             `;
         }
 
-        votingHTML += alive.map(id => {
-            const isMe = id === myUserId;
-            const isSelected = myVote === id;
-            const isShielded = logic.shieldedPlayers?.[id];
-            
-            return `
-            <div class="vote-item aesthetic-player-card ${isSelected ? 'selected' : ''} ${(isMe || isShielded) ? 'dimmed' : ''}" ${!isMe && !isQuarantined && !isShielded ? `onclick="submitVote('${id}')"` : ''} style="margin-bottom: 12px; padding: 12px 18px; ${isShielded ? 'border-color: var(--accent-cyan); box-shadow: inset 0 0 15px rgba(0, 229, 255, 0.2);' : ''}">
-                <div class="player-header-row" style="margin-bottom: 0;">
-                    <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'" style="width: 48px; height: 48px;">
-                    <div style="flex-grow: 1;">
-                        <span class="font-header" style="font-size: 1.4rem; line-height: 1; ${isShielded ? 'color: var(--accent-cyan)' : ''}">${globalState.playerNames?.[id]}</span>
+        if (!isKicked) {
+            votingHTML += alive.map(id => {
+                const isMe = id === myUserId;
+                const isSelected = myVote === id;
+                const isShielded = logic.shieldedPlayers?.[id];
+                
+                return `
+                <div class="vote-item aesthetic-player-card ${isSelected ? 'selected' : ''} ${(isMe || isShielded) ? 'dimmed' : ''}" ${!isMe && !isQuarantined && !isShielded ? `onclick="submitVote('${id}')"` : ''} style="margin-bottom: 12px; padding: 12px 18px; ${isShielded ? 'border-color: var(--accent-cyan); box-shadow: inset 0 0 15px rgba(0, 229, 255, 0.2);' : ''}">
+                    <div class="player-header-row" style="margin-bottom: 0;">
+                        <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'" style="width: 48px; height: 48px;">
+                        <div style="flex-grow: 1;">
+                            <span class="font-header" style="font-size: 1.4rem; line-height: 1; ${isShielded ? 'color: var(--accent-cyan)' : ''}">${globalState.playerNames?.[id]}</span>
+                        </div>
+                        <div>${isShielded ? SVG_SHIELD : isSelected ? SVG_TARGET : ''}</div>
                     </div>
-                    <div>${isShielded ? SVG_SHIELD : isSelected ? SVG_TARGET : ''}</div>
-                </div>
-            </div>`;
-        }).join('');
+                </div>`;
+            }).join('');
+        }
 
         document.getElementById('voting-players').innerHTML = votingHTML;
 
@@ -201,7 +229,6 @@ function handleVotingUI() {
     }
 }
 
-// --- КИНО-ЭКРАН АНИМАЦИИ ---
 function playActionCinema(actionData) {
     if (!actionData) return;
     
@@ -277,7 +304,6 @@ function playActionCinema(actionData) {
                 svgIcon = SVG_REROLL; text1 = `СБРОШЕНО: ${actionData.targetOldVal}`; text2 = `ОБНОВЛЕНИЕ: ${actionData.targetNewVal}`;
                 setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-swap-dynamic'); }, 100);
             }
-            // НОВЫЕ ТИПЫ
             else if (actionData.type === 'shield') { 
                 svgIcon = SVG_SHIELD; text1 = "АКТИВАЦИЯ"; text2 = "ИММУНИТЕТ ОТ ИЗГНАНИЯ"; 
                 setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-shield-pulse'); }, 100); 
@@ -320,7 +346,6 @@ function playActionCinema(actionData) {
     }, 2500);
 }
 
-// --- ФИНАЛЬНЫЙ ЭКРАН И ИИ ---
 let aiStoryGenerated = false;
 
 async function renderEndScreen() {

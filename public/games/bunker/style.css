@@ -353,32 +353,6 @@ body {
 .log-entry { background: rgba(0,0,0,0.4); padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; border-left: 3px solid var(--accent-cyan); }
 .log-danger { border-left-color: var(--danger); } .log-success { border-left-color: var(--success); } .log-warning { border-left-color: var(--warning); }
 
-/* ========================================= */
-/* --- 12. АДАПТАЦИЯ ДЛЯ СМАРТФОНОВ --- */
-/* ========================================= */
-@media (max-width: 768px) {
-    .world-grid { grid-template-columns: 1fr; } 
-    .cards-grid { grid-template-columns: repeat(2, 1fr); } 
-    
-    .tabs-nav { margin: 10px; width: calc(100% - 20px); }
-    .tabs-container { padding: 0 10px 10px 10px; }
-    
-    .aesthetic-player-card { padding: 15px; }
-    .aesthetic-trait-row { flex-direction: column; align-items: flex-start; padding: 12px 14px; gap: 6px; }
-    .aesthetic-trait-row .trait-value { text-align: left; max-width: 100%; width: 100%; font-size: 0.95rem; }
-    
-    .effect-container { flex-direction: column; gap: 20px; } 
-
-    #end-screen { padding: 10px; align-items: flex-start !important; overflow-y: auto; }
-    .end-screen-container { margin: 10px auto; padding: 20px 15px; }
-    .ai-story-box { padding: 15px; }
-    .ai-story-box h3 { font-size: 1.1rem; }
-    .story-text { font-size: 0.95rem; line-height: 1.5; }
-    #end-screen h1 { font-size: 2rem !important; }
-    
-    #cinema-title { margin-bottom: 80px !important; margin-top: -60px !important; font-size: 2rem !important; }
-}
-
 /* АНИМАЦИИ ДЛЯ СПЕЦПРОТОКОЛОВ */
 .anim-shield .effect-center-icon { color: var(--accent-cyan); }
 .anim-shield .effect-center-icon svg { animation: shield-defend 2s ease-in-out infinite; }
@@ -410,7 +384,6 @@ body {
 /* ========================================= */
 /* --- 13. ЭКРАН ИЗОЛЯЦИИ (ИЗГНАНИЯ) --- */
 /* ========================================= */
-/* ИСПРАВЛЕНО 1: Стили для полноценной панели изоляции вместо серого текста */
 .isolation-panel {
     grid-column: 1 / -1; 
     background: rgba(255, 42, 85, 0.03);
@@ -447,11 +420,12 @@ body {
     z-index: 2;
 }
 .isolation-icon svg { width: 100%; height: 100%; fill: currentColor; }
+
 .isolation-title {
     font-family: 'Rajdhani', sans-serif;
-    font-size: 2.2rem;
+    font-size: clamp(1.2rem, 5vw, 2.2rem); 
     color: var(--danger);
-    letter-spacing: 5px;
+    letter-spacing: 3px; 
     margin-bottom: 15px;
     text-transform: uppercase;
     font-weight: 700;
@@ -478,4 +452,36 @@ body {
 @keyframes scanline {
     0% { top: -10px; }
     100% { top: 100%; }
+}
+
+/* ========================================= */
+/* --- 12. АДАПТАЦИЯ ДЛЯ СМАРТФОНОВ --- */
+/* ========================================= */
+@media (max-width: 768px) {
+    .world-grid { grid-template-columns: 1fr; } 
+    .cards-grid { grid-template-columns: repeat(2, 1fr); } 
+    
+    .tabs-nav { margin: 10px; width: calc(100% - 20px); }
+    .tabs-container { padding: 0 10px 10px 10px; }
+    
+    .aesthetic-player-card { padding: 15px; }
+    .aesthetic-trait-row { flex-direction: column; align-items: flex-start; padding: 12px 14px; gap: 6px; }
+    .aesthetic-trait-row .trait-value { text-align: left; max-width: 100%; width: 100%; font-size: 0.95rem; }
+    
+    .effect-container { flex-direction: column; gap: 20px; } 
+
+    #end-screen { padding: 10px; align-items: flex-start !important; overflow-y: auto; }
+    .end-screen-container { margin: 10px auto; padding: 20px 15px; }
+    .ai-story-box { padding: 15px; }
+    .ai-story-box h3 { font-size: 1.1rem; }
+    .story-text { font-size: 0.95rem; line-height: 1.5; }
+    #end-screen h1 { font-size: 2rem !important; }
+    
+    #cinema-title { margin-bottom: 80px !important; margin-top: -60px !important; font-size: 2rem !important; }
+    
+    /* Принудительно уменьшаем панель изоляции для телефонов */
+    .isolation-panel { padding: 30px 15px; min-height: 220px; }
+    .isolation-icon { width: 55px; height: 55px; margin-bottom: 10px; }
+    .isolation-title { font-size: 1.35rem; letter-spacing: 1px; margin-bottom: 10px; }
+    .isolation-desc { font-size: 0.9rem; line-height: 1.4; }
 }
