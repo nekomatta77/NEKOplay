@@ -15,23 +15,19 @@ const GameView = React.lazy(() => {
 });
 
 export default function App() {
-  // Инициализируем пользователя из памяти браузера
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('nekoplay_user');
     return saved ? JSON.parse(saved) : null;
   });
   
-  // ИСПРАВЛЕНО 1: Восстанавливаем ID комнаты при перезагрузке
-  const [currentRoomId, setCurrentRoomId] = useState<string | null>(() => {
-    return localStorage.getItem('nekoplay_room_id') || null;
-  });
-  
+  // ИСПРАВЛЕНО: Больше никаких авто-забросов в комнату при обновлении страницы.
+  // Теперь все контролируется через Dashboard.
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
 
   useEffect(() => {
     if (!currentRoomId) {
       setCurrentRoom(null);
-      localStorage.removeItem('nekoplay_room_id');
       return;
     }
 
@@ -41,10 +37,9 @@ export default function App() {
       if (roomData) {
         setCurrentRoom(roomData);
       } else {
-        // Если комната удалена - сбрасываем стейт и хранилище
+        // Комната удалена (хост вышел)
         setCurrentRoomId(null);
         setCurrentRoom(null);
-        localStorage.removeItem('nekoplay_room_id');
       }
     });
 
@@ -66,10 +61,5 @@ export default function App() {
     return <Lobby room={currentRoom} user={user} onLeave={() => setCurrentRoomId(null)} />;
   }
 
-  const handleJoin = (room: Room) => {
-    localStorage.setItem('nekoplay_room_id', room.id);
-    setCurrentRoomId(room.id);
-  };
-
-  return <Dashboard user={user} onJoinRoom={handleJoin} />;
+  return <Dashboard user={user} onJoinRoom={(room) => setCurrentRoomId(room.id)} />;
 }

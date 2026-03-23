@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Room, User } from '../types';
 import { ref, update, onValue, set, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
@@ -11,6 +11,11 @@ interface GameViewProps {
 
 export default function GameView({ room, user, onLeave }: GameViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  
+  // ИСПРАВЛЕНО: Флаг готовности iframe
+  const [isIframeLoaded, setIsIframeLoaded] = useState(false);
+  // Сохраняем последний полученный стейт из базы, чтобы передать его после загрузки
+  const pendingState = useRef<any>(null);
 
   const handleLeaveGame = async () => {
     if (document.fullscreenElement) {
@@ -30,100 +35,79 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     onLeave();
   };
 
-  // Пинг активности (чтобы комната не удалялась, пока в ней активно играют)
   useEffect(() => {
-    const updateActivity = () => {
-      update(ref(db, `rooms/${room.id}`), { lastActive: Date.now() }).catch(() => {});
-    };
-    updateActivity(); // Обновляем сразу при входе
-    const activityInterval = setInterval(updateActivity, 60000); // Раз в минуту
+    const updateActivity = () => update(ref(db, `rooms/${room.id}`), { lastActive: Date.now() }).catch(() => {});
+    updateActivity(); 
+    const activityInterval = setInterval(updateActivity, 60000); 
     return () => clearInterval(activityInterval);
   }, [room.id]);
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
-      // Запрос на полный экран
       if (event.data?.type === 'request_fullscreen') {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(err => console.log("Fullscreen error:", err));
-        }
+        if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); }
       }
 
-      // Старт игры
       if (event.data?.type === 'start_game') {
         const gamePlayers = room.players || [];
         const playerNames = gamePlayers.reduce((acc: any, p) => ({...acc, [p.id]: p.name}), {});
         const playerAvatars = gamePlayers.reduce((acc: any, p) => ({...acc, [p.id]: p.avatar}), {});
 
         await update(ref(db, `rooms/${room.id}/gameState`), {
-          status: 'playing',
-          round: 1,
-          totalRounds: gamePlayers.length > 0 ? gamePlayers.length : 2,
-          players: gamePlayers.map(p => p.id),
-          playerNames: playerNames,
-          playerAvatars: playerAvatars,
-          settings: event.data.settings || { mode: 'classic', time: 90 },
-          submissions: null 
+          status: 'playing', round: 1, totalRounds: gamePlayers.length > 0 ? gamePlayers.length : 2,
+          players: gamePlayers.map(p => p.id), playerNames: playerNames, playerAvatars: playerAvatars,
+          settings: event.data.settings || { mode: 'classic', time: 90 }, submissions: null 
         });
       }
 
-      // Возврат в лобби (очистка состояния)
       if (event.data?.type === 'play_again') {
-        const updates: any = {};
-        updates[`rooms/${room.id}/gameState`] = null; 
-        updates[`rooms/${room.id}/status`] = 'waiting'; 
+        const updates: any = {}; updates[`rooms/${room.id}/gameState`] = null; updates[`rooms/${room.id}/status`] = 'waiting'; 
         await update(ref(db), updates);
       }
 
-      // Отправка хода (сохраняем в Firebase)
       if (event.data?.type === 'game_action') {
-        await set(ref(db, `rooms/${room.id}/lastAction`), {
-          senderId: user.id,
-          action: event.data.action,
-          timestamp: Date.now()
-        });
+        await set(ref(db, `rooms/${room.id}/lastAction`), { senderId: user.id, action: event.data.action, timestamp: Date.now() });
       }
       
       if (event.data?.type === 'update_state' && event.data.updates) {
         await update(ref(db, `rooms/${room.id}/gameState`), event.data.updates);
       }
       
-      if (event.data?.type === 'leave_game') {
-        handleLeaveGame();
-      }
+      if (event.data?.type === 'leave_game') { handleLeaveGame(); }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [room.id, user.id, room.players]);
 
-  // Слушаем глобальное состояние
+  // ИСПРАВЛЕНО: Слушаем Firebase, но отправляем данные только если Iframe готов
   useEffect(() => {
     const stateRef = ref(db, `rooms/${room.id}/gameState`);
     const unsubscribe = onValue(stateRef, (snapshot) => {
       const state = snapshot.val() || {};
-      if (iframeRef.current?.contentWindow) {
+      pendingState.current = state; // Сохраняем в кэш
+      
+      if (isIframeLoaded && iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({ 
           type: 'sync_state', 
           state: state,
-          roomPlayers: room.players // ИСПРАВЛЕНИЕ: Передаем актуальных игроков для лобби
+          roomPlayers: room.players 
         }, '*');
       }
     });
     return () => unsubscribe();
-  }, [room.id, room.players]); // ИСПРАВЛЕНИЕ: Добавили room.players в зависимости
+  }, [room.id, room.players, isIframeLoaded]);
 
-  // Слушаем действия (game_action) из Firebase
   useEffect(() => {
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
       const actionData = snapshot.val();
-      if (actionData && actionData.senderId !== user.id && iframeRef.current?.contentWindow) {
+      if (isIframeLoaded && actionData && actionData.senderId !== user.id && iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({ type: 'game_action', action: actionData.action }, '*');
       }
     });
     return () => unsubscribe();
-  }, [room.id, user.id]);
+  }, [room.id, user.id, isIframeLoaded]);
 
   const getGameUrl = () => {
     const playersCount = room.players?.length || 2;
@@ -134,10 +118,23 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return `/games/${gameId}/${fileName}?players=${playersCount}&name=${encodeURIComponent(user.name)}&userId=${user.id}&isHost=${isHost}`;
   };
 
+  // ИСПРАВЛЕНО: Когда Iframe загрузился, отправляем ему самый свежий стейт из кэша
+  const handleIframeLoad = () => {
+    setIsIframeLoaded(true);
+    if (pendingState.current && iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({ 
+        type: 'sync_state', 
+        state: pendingState.current,
+        roomPlayers: room.players 
+      }, '*');
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black z-50">
       <iframe
         ref={iframeRef}
+        onLoad={handleIframeLoad}
         src={getGameUrl()}
         className="w-full h-full border-0 block"
         title="Game Window"
