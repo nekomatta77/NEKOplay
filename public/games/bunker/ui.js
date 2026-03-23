@@ -77,11 +77,15 @@ function generatePlayerTraitsList(pData) {
 
 window.getPlayerTraitsHTML = generatePlayerTraitsList;
 
+// ИСПРАВЛЕНО: Безопасное разворачивание (работает даже если шеврона нет)
 window.toggleAccordion = function(id) {
     const content = document.getElementById(`disc-content-${id}`);
     const chevron = document.getElementById(`disc-chevron-${id}`);
-    if (content && chevron) {
+    
+    if (content) {
         content.classList.toggle('expanded');
+    }
+    if (chevron) {
         chevron.classList.toggle('expanded');
     }
 };
@@ -103,6 +107,7 @@ function handleDiscussionUI() {
         const isReady = readyMap[id];
         if (isReady) readyCount++;
         
+        // ИСПРАВЛЕНО: Теперь, если игрок готов, мы рисуем И галочку, И стрелочку
         return `
             <div class="player-item aesthetic-player-card ${isReady ? 'ready-pulse' : ''}" style="padding: 15px;">
                 <div class="player-header-row" onclick="toggleAccordion('${id}')" style="cursor: pointer; position: relative;">
@@ -112,8 +117,9 @@ function handleDiscussionUI() {
                             ${globalState.playerNames?.[id]}
                         </div>
                     </div>
-                    <div>
-                        ${isReady ? SVG_CHECK : `<svg id="disc-chevron-${id}" class="accordion-chevron" viewBox="0 0 24 24" width="24" height="24" fill="var(--accent-cyan)"><path d="M7 10l5 5 5-5z"/></svg>`}
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${isReady ? `<span style="color: var(--success); display: flex; align-items: center;">${SVG_CHECK}</span>` : ''}
+                        <svg id="disc-chevron-${id}" class="accordion-chevron" viewBox="0 0 24 24" width="24" height="24" fill="${isReady ? 'var(--success)' : 'var(--accent-cyan)'}"><path d="M7 10l5 5 5-5z"/></svg>
                     </div>
                 </div>
                 <div id="disc-content-${id}" class="accordion-content">
