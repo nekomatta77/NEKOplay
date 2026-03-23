@@ -35,7 +35,6 @@ Promise.all([
 window.addEventListener('message', (event) => {
     if (event.data?.type === 'sync_state') {
         globalState = event.data.state || {};
-        // ИСПРАВЛЕНО: Подтягиваем список активных сессий игроков из React (отключает ожидание ливнувших)
         globalState.roomPlayers = event.data.roomPlayers || []; 
         handleStateChange();
         if(document.getElementById('logs-panel')?.classList.contains('active')) renderLogs();
@@ -180,7 +179,6 @@ function renderGame() {
         document.getElementById('status-banner').className = 'status-banner';
     }
 
-    // ИСПРАВЛЕНО: Теперь мы рендерим ТОЛЬКО alivePlayers (выживших). Кикнутые карточки скрываются.
     document.getElementById('ingame-players-list').innerHTML = alivePlayers.map(id => {
         const pData = globalState.playersData?.[id] || {}; 
         const name = globalState.playerNames?.[id] || "Аноним";
@@ -204,24 +202,43 @@ function renderGame() {
     }).join('');
 
     const myData = globalState.playersData?.[myUserId];
-    document.getElementById('ui-my-turn-hint').innerHTML = myData?.kicked 
-        ? `<span class='text-danger'>Вы изолированы. Доступ к картам закрыт.</span>` 
-        : isMyTurn ? `<span class='text-warning'>Вскройте ${getRoundRules(logic.round).revealsRequired} карт(у).</span>` : "Дождитесь очереди.";
+    const hintEl = document.getElementById('ui-my-turn-hint');
+    const cardsContainer = document.getElementById('my-cards-container');
 
-    if (myData && myData.cards) {
-        document.getElementById('my-cards-container').innerHTML = CARD_ORDER.map(cardKey => {
-            const card = myData.cards[cardKey]; if(!card) return '';
-            const canClick = isMyTurn && !myData.kicked && !card.isOpen;
-            const clickFunc = cardKey === 'action' ? `startActionTargeting()` : `revealCard('${cardKey}')`;
-            return `
-                <div class="bunker-card ${card.isOpen?'revealed-card':'hidden-card'} ${!canClick?'disabled':''}" ${canClick?`onclick="${clickFunc}"`:''}>
-                    <div class="card-content-wrapper">
-                        <div class="type">${card.label}</div>
-                        <div class="value">${card.value}</div>
-                        <div class="status-badge font-header">${card.isOpen ? 'ОТКРЫТО' : 'СКРЫТО'}</div>
-                    </div>
-                </div>`;
-        }).join('');
+    // ИСПРАВЛЕНО 1: Полноценный интерфейс изоляции вместо простого текста
+    if (myData?.kicked) {
+        hintEl.style.display = 'none'; // Скрываем надпись с подсказкой хода
+        cardsContainer.innerHTML = `
+            <div class="isolation-panel">
+                <div class="isolation-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C7.58 2 4 5.58 4 10v4.58c0 1.25.75 2.37 1.89 2.83l1.84.74c1.17.47 1.94 1.62 1.94 2.89V21a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-.96c0-1.27.77-2.42 1.94-2.89l1.84-.74C21.25 16.95 22 15.83 22 14.58V10c0-4.42-3.58-8-8-8zm-3 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm6 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4zM9 16h6v2H9v-2z"/>
+                    </svg>
+                </div>
+                <h2 class="isolation-title glitch-text">СИСТЕМА ЗАБЛОКИРОВАНА</h2>
+                <p class="isolation-desc">Протокол изгнания завершен. Вы покинули бункер.<br>Доступ к терминалу и личным карточкам навсегда закрыт. Теперь вы находитесь в режиме наблюдения за выжившими.</p>
+                <div class="isolation-scanline"></div>
+            </div>
+        `;
+    } else {
+        hintEl.style.display = 'block';
+        hintEl.innerHTML = isMyTurn ? `<span class='text-warning'>Вскройте ${getRoundRules(logic.round).revealsRequired} карт(у).</span>` : "Дождитесь очереди.";
+
+        if (myData && myData.cards) {
+            cardsContainer.innerHTML = CARD_ORDER.map(cardKey => {
+                const card = myData.cards[cardKey]; if(!card) return '';
+                const canClick = isMyTurn && !card.isOpen;
+                const clickFunc = cardKey === 'action' ? `startActionTargeting()` : `revealCard('${cardKey}')`;
+                return `
+                    <div class="bunker-card ${card.isOpen?'revealed-card':'hidden-card'} ${!canClick?'disabled':''}" ${canClick?`onclick="${clickFunc}"`:''}>
+                        <div class="card-content-wrapper">
+                            <div class="type">${card.label}</div>
+                            <div class="value">${card.value}</div>
+                            <div class="status-badge font-header">${card.isOpen ? 'ОТКРЫТО' : 'СКРЫТО'}</div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
     }
 }
 
@@ -265,7 +282,6 @@ function startActionTargeting() {
     
     document.getElementById('target-action-name').innerText = actionCard.value;
     
-    // Массовые действия или действия на себя
     if (['shuffle', 'dictator_veto'].includes(actionCard.type)) {
         document.getElementById('target-players-list').innerHTML = `
             <div class="vote-item" onclick="executeAction('${myUserId}')" style="text-align: center;">
@@ -277,18 +293,16 @@ function startActionTargeting() {
 
     let availableTargets = getAlivePlayers();
     
-    // Специфичные фильтры целей
     if (actionCard.type === 'scavenge') {
         availableTargets = (globalState.players || []).filter(id => globalState.playersData[id].kicked);
     } 
     else if (actionCard.type === 'shield') {
-        availableTargets = getAlivePlayers(); // Можно применять на себя
+        availableTargets = getAlivePlayers(); 
     } 
     else {
-        availableTargets = availableTargets.filter(id => id !== myUserId); // Для остальных механик выбираем других
+        availableTargets = availableTargets.filter(id => id !== myUserId); 
     }
 
-    // Проверка КЛЯПА (запрет на применение на тех, кто дал кляп)
     availableTargets = availableTargets.filter(id => !(globalState.gameLogic?.gaggedTargets?.[myUserId]?.[id]));
 
     if (availableTargets.length === 0) {
@@ -339,7 +353,6 @@ function executeAction(targetId) {
     const updates = {};
     updates[`playersData/${myUserId}/cards/action/isOpen`] = true; 
     
-    // --- ОБРАБОТКА НОВЫХ МЕХАНИК ---
     if (action.type === 'shield') {
         updates[`gameLogic/shieldedPlayers/${targetId}`] = true;
     } 
@@ -370,7 +383,6 @@ function executeAction(targetId) {
             updates[`playersData/${id}/cards/${action.targetTrait}/isOpen`] = true;
         });
     }
-    // --- ОБРАБОТКА БАЗОВЫХ МЕХАНИК ---
     else if (action.type === 'reroll' && targetCard) {
         let newTraitValue = "Неизвестно";
         if (action.targetTrait === 'bio') newTraitValue = generateBio();
@@ -432,7 +444,6 @@ function executeExile() {
     const vetoes = globalState.gameLogic?.vetoPlayers || {};
     const voteCounts = {};
     
-    // Подсчет голосов с учетом двойного веса от "Вето"
     Object.entries(votes).forEach(([voterId, tId]) => { 
         let weight = vetoes[voterId] ? 2 : 1;
         voteCounts[tId] = (voteCounts[tId] || 0) + weight; 
@@ -444,20 +455,19 @@ function executeExile() {
     Object.entries(voteCounts).forEach(([tId, count]) => { 
         if (count > maxVotes) { 
             maxVotes = count; 
-            tiedPlayers = [tId]; // Нашли нового лидера
+            tiedPlayers = [tId]; 
         } else if (count === maxVotes) {
-            tiedPlayers.push(tId); // Ничья
+            tiedPlayers.push(tId); 
         }
     });
     
-    // Исключаем игроков со щитом из потенциальных целей
     let availableForKick = tiedPlayers.length > 0 
         ? tiedPlayers.filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]))
         : getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
         
     if (availableForKick.length === 0) {
         availableForKick = getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
-        if (availableForKick.length === 0) availableForKick = getAlivePlayers(); // Абсолютный фолбэк
+        if (availableForKick.length === 0) availableForKick = getAlivePlayers(); 
     }
         
     let targetToKick = availableForKick.length > 0 ? getRandom(availableForKick) : getRandom(getAlivePlayers());
@@ -470,7 +480,6 @@ function executeExile() {
     updates['gameLogic/phase'] = 'exile_animation'; 
     updates['gameLogic/exiledPlayer'] = targetToKick;
     
-    // Очистка временных статусов текущего раунда
     updates['gameLogic/quarantinedPlayers'] = {}; 
     updates['gameLogic/shieldedPlayers'] = {};
     updates['gameLogic/vetoPlayers'] = {};

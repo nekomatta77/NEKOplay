@@ -52,7 +52,7 @@ body {
 
 /* Экраны */
 .screen { display: none; width: 100%; height: 100%; padding: 15px; }
-.screen.active { display: flex; justify-content: center; align-items: center; overflow-y: auto; overflow-x: hidden; }
+.screen.active { display: flex; justify-content: center; align-items: flex-start; padding: 40px 15px; overflow-y: auto; overflow-x: hidden; }
 
 /* ========================================= */
 /* --- 3. UI ЭЛЕМЕНТЫ (КНОПКИ, ПАНЕЛИ) --- */
@@ -90,7 +90,7 @@ body {
 /* ========================================= */
 /* --- 4. ЭКРАН ИГРЫ И НАВИГАЦИЯ --- */
 /* ========================================= */
-.game-layout { display: flex; flex-direction: column; width: 100%; max-width: 950px; margin: 0 auto; min-height: 100%; }
+.game-layout { display: flex; flex-direction: column; width: 100%; max-width: 950px; margin: 0 auto; min-height: min-content; }
 
 .tabs-nav {
     display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.4);
@@ -217,10 +217,7 @@ body {
 .quarantine-badge { background: var(--danger); color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; letter-spacing: 1px; display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; animation: blink 2s infinite; vertical-align: middle; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-/* ========================================= */
-/* --- ПОВЕДЕНИЕ АККОРДЕОНА (ИДЕАЛЬНАЯ ПЛАВНОСТЬ) --- */
-/* ========================================= */
-/* ИСПРАВЛЕНО 2: Анимация через grid для идеальной плавности (без дерганий) */
+/* ПОВЕДЕНИЕ АККОРДЕОНА */
 .accordion-content {
     display: grid;
     grid-template-rows: 0fr;
@@ -233,9 +230,7 @@ body {
     opacity: 1;
     margin-top: 15px;
 }
-.accordion-inner {
-    overflow: hidden;
-}
+.accordion-inner { overflow: hidden; }
 .accordion-chevron { transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
 .accordion-chevron.expanded { transform: rotate(180deg); }
 
@@ -383,23 +378,20 @@ body {
     
     #cinema-title { margin-bottom: 80px !important; margin-top: -60px !important; font-size: 2rem !important; }
 }
-/* --- НОВЫЕ АНИМАЦИИ ДЛЯ СПЕЦПРОТОКОЛОВ --- */
 
-/* ЩИТ (SHIELD) */
+/* АНИМАЦИИ ДЛЯ СПЕЦПРОТОКОЛОВ */
 .anim-shield .effect-center-icon { color: var(--accent-cyan); }
 .anim-shield .effect-center-icon svg { animation: shield-defend 2s ease-in-out infinite; }
 @keyframes shield-defend { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--accent-cyan)); } 50% { transform: scale(1.15); filter: drop-shadow(0 0 40px var(--accent-cyan)); } }
 .anim-shield-pulse { animation: shieldPulse 1.5s infinite; border-color: var(--accent-cyan) !important; box-shadow: inset 0 0 20px rgba(0,229,255,0.4) !important; }
 @keyframes shieldPulse { 0%, 100% { background: rgba(0, 229, 255, 0.05); } 50% { background: rgba(0, 229, 255, 0.2); } }
 
-/* ЛЕЧЕНИЕ (HEAL) */
 .anim-heal .effect-center-icon { color: var(--success); }
 .anim-heal .effect-center-icon svg { animation: heartbeat 1.5s ease-in-out infinite; }
 @keyframes heartbeat { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--success)); } 20% { transform: scale(1.2); filter: drop-shadow(0 0 30px var(--success)); } 40% { transform: scale(1); } 60% { transform: scale(1.3); filter: drop-shadow(0 0 50px var(--success)); } }
 .anim-heal-pulse { animation: healPulse 2s forwards; border-color: var(--success) !important; }
 @keyframes healPulse { 0% { box-shadow: inset 0 0 0 transparent; } 50% { box-shadow: inset 0 0 50px rgba(0, 230, 118, 0.6); background: rgba(0, 230, 118, 0.1); } 100% { box-shadow: inset 0 0 15px rgba(0, 230, 118, 0.2); } }
 
-/* САБОТАЖ (SABOTAGE) */
 .anim-sabotage .effect-center-icon { color: #aa00ff; }
 .anim-sabotage .effect-center-icon svg { animation: toxic-glitch 0.5s infinite; }
 @keyframes toxic-glitch { 0% { transform: translate(0) scale(1); filter: drop-shadow(0 0 10px #aa00ff); } 25% { transform: translate(-3px, 3px) scale(1.05); filter: drop-shadow(0 0 30px #aa00ff); } 50% { transform: translate(3px, -2px) scale(0.95); } 75% { transform: translate(-2px, -3px) scale(1.1); filter: drop-shadow(0 0 40px #aa00ff); } }
@@ -407,12 +399,83 @@ body {
 @keyframes glitchBox { 0% { transform: skewX(0deg); } 25% { transform: skewX(5deg); background: rgba(170,0,255,0.2); } 50% { transform: skewX(-5deg); } 75% { transform: skewX(2deg); background: rgba(170,0,255,0.4); } 100% { transform: skewX(0deg); } }
 @keyframes sabotageEnd { to { box-shadow: inset 0 0 30px rgba(170,0,255,0.3); background: rgba(170,0,255,0.05); } }
 
-/* ПЕРЕТАСОВКА (SHUFFLE) */
 .anim-shuffle .effect-center-icon { color: var(--accent-cyan); }
 .anim-shuffle .effect-center-icon svg { animation: hyper-spin 1s cubic-bezier(0.5, 0, 0.5, 1) infinite; }
 @keyframes hyper-spin { 0% { transform: rotate(0deg) scale(1); filter: drop-shadow(0 0 5px var(--accent-cyan)); } 50% { transform: rotate(180deg) scale(1.3); filter: drop-shadow(0 0 40px var(--accent-cyan)); } 100% { transform: rotate(360deg) scale(1); filter: drop-shadow(0 0 5px var(--accent-cyan)); } }
 
-/* ДИКТАТУРА (DICTATOR) */
 .anim-dictator_veto .effect-center-icon, .anim-dictator_gag .effect-center-icon { color: var(--warning); }
 .anim-dictator_veto .effect-center-icon svg, .anim-dictator_gag .effect-center-icon svg { animation: slam-gavel 1s cubic-bezier(0.25, 1, 0.5, 1) forwards; }
 @keyframes slam-gavel { 0% { transform: translateY(-50px) rotate(-20deg) scale(1.5); opacity: 0; } 50% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; filter: drop-shadow(0 0 40px var(--warning)); } 70% { transform: translateY(-10px); } 100% { transform: translateY(0); filter: drop-shadow(0 0 15px var(--warning)); } }
+
+/* ========================================= */
+/* --- 13. ЭКРАН ИЗОЛЯЦИИ (ИЗГНАНИЯ) --- */
+/* ========================================= */
+/* ИСПРАВЛЕНО 1: Стили для полноценной панели изоляции вместо серого текста */
+.isolation-panel {
+    grid-column: 1 / -1; 
+    background: rgba(255, 42, 85, 0.03);
+    border: 1px solid rgba(255, 42, 85, 0.2);
+    border-radius: 16px;
+    padding: 60px 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 80px rgba(255, 42, 85, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 350px;
+    backdrop-filter: blur(5px);
+}
+.isolation-panel::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255, 42, 85, 0.03) 15px, rgba(255, 42, 85, 0.03) 30px);
+    pointer-events: none;
+}
+.isolation-panel::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+}
+.isolation-icon {
+    color: var(--danger);
+    width: 90px; height: 90px;
+    margin-bottom: 25px;
+    filter: drop-shadow(0 0 25px rgba(255, 42, 85, 0.6));
+    animation: alert-flash 2.5s infinite;
+    z-index: 2;
+}
+.isolation-icon svg { width: 100%; height: 100%; fill: currentColor; }
+.isolation-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 2.2rem;
+    color: var(--danger);
+    letter-spacing: 5px;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    font-weight: 700;
+    text-shadow: 0 0 15px rgba(255, 42, 85, 0.5);
+    z-index: 2;
+}
+.isolation-desc {
+    color: var(--text-main);
+    font-size: 1.05rem;
+    opacity: 0.85;
+    max-width: 500px;
+    line-height: 1.6;
+    z-index: 2;
+}
+.isolation-scanline {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 4px;
+    background: rgba(255, 42, 85, 0.4);
+    box-shadow: 0 0 15px var(--danger);
+    animation: scanline 4s linear infinite;
+    opacity: 0.7;
+    z-index: 3;
+}
+@keyframes scanline {
+    0% { top: -10px; }
+    100% { top: 100%; }
+}
