@@ -11,16 +11,19 @@ Promise.all([
     fetch('catastrophes.json').then(res => res.json()),
     fetch('bunkers.json').then(res => res.json())
 ]).then(([actionsData, bioData, profData, healthData, hobbiesData, phobiasData, baggagesData, traitsData, catastrophesData, bunkersData]) => { 
-    database = { actionCards: actionsData }; 
-    database.bio = bioData; 
-    database.professions = profData; 
-    database.healths = healthData;   
-    database.hobbies = hobbiesData;
-    database.phobias = phobiasData;
-    database.baggages = baggagesData;
-    database.traits = traitsData;
-    database.catastrophes = catastrophesData;
-    database.bunkers = bunkersData;
+    // Исправлено: безопасное добавление в объект database без полного переопределения
+    Object.assign(database, {
+        actionCards: actionsData,
+        bio: bioData,
+        professions: profData,
+        healths: healthData,
+        hobbies: hobbiesData,
+        phobias: phobiasData,
+        baggages: baggagesData,
+        traits: traitsData,
+        catastrophes: catastrophesData,
+        bunkers: bunkersData
+    });
     
     try {
         const checkIsHost = typeof isHost !== 'undefined' ? isHost : (new URLSearchParams(window.location.search).get('isHost') === 'true');
@@ -261,7 +264,6 @@ function startActionTargeting() {
     
     document.getElementById('target-action-name').innerText = actionCard.value;
     
-    // Массовые действия или действия на себя
     if (['shuffle', 'dictator_veto'].includes(actionCard.type)) {
         document.getElementById('target-players-list').innerHTML = `
             <div class="vote-item" onclick="executeAction('${myUserId}')" style="text-align: center;">
@@ -273,18 +275,16 @@ function startActionTargeting() {
 
     let availableTargets = getAlivePlayers();
     
-    // Специфичные фильтры целей
     if (actionCard.type === 'scavenge') {
         availableTargets = (globalState.players || []).filter(id => globalState.playersData[id].kicked);
     } 
     else if (actionCard.type === 'shield') {
-        availableTargets = getAlivePlayers(); // Можно применять на себя
+        availableTargets = getAlivePlayers(); 
     } 
     else {
-        availableTargets = availableTargets.filter(id => id !== myUserId); // Для остальных механик выбираем других
+        availableTargets = availableTargets.filter(id => id !== myUserId); 
     }
 
-    // Проверка КЛЯПА (запрет на применение на тех, кто дал кляп)
     availableTargets = availableTargets.filter(id => !(globalState.gameLogic?.gaggedTargets?.[myUserId]?.[id]));
 
     if (availableTargets.length === 0) {
@@ -335,7 +335,6 @@ function executeAction(targetId) {
     const updates = {};
     updates[`playersData/${myUserId}/cards/action/isOpen`] = true; 
     
-    // --- ОБРАБОТКА НОВЫХ МЕХАНИК ---
     if (action.type === 'shield') {
         updates[`gameLogic/shieldedPlayers/${targetId}`] = true;
     } 
@@ -366,7 +365,6 @@ function executeAction(targetId) {
             updates[`playersData/${id}/cards/${action.targetTrait}/isOpen`] = true;
         });
     }
-    // --- ОБРАБОТКА БАЗОВЫХ МЕХАНИК ---
     else if (action.type === 'reroll' && targetCard) {
         let newTraitValue = "Неизвестно";
         if (action.targetTrait === 'bio') newTraitValue = generateBio();
@@ -381,7 +379,8 @@ function executeAction(targetId) {
         updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true;
         activeAction.targetNewVal = newTraitValue;
     } 
-    else if (action.type === 'swap' && sourceCard && targetCard) {
+    // Исправлено: запрет на свап, если у цели (или у вас) нет этой карточки (например она "—")
+    else if (action.type === 'swap' && sourceCard && targetCard && activeAction.sourceOldVal !== "—" && activeAction.targetOldVal !== "—") {
         updates[`playersData/${myUserId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal;
         updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = activeAction.sourceOldVal;
         updates[`playersData/${myUserId}/cards/${action.targetTrait}/isOpen`] = true;
@@ -428,7 +427,6 @@ function executeExile() {
     const vetoes = globalState.gameLogic?.vetoPlayers || {};
     const voteCounts = {};
     
-    // Подсчет голосов с учетом двойного веса от "Вето"
     Object.entries(votes).forEach(([voterId, tId]) => { 
         let weight = vetoes[voterId] ? 2 : 1;
         voteCounts[tId] = (voteCounts[tId] || 0) + weight; 
@@ -440,15 +438,24 @@ function executeExile() {
     Object.entries(voteCounts).forEach(([tId, count]) => { 
         if (count > maxVotes) { 
             maxVotes = count; 
-            tiedPlayers = [tId]; // Нашли нового лидера
+            tiedPlayers = [tId]; 
         } else if (count === maxVotes) {
-            tiedPlayers.push(tId); // Ничья
+            tiedPlayers.push(tId); 
         }
     });
     
-    // Исключаем игроков со щитом из потенциальных целей
-    let availableForKick = tiedPlayers.length > 0 ? tiedPlayers : getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
-    let targetToKick = availableForKick.length > 0 ? getRandom(availableForKick) : getRandom(getAlivePlayers());
+    // Исправлено: щит корректно фильтруется даже при ничьей
+    let availableForKick = tiedPlayers.length > 0 
+        ? tiedPlayers.filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]))
+        : getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
+    
+    // Фолбэк, если все ничейные оказались под щитом
+    if (availableForKick.length === 0) {
+        availableForKick = getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
+        if (availableForKick.length === 0) availableForKick = getAlivePlayers(); // Абсолютный фолбэк
+    }
+
+    let targetToKick = getRandom(availableForKick);
 
     addLog(`Игрок ${globalState.playerNames?.[targetToKick]} изгнан.`, "danger");
 
@@ -458,7 +465,6 @@ function executeExile() {
     updates['gameLogic/phase'] = 'exile_animation'; 
     updates['gameLogic/exiledPlayer'] = targetToKick;
     
-    // Очистка временных статусов текущего раунда
     updates['gameLogic/quarantinedPlayers'] = {}; 
     updates['gameLogic/shieldedPlayers'] = {};
     updates['gameLogic/vetoPlayers'] = {};

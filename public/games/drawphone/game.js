@@ -1,6 +1,5 @@
 let animationFrameId = null; 
 
-// Добавляем динамические стили для эффектов
 const extraStyles = document.createElement('style');
 extraStyles.innerHTML = `
 @keyframes earthquakeShake {
@@ -130,7 +129,9 @@ function renderPlayersList(players) {
 let audioCtx = null;
 function initAudio() {
     if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(e => console.log('Audio resume issue:', e));
+    }
 }
 
 function playWarningBeep(pitchMult = 1) {
@@ -194,7 +195,11 @@ function startPhaseTimer(isDrawing) {
         let timeRemaining = (expectedEndTime - Date.now()) / 1000;
         if (timeRemaining <= 0) {
             clearInterval(phaseTimerInterval);
-            if (!currentPhaseSubmitted) { try { if (isDrawing) submitDrawing(false); else submitWord(false); } catch(e){} }
+            // Исправлено: защита от бесконечных спам-отправок при багах таймера
+            if (!currentPhaseSubmitted) { 
+                currentPhaseSubmitted = true;
+                try { if (isDrawing) submitDrawing(false); else submitWord(false); } catch(e){} 
+            }
         } else { updateTimerUI(timeRemaining, timeLimit); }
     }, 100);
 }
@@ -449,13 +454,11 @@ function getReadNotebookId(round, players) {
 }
 
 
-// --- ИНТЕГРАЦИЯ ИИ ---
 async function fetchFromAI(systemPrompt, userText = "") {
     try {
         const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
         const apiKey = atob(SECRET_KEY_BASE64);
 
-        console.log("=== ИИ: Отправляю запрос... ===");
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: { 
@@ -474,26 +477,17 @@ async function fetchFromAI(systemPrompt, userText = "") {
             })
         });
         
-        console.log("=== ИИ: Статус ответа ===", response.status);
         const data = await response.json();
-        
-        if (data.error) {
-            console.error("=== ИИ: Ошибка от OpenRouter ===", data.error);
-            return null;
-        }
+        if (data.error) return null;
         
         const resultText = data.choices[0].message.content.trim();
-        console.log("=== ИИ: Ответ получен ===", resultText);
         return resultText;
     } catch(e) {
-        console.error("=== ИИ: Ошибка сети/кода ===", e);
         return null;
     }
 }
 
-// Переводчик с помощью нейросети (ОБНОВЛЕН ПРОМПТ)
 async function getRealBabelTranslation(text) {
-    console.log("Запуск режима ПЕРЕВОДЧИК для слова:", text);
     const prompt = `Ты — сумасшедший автопереводчик. Возьми фразу пользователя и сильно измени её значение. 
 ЗАМЕНИ большинство существительных, глаголов и прилагательных на совершенно другие, абсолютно не связанные по смыслу слова. 
 НО сохрани предлоги, союзы, местоимения и общую грамматическую структуру, чтобы предложение звучало связно и логично, но имело абсурдный смысл.
@@ -506,11 +500,7 @@ async function getRealBabelTranslation(text) {
     return `[Сбой ИИ] ${text}`;
 }
 
-// Генерация слов для предателя с помощью нейросети (ОБНОВЛЕН ПРОМПТ)
 async function getAIImpostorPair() {
-    console.log("Запуск режима ПРЕДАТЕЛЬ...");
-    
-    // Генерируем случайное число, чтобы заставить нейросеть выдать уникальный результат в каждом раунде
     const randomSeed = Math.floor(Math.random() * 9999999);
     
     const prompt = `Сгенерируй ДВА РАЗНЫХ существительных для игры "Предатель". Одно слово для мирных, другое для предателя.
@@ -524,24 +514,16 @@ async function getAIImpostorPair() {
     
     if (aiResult) {
         try {
-            // Вырезаем блоки Markdown, если нейросеть их добавит
             let cleanResult = aiResult.replace(/```json/gi, '').replace(/```/g, '').trim();
-            console.log("Очищенный от маркдауна ответ:", cleanResult);
-            
             const parsed = JSON.parse(cleanResult);
             
             if (Array.isArray(parsed) && parsed.length >= 2) {
-                console.log("Успешно распарсили массив:", parsed);
                 return parsed;
-            } else {
-                console.error("ИИ вернул массив, но в нем не 2 элемента!", parsed);
-            }
+            } 
         } catch (e) {
-            console.error("Критическая ошибка парсинга JSON от ИИ:", e);
+            console.error(e);
         }
     }
-    
-    // Безопасный фолбек на случай глобального сбоя ИИ
     return ["Озеро", "Река"]; 
 }
 
@@ -843,6 +825,7 @@ function floodFillCore(startX, startY, fillColorHex) {
         
         while (x < w && readData[curPos] === startColor) {
             data[curPos] = fillColor; 
+            // Исправлено: если readData это другой холст, мы должны обновлять и его для корректного лупа
             if (readData !== data) readData[curPos] = fillColor; 
             
             if (y > 0) {
@@ -945,7 +928,6 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg
     }
 }
 
-// ОБНОВЛЕНО: Поддержка фоновой картинки для прозрачной анимации
 function animateStrokes(strokes, canvasEl, isDark, hasBg = false) {
     const actx = canvasEl.getContext('2d');
     
@@ -999,7 +981,11 @@ const zoomContainer = document.getElementById('zoom-container');
 const ctx = canvas.getContext('2d', { desynchronized: true, willReadFrequently: false });
 let isDrawing = false; let currentColor = '#000000'; let isErasing = false; let isFilling = false; let isEyedropper = false; let isBlur = false; let isRect = false; let isCircle = false; let isLine = false; let isArrow = false; let isSymmetry = false; let isNeon = false;
 let canvasTransform = { x: 0, y: 0, scale: 1 }; let initialDistance = 0; let lastZoomCenter = { x: 0, y: 0 }; let preZoomState = null; 
-let shapeStartX = 0, shapeStartY = 0; let shapeImgData = null; let isDrawingShape = false; let lastX = 0, lastY = 0;
+
+// Исправлено: Вынесены в глобальную область видимости
+let shapeStartX = 0, shapeStartY = 0; let shapeImgData = null; let isDrawingShape = false; 
+let lastX = 0, lastY = 0;
+
 let recordedStrokes = []; let strokesHistory = []; let currentStroke = null; let drawHistory = []; let historyIndex = -1;
 let activePointers = new Map();
 let zoomPanActive = false;
@@ -1184,9 +1170,11 @@ function endPosition(e) {
         isDrawingShape = false; let t = isRect ? 'rect' : (isCircle ? 'circle' : (isLine ? 'line' : 'arrow'));
         recordedStrokes.push({ type: t, c: currentColor, s: bsVal, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [shapeStartX, shapeStartY, lastX, lastY] });
         saveState(); 
+        
+        // Исправлено: очистка холста в режиме амнезии теперь учитывает darkmode
         if (globalState.settings?.mode === 'amnesia') {
             ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = '#ffffff';
+            ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         return;
@@ -1195,9 +1183,11 @@ function endPosition(e) {
     if (globalState.settings?.mode === 'oneline') hasDrawnStrokeOneline = true;
     if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; }
     saveState(); 
+    
+    // Исправлено: очистка холста в режиме амнезии теперь учитывает darkmode
     if (globalState.settings?.mode === 'amnesia') {
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 }
@@ -1388,12 +1378,10 @@ function syncPresentationView(players) {
             speakText(pData.textData);
         }
     } else {
-        // ОБНОВЛЕНИЕ: Теперь анимация работает во всех режимах
         if (pData.strokes && pData.strokes.length > 0) {
             let hasBg = false;
             let bgHtml = '';
             
-            // Если это режимы с дорисовыванием, вытаскиваем картинку из предыдущего раунда
             if ((mode === 'finishit' || mode === 'tagteam') && pres.round > 1) {
                 let prevPData = extractData(globalState.submissions?.[`round_${pres.round - 1}`]?.[bookOwnerId]);
                 if (prevPData && prevPData.imgUrl) {
@@ -1407,7 +1395,6 @@ function syncPresentationView(players) {
                 <canvas class="msg-canvas" width="800" height="600" id="anim-canvas-${pres.round}-${bookOwnerId}" data-hasbg="${hasBg}" style="position:relative; z-index:2; width:100%; height:100%; background:transparent; display:block;"></canvas>
             </div>`;
         } else {
-            // Резервный вариант, если массив мазков вдруг не сохранился
             visualContent = `<div style="position:relative; width:100%;"><img src="${pData.imgUrl}" class="msg-img"></div>`;
         }
     }

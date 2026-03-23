@@ -1,7 +1,7 @@
 const urlParams = new URLSearchParams(window.location.search);
 const playersCount = parseInt(urlParams.get('players')) || 2;
 const myName = urlParams.get('name') || 'Аноним';
-const isHost = urlParams.get('isHost') === 'true'; // Проверяем хоста
+const isHost = urlParams.get('isHost') === 'true'; 
 
 let BOARD_SIZE = 4;
 let WIN_STREAK = 3;
@@ -12,13 +12,15 @@ else if (playersCount >= 5) { BOARD_SIZE = 8; WIN_STREAK = 4; }
 
 document.documentElement.style.setProperty('--board-size', BOARD_SIZE);
 
-// БЕЗОПАСНАЯ загрузка правил (чтобы не было ошибки null)
+// Исправлено: защита от бесконечного цикла, если DOM элемент не отрендерился
+let ruleRetries = 0;
 function tryApplyRules() {
     if (typeof applyRulesText === 'function') {
         if (document.getElementById('rulesDescription')) {
             applyRulesText(playersCount, BOARD_SIZE, WIN_STREAK);
-        } else {
-            setTimeout(tryApplyRules, 50); // Ждем 50мс и пробуем снова
+        } else if (ruleRetries < 50) {
+            ruleRetries++;
+            setTimeout(tryApplyRules, 50);
         }
     }
 }
@@ -204,13 +206,15 @@ function showWinner(color, winnerName) {
   }
 }
 
-// Запуск при готовности
-window.addEventListener('DOMContentLoaded', () => {
+// Исправлено: Защита от двойной инициализации
+let isInitialized = false;
+function runInit() {
+    if (isInitialized) return;
+    isInitialized = true;
     initBoard();
     startCountdown();
-});
-// Если DOM уже загружен
+}
+window.addEventListener('DOMContentLoaded', runInit);
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    initBoard();
-    startCountdown();
+    runInit();
 }

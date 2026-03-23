@@ -23,7 +23,9 @@ const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function playSound(type) {
     if (!isHost) return; 
     try {
-        if (audioCtx.state === 'suspended') audioCtx.resume();
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(e => console.log("Audio resume blocked by browser"));
+        }
         const t = audioCtx.currentTime;
         if (type === 'tick') {
             const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
@@ -65,26 +67,20 @@ async function speakText(text) {
     const cleanText = text.replace(/<[^>]*>?/gm, ' ').replace(/[^\w\sа-яА-ЯёЁ0-9.,!?\-:;]/g, '').trim().substring(0, 150);
     if (!cleanText) return;
 
-    if (window.speechSynthesis) {
-        const playLocal = () => {
-            window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance(cleanText);
-            u.lang = 'ru-RU';
-            u.rate = 1.0;
-            const voices = window.speechSynthesis.getVoices();
-            let maleVoice = voices.find(v => v.lang.includes('ru') && /(dmitry|pavel|maxim|male|муж)/i.test(v.name));
-            let anyRuVoice = voices.find(v => v.lang.includes('ru'));
-            if (maleVoice) { u.voice = maleVoice; u.pitch = 0.8; } 
-            else if (anyRuVoice) { u.voice = anyRuVoice; u.pitch = 0.5; } 
-            else { u.pitch = 0.6; }
-            window.speechSynthesis.speak(u);
-        };
-        if (window.speechSynthesis.getVoices().length === 0) {
-            window.speechSynthesis.onvoiceschanged = playLocal;
-            setTimeout(playLocal, 300);
-        } else { playLocal(); }
-        return; 
-    }
+    const playLocal = () => {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(cleanText);
+        u.lang = 'ru-RU';
+        u.rate = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        let maleVoice = voices.find(v => v.lang.includes('ru') && /(dmitry|pavel|maxim|male|муж)/i.test(v.name));
+        let anyRuVoice = voices.find(v => v.lang.includes('ru'));
+        if (maleVoice) { u.voice = maleVoice; u.pitch = 0.8; } 
+        else if (anyRuVoice) { u.voice = anyRuVoice; u.pitch = 0.5; } 
+        else { u.pitch = 0.6; }
+        window.speechSynthesis.speak(u);
+    };
 
     const playCloud = (url) => {
         return new Promise((resolve, reject) => {
@@ -93,10 +89,14 @@ async function speakText(text) {
             audio.onended = resolve; audio.onerror = () => reject(new Error('Ошибка Google TTS')); audio.load();
         });
     };
+    
+    // Исправлено: если облачный TTS недоступен, фолбэк на локальный синтезатор
     try {
         const googleUrl = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=ru&q=${encodeURIComponent(cleanText)}`;
         await playCloud(googleUrl);
-    } catch (e) {}
+    } catch (e) {
+        playLocal();
+    }
 }
 
 // --- SVG ИКОНКИ ---
@@ -156,7 +156,7 @@ function startLocalTimer(deadlineMs, displayId, onExpireCallback, timerKey) {
     update(); currentTimerInterval = setInterval(update, 1000);
 }
 
-// --- ИИ ФУНКЦИИ (ОБНОВЛЕННЫЕ JACKBOX ПРОМПТЫ) ---
+// --- ИИ ФУНКЦИИ ---
 async function fetchFromAI(systemPrompt) {
     try {
         const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
@@ -176,7 +176,6 @@ async function generatePrompts(round, count, playerNamesList = [], theme = "") {
     let namesStr = playerNamesList.length > 0 ? playerNamesList.join(', ') : "";
     let themeStr = theme ? `ИГРА ИДЕТ НА ТЕМУ: "${theme}". ВСЕ ВОПРОСЫ СВЯЖИ С ЭТОЙ ТЕМОЙ! ` : "";
     
-    // ТВОЙ НОВЫЙ СУПЕР-ПРОМПТ ДЛЯ ВОПРОСОВ
     let basePrompt = `Твоя роль: Ты — ведущий комедийный сценарист студии Jackbox Games. Твоя задача — придумать вопросы и заходы (промпты) для игры в стиле «Смехлыст» (Quiplash).
 Вайб и тональность: Абсурдный, дерзкий, слегка циничный, очень жизненный, иногда на грани фола (но без откровенной жести, запрещенной правилами). Вопросы должны провоцировать игроков на смешные, неожиданные или пошлые ответы.
 Правило анти-повторов: Ты строго не должен повторяться ни в темах, ни в структуре вопросов. Чтобы избежать зацикливания, используй разные формулы генерации. Запрещено использовать заезженные клише (инопланетяне, зомби, первое свидание, собеседование).
@@ -191,9 +190,7 @@ ${themeStr}
 Требования к генерации: Сгенерируй ровно ${count} уникальных вопросов. Вопросы должны быть лаконичными (не больше 1-2 предложений) и оставлять игроку огромное пространство для шутки. НЕ задавай вопросы, на которые можно ответить «да» или «нет». `;
 
     if (namesStr) basePrompt += `Строго максимум в 1 вопросе используй случайное имя игрока (${namesStr}). `;
-    
     if (round === 3) basePrompt += `ВАЖНО: Это ФИНАЛЬНЫЙ раунд. КАЖДЫЙ вопрос должен требовать перечислить ровно ТРИ вещи. `;
-    
     basePrompt += `Выведи СТРОГО JSON массив строк (["вопрос 1", "вопрос 2"]). Больше ничего не пиши. Включи режим максимальной креативности. Поехали!`;
 
     let res = await fetchFromAI(basePrompt);
@@ -223,7 +220,6 @@ async function generateMissions(count) {
 async function generateRoast(sortedPlayers) {
     const loser = sortedPlayers[sortedPlayers.length - 1]?.name || "Кто-то";
     
-    // ТВОЙ НОВЫЙ СУПЕР-ПРОМПТ ДЛЯ ПРОЖАРКИ
     const sys = `Твоя роль: Ты — максимально язвительный, циничный и высокомерный закадровый голос комедийной игры для вечеринок. Твоя задача — коротко и жестоко «прожарить» (зароустить) игрока, который занял абсолютное последнее место по очкам.
 Имя этого неудачника: "${loser}".
 Вайб и тональность: Пассивная агрессия, черный юмор, сарказм и хлесткие панчлайны. Это дружеская игра, так что избегай запрещенных тем (расизм, сексизм, реальные трагедии), но бей прямо по эго проигравшего. Игрок на последнем месте должен почувствовать себя интеллектуально беспомощным.
@@ -297,7 +293,11 @@ function handleStateChange() {
 
     if (status === 'playing' && !phase) {
         showPhase('lobby-screen'); showLoading(true, "Нейросеть генерирует вопросы...");
-        if (isHost && !isGeneratingRound) { if(audioCtx.state === 'suspended') audioCtx.resume(); isGeneratingRound = true; initFirstRound(); }
+        if (isHost && !isGeneratingRound) { 
+            if(audioCtx.state === 'suspended') audioCtx.resume().catch(e => {}); 
+            isGeneratingRound = true; 
+            initFirstRound(); 
+        }
         return;
     }
 
@@ -531,9 +531,11 @@ function renderVotingResultPhase() {
             }
         });
         
-        sendUpdate({'gameData/scores': newScores, [`gameData/scoresCalculated/${vIdx}`]: true});
-
-        setTimeout(() => {
+        // Исправлено: замена жесткого setTimeout на управляемый таймер, который восстанавливается, даже если хост моргнет
+        const targetDeadline = Date.now() + 7000;
+        sendUpdate({'gameData/scores': newScores, [`gameData/scoresCalculated/${vIdx}`]: true, 'gameData/resultPhaseDeadline': targetDeadline});
+        
+        startLocalTimer(targetDeadline, 'some-dummy-id', () => {
             document.getElementById('result-answers-grid').removeAttribute('data-rendered-idx');
             let nextIdx = vIdx + 1;
             if (nextIdx >= gd.prompts.length) {
@@ -541,7 +543,18 @@ function renderVotingResultPhase() {
                 generateRoast(sorted).then(r => sendUpdate({ phase: 'scoreboard', 'gameData/roast': r }));
             }
             else sendUpdate({ phase: 'voting', 'gameData/currentVoteIndex': nextIdx, 'gameData/deadline': Date.now() + 20000 });
-        }, 7000);
+        }, 'result_timer');
+    } else if (isHost && gd.scoresCalculated?.[vIdx] && gd.resultPhaseDeadline) {
+        // Подхватываем таймер, если хост обновил страницу в процессе
+        startLocalTimer(gd.resultPhaseDeadline, 'some-dummy-id', () => {
+            document.getElementById('result-answers-grid').removeAttribute('data-rendered-idx');
+            let nextIdx = vIdx + 1;
+            if (nextIdx >= gd.prompts.length) {
+                const sorted = (globalState.activePlayersList || []).map(id => ({ name: globalState.playerNames?.[id] || "Бот", score: gd.scores[id] || 0 })).sort((a, b) => b.score - a.score);
+                generateRoast(sorted).then(r => sendUpdate({ phase: 'scoreboard', 'gameData/roast': r }));
+            }
+            else sendUpdate({ phase: 'voting', 'gameData/currentVoteIndex': nextIdx, 'gameData/deadline': Date.now() + 20000 });
+        }, 'result_timer');
     }
 
     const grid = document.getElementById('result-answers-grid');
