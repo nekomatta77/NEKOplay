@@ -38,10 +38,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
         const validRooms: Room[] = [];
         
         Object.entries(data).forEach(([roomId, roomData]: [string, any]) => {
-          // ИСПРАВЛЕНО: Автоматическое удаление комнат, неактивных более 30 минут (1800000 мс)
-          if (roomData.lastActive && (now - roomData.lastActive > 1800000)) {
+          const players = roomData.players || [];
+          
+          // ИСПРАВЛЕНО 2: Мгновенное удаление пустых "неизвестных" комнат
+          if (players.length === 0) {
             remove(ref(db, `rooms/${roomId}`)).catch(console.error);
-          } else {
+          } 
+          else if (roomData.lastActive && (now - roomData.lastActive > 1800000)) {
+            remove(ref(db, `rooms/${roomId}`)).catch(console.error);
+          } 
+          else {
             validRooms.push(roomData as Room);
           }
         });
@@ -74,7 +80,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
         isReady: false
       }],
       status: "waiting",
-      lastActive: Date.now() // Задаем время активности при создании
+      lastActive: Date.now()
     };
 
     await set(newRoomRef, {
@@ -103,7 +109,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
       }];
       
       await set(ref(db, `rooms/${room.id}/players`), updatedPlayers);
-      // Обновляем активность при входе нового игрока
       await set(ref(db, `rooms/${room.id}/lastActive`), Date.now());
     }
 

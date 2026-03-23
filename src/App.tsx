@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState, useEffect, Suspense } from 'react';
 import { AuthScreen } from './components/AuthScreen';
 import { Dashboard } from './components/Dashboard';
@@ -16,6 +15,7 @@ const GameView = React.lazy(() => {
 });
 
 export default function App() {
+  // Инициализируем пользователя из памяти браузера
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('nekoplay_user');
     return saved ? JSON.parse(saved) : null;

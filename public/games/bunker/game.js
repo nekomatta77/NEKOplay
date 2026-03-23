@@ -11,7 +11,6 @@ Promise.all([
     fetch('catastrophes.json').then(res => res.json()),
     fetch('bunkers.json').then(res => res.json())
 ]).then(([actionsData, bioData, profData, healthData, hobbiesData, phobiasData, baggagesData, traitsData, catastrophesData, bunkersData]) => { 
-    // Исправлено: безопасное добавление в объект database без полного переопределения
     Object.assign(database, {
         actionCards: actionsData,
         bio: bioData,
@@ -36,8 +35,10 @@ Promise.all([
 window.addEventListener('message', (event) => {
     if (event.data?.type === 'sync_state') {
         globalState = event.data.state || {};
+        // ИСПРАВЛЕНО: Подтягиваем список активных сессий игроков из React (отключает ожидание ливнувших)
+        globalState.roomPlayers = event.data.roomPlayers || []; 
         handleStateChange();
-        if(document.getElementById('logs-panel').classList.contains('active')) renderLogs();
+        if(document.getElementById('logs-panel')?.classList.contains('active')) renderLogs();
     }
 });
 
@@ -179,7 +180,8 @@ function renderGame() {
         document.getElementById('status-banner').className = 'status-banner';
     }
 
-    document.getElementById('ingame-players-list').innerHTML = (globalState.players || []).map(id => {
+    // ИСПРАВЛЕНО: Теперь мы рендерим ТОЛЬКО alivePlayers (выживших). Кикнутые карточки скрываются.
+    document.getElementById('ingame-players-list').innerHTML = alivePlayers.map(id => {
         const pData = globalState.playersData?.[id] || {}; 
         const name = globalState.playerNames?.[id] || "Аноним";
         
@@ -188,14 +190,13 @@ function renderGame() {
         if (logic.shieldedPlayers?.[id]) badges += `<span class="shield-badge" style="background:var(--accent-cyan);color:#000;padding:3px 8px;border-radius:4px;font-size:0.7rem;font-weight:bold;margin-left:10px;vertical-align:middle;">ИММУНИТЕТ</span>`;
         
         return `
-            <div class="player-item aesthetic-player-card ${pData.kicked ? 'kicked' : ''} ${id === activePlayerId && logic.phase === 'reveal' ? 'active-turn' : ''}">
+            <div class="player-item aesthetic-player-card ${id === activePlayerId && logic.phase === 'reveal' ? 'active-turn' : ''}">
                 <div class="player-header-row mb-10">
                     <img src="${globalState.playerAvatars?.[id]}" onerror="this.src=''">
                     <div>
                         <div class="font-header" style="font-size:1.6rem;color:${id===myUserId?'var(--accent-cyan)':'var(--text-main)'}">
                             ${name} ${id === myUserId ? '<span class="text-muted" style="font-size:0.8rem; vertical-align: middle;">(ВЫ)</span>' : ''} ${badges}
                         </div>
-                        ${pData.kicked?'<div class="text-danger font-header">ИЗГНАН</div>':''}
                     </div>
                 </div>
                 ${window.getPlayerTraitsHTML(pData)}
@@ -264,6 +265,7 @@ function startActionTargeting() {
     
     document.getElementById('target-action-name').innerText = actionCard.value;
     
+    // Массовые действия или действия на себя
     if (['shuffle', 'dictator_veto'].includes(actionCard.type)) {
         document.getElementById('target-players-list').innerHTML = `
             <div class="vote-item" onclick="executeAction('${myUserId}')" style="text-align: center;">
@@ -275,16 +277,18 @@ function startActionTargeting() {
 
     let availableTargets = getAlivePlayers();
     
+    // Специфичные фильтры целей
     if (actionCard.type === 'scavenge') {
         availableTargets = (globalState.players || []).filter(id => globalState.playersData[id].kicked);
     } 
     else if (actionCard.type === 'shield') {
-        availableTargets = getAlivePlayers(); 
+        availableTargets = getAlivePlayers(); // Можно применять на себя
     } 
     else {
-        availableTargets = availableTargets.filter(id => id !== myUserId); 
+        availableTargets = availableTargets.filter(id => id !== myUserId); // Для остальных механик выбираем других
     }
 
+    // Проверка КЛЯПА (запрет на применение на тех, кто дал кляп)
     availableTargets = availableTargets.filter(id => !(globalState.gameLogic?.gaggedTargets?.[myUserId]?.[id]));
 
     if (availableTargets.length === 0) {
@@ -335,6 +339,7 @@ function executeAction(targetId) {
     const updates = {};
     updates[`playersData/${myUserId}/cards/action/isOpen`] = true; 
     
+    // --- ОБРАБОТКА НОВЫХ МЕХАНИК ---
     if (action.type === 'shield') {
         updates[`gameLogic/shieldedPlayers/${targetId}`] = true;
     } 
@@ -365,6 +370,7 @@ function executeAction(targetId) {
             updates[`playersData/${id}/cards/${action.targetTrait}/isOpen`] = true;
         });
     }
+    // --- ОБРАБОТКА БАЗОВЫХ МЕХАНИК ---
     else if (action.type === 'reroll' && targetCard) {
         let newTraitValue = "Неизвестно";
         if (action.targetTrait === 'bio') newTraitValue = generateBio();
@@ -379,7 +385,6 @@ function executeAction(targetId) {
         updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true;
         activeAction.targetNewVal = newTraitValue;
     } 
-    // Исправлено: запрет на свап, если у цели (или у вас) нет этой карточки (например она "—")
     else if (action.type === 'swap' && sourceCard && targetCard && activeAction.sourceOldVal !== "—" && activeAction.targetOldVal !== "—") {
         updates[`playersData/${myUserId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal;
         updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = activeAction.sourceOldVal;
@@ -427,6 +432,7 @@ function executeExile() {
     const vetoes = globalState.gameLogic?.vetoPlayers || {};
     const voteCounts = {};
     
+    // Подсчет голосов с учетом двойного веса от "Вето"
     Object.entries(votes).forEach(([voterId, tId]) => { 
         let weight = vetoes[voterId] ? 2 : 1;
         voteCounts[tId] = (voteCounts[tId] || 0) + weight; 
@@ -438,24 +444,23 @@ function executeExile() {
     Object.entries(voteCounts).forEach(([tId, count]) => { 
         if (count > maxVotes) { 
             maxVotes = count; 
-            tiedPlayers = [tId]; 
+            tiedPlayers = [tId]; // Нашли нового лидера
         } else if (count === maxVotes) {
-            tiedPlayers.push(tId); 
+            tiedPlayers.push(tId); // Ничья
         }
     });
     
-    // Исправлено: щит корректно фильтруется даже при ничьей
+    // Исключаем игроков со щитом из потенциальных целей
     let availableForKick = tiedPlayers.length > 0 
         ? tiedPlayers.filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]))
         : getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
-    
-    // Фолбэк, если все ничейные оказались под щитом
+        
     if (availableForKick.length === 0) {
         availableForKick = getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
         if (availableForKick.length === 0) availableForKick = getAlivePlayers(); // Абсолютный фолбэк
     }
-
-    let targetToKick = getRandom(availableForKick);
+        
+    let targetToKick = availableForKick.length > 0 ? getRandom(availableForKick) : getRandom(getAlivePlayers());
 
     addLog(`Игрок ${globalState.playerNames?.[targetToKick]} изгнан.`, "danger");
 
@@ -465,6 +470,7 @@ function executeExile() {
     updates['gameLogic/phase'] = 'exile_animation'; 
     updates['gameLogic/exiledPlayer'] = targetToKick;
     
+    // Очистка временных статусов текущего раунда
     updates['gameLogic/quarantinedPlayers'] = {}; 
     updates['gameLogic/shieldedPlayers'] = {};
     updates['gameLogic/vetoPlayers'] = {};

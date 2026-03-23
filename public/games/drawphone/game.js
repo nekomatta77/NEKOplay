@@ -1,5 +1,6 @@
 let animationFrameId = null; 
 
+// Добавляем динамические стили для эффектов
 const extraStyles = document.createElement('style');
 extraStyles.innerHTML = `
 @keyframes earthquakeShake {
@@ -129,9 +130,7 @@ function renderPlayersList(players) {
 let audioCtx = null;
 function initAudio() {
     if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume().catch(e => console.log('Audio resume issue:', e));
-    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
 function playWarningBeep(pitchMult = 1) {
@@ -195,11 +194,7 @@ function startPhaseTimer(isDrawing) {
         let timeRemaining = (expectedEndTime - Date.now()) / 1000;
         if (timeRemaining <= 0) {
             clearInterval(phaseTimerInterval);
-            // Исправлено: защита от бесконечных спам-отправок при багах таймера
-            if (!currentPhaseSubmitted) { 
-                currentPhaseSubmitted = true;
-                try { if (isDrawing) submitDrawing(false); else submitWord(false); } catch(e){} 
-            }
+            if (!currentPhaseSubmitted) { try { if (isDrawing) submitDrawing(false); else submitWord(false); } catch(e){} }
         } else { updateTimerUI(timeRemaining, timeLimit); }
     }, 100);
 }
@@ -454,11 +449,13 @@ function getReadNotebookId(round, players) {
 }
 
 
+// --- ИНТЕГРАЦИЯ ИИ ---
 async function fetchFromAI(systemPrompt, userText = "") {
     try {
         const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
         const apiKey = atob(SECRET_KEY_BASE64);
 
+        console.log("=== ИИ: Отправляю запрос... ===");
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: { 
@@ -477,17 +474,25 @@ async function fetchFromAI(systemPrompt, userText = "") {
             })
         });
         
+        console.log("=== ИИ: Статус ответа ===", response.status);
         const data = await response.json();
-        if (data.error) return null;
+        
+        if (data.error) {
+            console.error("=== ИИ: Ошибка от OpenRouter ===", data.error);
+            return null;
+        }
         
         const resultText = data.choices[0].message.content.trim();
+        console.log("=== ИИ: Ответ получен ===", resultText);
         return resultText;
     } catch(e) {
+        console.error("=== ИИ: Ошибка сети/кода ===", e);
         return null;
     }
 }
 
 async function getRealBabelTranslation(text) {
+    console.log("Запуск режима ПЕРЕВОДЧИК для слова:", text);
     const prompt = `Ты — сумасшедший автопереводчик. Возьми фразу пользователя и сильно измени её значение. 
 ЗАМЕНИ большинство существительных, глаголов и прилагательных на совершенно другие, абсолютно не связанные по смыслу слова. 
 НО сохрани предлоги, союзы, местоимения и общую грамматическую структуру, чтобы предложение звучало связно и логично, но имело абсурдный смысл.
@@ -501,8 +506,8 @@ async function getRealBabelTranslation(text) {
 }
 
 async function getAIImpostorPair() {
+    console.log("Запуск режима ПРЕДАТЕЛЬ...");
     const randomSeed = Math.floor(Math.random() * 9999999);
-    
     const prompt = `Сгенерируй ДВА РАЗНЫХ существительных для игры "Предатель". Одно слово для мирных, другое для предателя.
 Слова должны быть немного похожи визуально или по смыслу (например: Пельмени/Вареники, Озеро/Река, Орел/Ястреб).
 ВАЖНОЕ ПРАВИЛО: Выбирай слова из базы в 100,000 слов! Используй этот случайный сид для выбора категории и слов: ${randomSeed}. 
@@ -515,13 +520,16 @@ async function getAIImpostorPair() {
     if (aiResult) {
         try {
             let cleanResult = aiResult.replace(/```json/gi, '').replace(/```/g, '').trim();
+            console.log("Очищенный от маркдауна ответ:", cleanResult);
             const parsed = JSON.parse(cleanResult);
-            
             if (Array.isArray(parsed) && parsed.length >= 2) {
+                console.log("Успешно распарсили массив:", parsed);
                 return parsed;
-            } 
+            } else {
+                console.error("ИИ вернул массив, но в нем не 2 элемента!", parsed);
+            }
         } catch (e) {
-            console.error(e);
+            console.error("Критическая ошибка парсинга JSON от ИИ:", e);
         }
     }
     return ["Озеро", "Река"]; 
@@ -825,7 +833,6 @@ function floodFillCore(startX, startY, fillColorHex) {
         
         while (x < w && readData[curPos] === startColor) {
             data[curPos] = fillColor; 
-            // Исправлено: если readData это другой холст, мы должны обновлять и его для корректного лупа
             if (readData !== data) readData[curPos] = fillColor; 
             
             if (y > 0) {
@@ -980,12 +987,8 @@ const canvas = document.getElementById('drawing-board');
 const zoomContainer = document.getElementById('zoom-container');
 const ctx = canvas.getContext('2d', { desynchronized: true, willReadFrequently: false });
 let isDrawing = false; let currentColor = '#000000'; let isErasing = false; let isFilling = false; let isEyedropper = false; let isBlur = false; let isRect = false; let isCircle = false; let isLine = false; let isArrow = false; let isSymmetry = false; let isNeon = false;
-let canvasTransform = { x: 0, y: 0, scale: 1 }; let initialDistance = 0; let lastZoomCenter = { x: 0, y: 0 }; let preZoomState = null; 
-
-// Исправлено: Вынесены в глобальную область видимости
-let shapeStartX = 0, shapeStartY = 0; let shapeImgData = null; let isDrawingShape = false; 
-let lastX = 0, lastY = 0;
-
+let canvasTransform = { x: 0, y: 0, scale: 1 }; let initialDistance = 0; let initialScale = 1; let lastZoomCenter = { x: 0, y: 0 }; let preZoomState = null; 
+let shapeStartX = 0, shapeStartY = 0; let shapeImgData = null; let isDrawingShape = false; let lastX = 0, lastY = 0;
 let recordedStrokes = []; let strokesHistory = []; let currentStroke = null; let drawHistory = []; let historyIndex = -1;
 let activePointers = new Map();
 let zoomPanActive = false;
@@ -1061,6 +1064,7 @@ function startPosition(e) {
         const pts = Array.from(activePointers.values());
         initialDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
         lastZoomCenter = { x: (pts[0].x + pts[1].x)/2, y: (pts[0].y + pts[1].y)/2 };
+        initialScale = canvasTransform.scale;
         return;
     }
     
@@ -1106,21 +1110,35 @@ function draw(e) {
       if (activePointers.size < 2) return;
       const pts = Array.from(activePointers.values());
       const currentDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      const cx = (pts[0].x + pts[1].x)/2; const cy = (pts[0].y + pts[1].y)/2;
+      const cx = (pts[0].x + pts[1].x)/2; 
+      const cy = (pts[0].y + pts[1].y)/2;
       
-      if (initialDistance === 0) { initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; }
+      if (initialDistance === 0) { 
+          initialDistance = currentDist; 
+          lastZoomCenter = { x: cx, y: cy }; 
+          initialScale = canvasTransform.scale;
+      }
       
-      let newScale = canvasTransform.scale * (currentDist / initialDistance);
-      if (newScale < 1) newScale = 1; if (newScale > 10) newScale = 10;
+      let newScale = initialScale * (currentDist / initialDistance);
+      newScale = Math.max(1, Math.min(newScale, 10)); 
       
+      const dx = cx - lastZoomCenter.x;
+      const dy = cy - lastZoomCenter.y;
+      
+      const scaleRatio = newScale / canvasTransform.scale;
       const wrapperRect = zoomContainer.parentElement.getBoundingClientRect();
-      canvasTransform.x -= (cx - wrapperRect.left - canvasTransform.x) * (newScale / canvasTransform.scale - 1);
-      canvasTransform.y -= (cy - wrapperRect.top - canvasTransform.y) * (newScale / canvasTransform.scale - 1);
-      canvasTransform.x += (cx - lastZoomCenter.x); canvasTransform.y += (cy - lastZoomCenter.y);
+      const localCx = cx - wrapperRect.left;
+      const localCy = cy - wrapperRect.top;
+
+      canvasTransform.x = localCx - (localCx - canvasTransform.x) * scaleRatio + dx;
+      canvasTransform.y = localCy - (localCy - canvasTransform.y) * scaleRatio + dy;
       canvasTransform.scale = newScale; 
       
-      initialDistance = currentDist; lastZoomCenter = { x: cx, y: cy }; 
-      updateTransform(); return;
+      if (newScale === 1) { canvasTransform.x = 0; canvasTransform.y = 0; }
+      
+      lastZoomCenter = { x: cx, y: cy }; 
+      updateTransform(); 
+      return;
   }
   
   if (!isDrawing && !isDrawingShape) return; 
@@ -1170,8 +1188,6 @@ function endPosition(e) {
         isDrawingShape = false; let t = isRect ? 'rect' : (isCircle ? 'circle' : (isLine ? 'line' : 'arrow'));
         recordedStrokes.push({ type: t, c: currentColor, s: bsVal, o: opacity, b: isBlur?1:0, sym: isSymmetry?1:0, n: isNeon?1:0, p: [shapeStartX, shapeStartY, lastX, lastY] });
         saveState(); 
-        
-        // Исправлено: очистка холста в режиме амнезии теперь учитывает darkmode
         if (globalState.settings?.mode === 'amnesia') {
             ctx.globalCompositeOperation = 'source-over';
             ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff';
@@ -1183,8 +1199,6 @@ function endPosition(e) {
     if (globalState.settings?.mode === 'oneline') hasDrawnStrokeOneline = true;
     if (currentStroke) { recordedStrokes.push(currentStroke); currentStroke = null; }
     saveState(); 
-    
-    // Исправлено: очистка холста в режиме амнезии теперь учитывает darkmode
     if (globalState.settings?.mode === 'amnesia') {
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = (globalState.settings?.mode === 'darkmode') ? '#000000' : '#ffffff';
@@ -1197,6 +1211,30 @@ canvas.addEventListener('pointerup', endPosition);
 canvas.addEventListener('pointermove', draw, {passive: false}); 
 canvas.addEventListener('pointercancel', endPosition);
 canvas.addEventListener('pointerout', endPosition);
+
+// Зум колесиком мыши (ПК)
+const wrapperEl = document.querySelector('.canvas-wrapper-outer');
+if (wrapperEl) {
+    wrapperEl.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const rect = wrapperEl.getBoundingClientRect();
+        const pointerX = e.clientX - rect.left;
+        const pointerY = e.clientY - rect.top;
+        
+        const zoomIntensity = 0.0015;
+        const zoomFactor = Math.exp(-e.deltaY * zoomIntensity);
+        
+        let newScale = canvasTransform.scale * zoomFactor;
+        newScale = Math.max(1, Math.min(newScale, 10));
+        
+        canvasTransform.x = pointerX - (pointerX - canvasTransform.x) * (newScale / canvasTransform.scale);
+        canvasTransform.y = pointerY - (pointerY - canvasTransform.y) * (newScale / canvasTransform.scale);
+        canvasTransform.scale = newScale;
+        
+        if (newScale === 1) { canvasTransform.x = 0; canvasTransform.y = 0; }
+        updateTransform();
+    }, {passive: false});
+}
 
 // ==========================================
 // ГОЛОСОВАНИЕ ПРЕДАТЕЛЯ И ЧАТ-ПРЕЗЕНТАЦИЯ

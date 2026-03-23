@@ -23,7 +23,20 @@ function getApiKey() {
     try { return atob(SECRET_KEY_BASE64); } catch(e) { return ""; }
 }
 
-function getAlivePlayers() { return (globalState.players || []).filter(id => !globalState.playersData?.[id]?.kicked); }
+function getAlivePlayers() { 
+    // ИСПРАВЛЕНО: Получаем массив ID игроков, которые сейчас реально онлайн в комнате
+    const connectedIds = (globalState.roomPlayers || []).map(p => p.id);
+    
+    return (globalState.players || []).filter(id => {
+        const isKicked = globalState.playersData?.[id]?.kicked;
+        // Если roomPlayers пуст (например при локальном дебаге), игнорируем проверку онлайна. 
+        // Иначе проверяем, что игрок все еще в комнате.
+        const isConnected = connectedIds.length === 0 || connectedIds.includes(id);
+        
+        return !isKicked && isConnected;
+    }); 
+}
+
 function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 function generateBio() { 
