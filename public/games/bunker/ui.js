@@ -115,7 +115,9 @@ function handleDiscussionUI() {
                     </div>
                 </div>
                 <div id="disc-content-${id}" class="accordion-content">
-                    ${generatePlayerTraitsList(pData)}
+                    <div class="accordion-inner">
+                        ${generatePlayerTraitsList(pData)}
+                    </div>
                 </div>
             </div>`;
     }).join('');

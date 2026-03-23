@@ -17,6 +17,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
   const [roomName, setRoomName] = useState('Комната ' + user.name);
   const [selectedGameId, setSelectedGameId] = useState(GAMES[0].id); 
   const [maxPlayers, setMaxPlayers] = useState(GAMES[0].maxPlayers);
+  
+  // ИСПРАВЛЕНО 1: Флаг процесса входа (блокирует показ баннера во время перехода)
+  const [isJoining, setIsJoining] = useState(false);
 
   const handleGameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newGameId = e.target.value;
@@ -82,6 +85,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
 
     await set(newRoomRef, { ...newRoom, timestamp: serverTimestamp() });
     setShowModal(false);
+    setIsJoining(true); // Блокируем показ баннера
     onJoinRoom(newRoom);
   };
 
@@ -96,10 +100,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
       await set(ref(db, `rooms/${room.id}/lastActive`), Date.now());
     }
 
+    setIsJoining(true); // Блокируем показ баннера
     onJoinRoom(room);
   };
 
-  // ИСПРАВЛЕНО: Функция для явного выхода из активной комнаты через Дашборд
   const handleLeaveActiveRoom = async (room: Room) => {
     const isHost = room.players?.find(p => p.id === user.id)?.isHost;
     const updatedPlayers = room.players?.filter(p => p.id !== user.id) || [];
@@ -117,8 +121,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
   };
 
   const selectedGameObj = GAMES.find(g => g.id === selectedGameId) || GAMES[0];
-  
-  // Проверяем, находится ли пользователь сейчас в какой-то комнате
   const activeRoom = rooms.find(r => r.players?.some(p => p.id === user.id));
 
   return (
@@ -146,8 +148,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
       </header>
 
       <div className="max-w-6xl mx-auto">
-        {/* ИСПРАВЛЕНО: Баннер возврата в игру, если сессия еще жива */}
-        {activeRoom && (
+        {/* ИСПРАВЛЕНО 1: Показываем баннер только если мы НЕ находимся в процессе входа */}
+        {activeRoom && !isJoining && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
             className="mb-10 bg-gradient-to-r from-indigo-900/50 to-violet-900/50 border border-indigo-500/50 p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_30px_rgba(99,102,241,0.15)]"
@@ -177,7 +179,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
           </motion.div>
         )}
 
-        <div className="flex justify-between items-end mb-6 opacity-100 transition-opacity" style={{ opacity: activeRoom ? 0.3 : 1, pointerEvents: activeRoom ? 'none' : 'auto' }}>
+        <div className="flex justify-between items-end mb-6 opacity-100 transition-opacity" style={{ opacity: (activeRoom && !isJoining) ? 0.3 : 1, pointerEvents: (activeRoom && !isJoining) ? 'none' : 'auto' }}>
           <div>
             <h2 className="text-xl font-bold text-white mb-1">Доступные сервера</h2>
             <p className="text-sm text-zinc-400">Присоединяйтесь к игре или создайте свою</p>
@@ -191,7 +193,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" style={{ opacity: activeRoom ? 0.3 : 1, pointerEvents: activeRoom ? 'none' : 'auto' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" style={{ opacity: (activeRoom && !isJoining) ? 0.3 : 1, pointerEvents: (activeRoom && !isJoining) ? 'none' : 'auto' }}>
           {rooms.length === 0 ? (
             <div className="col-span-full text-center py-20 text-zinc-500 bg-zinc-900/30 rounded-3xl border border-zinc-800/50 border-dashed">
               <Gamepad2 className="w-12 h-12 mx-auto mb-3 opacity-20" />
@@ -224,7 +226,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
         </div>
       </div>
 
-      {/* Модальное окно (без изменений) */}
       {showModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-zinc-900 border border-zinc-800 p-6 sm:p-8 rounded-3xl w-full max-w-md relative">
