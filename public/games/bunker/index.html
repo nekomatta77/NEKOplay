@@ -3,231 +3,250 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Бункер - Симулятор выживания</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <title>BUNKER // OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="extensions.css">
 </head>
 <body>
-    <div class="game-layout">
-        <div id="loading-screen" class="screen active">
-            <div style="text-align: center;">
-                <div class="spinner" style="width: 50px; height: 50px; border: 3px solid rgba(0,229,255,0.3); border-top-color: var(--accent-cyan); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px auto;"></div>
-                <h2 class="font-header text-accent" style="letter-spacing: 2px;">СИНХРОНИЗАЦИЯ ДАННЫХ...</h2>
-            </div>
+    <div id="loading-screen" class="screen active">
+        <div class="loader-container">
+            <div class="spinner"></div>
+            <h1 class="glow-text font-header">BUNKER OS</h1>
+            <p class="text-muted">Синхронизация...</p>
         </div>
-
-        <div id="setup-screen" class="screen">
-            <div class="glass-panel" style="width: 100%; max-width: 600px; margin: auto;">
-                <div class="panel-header mb-20">
-                    <h2 class="font-header text-accent" style="font-size: 1.8rem; letter-spacing: 2px;">НАСТРОЙКИ СИМУЛЯЦИИ</h2>
-                    <span class="hint">ХОСТ</span>
-                </div>
-                
-                <div class="setting-row mb-15">
-                    <label class="font-header text-muted mb-5" style="display:block; font-size: 1rem;">РАУНД НАЧАЛА ИЗГНАНИЙ</label>
-                    <select id="setting-first-vote-round" class="cyber-select">
-                        <option value="1">С 1-го раунда (Хардкор)</option>
-                        <option value="2" selected>Со 2-го раунда (Классика)</option>
-                        <option value="3">С 3-го раунда (Долгое знакомство)</option>
-                    </select>
-                </div>
-
-                <div class="setting-row mb-20">
-                    <label class="font-header text-muted mb-5" style="display:block; font-size: 1rem;">РАУНД ДВОЙНОГО ВСКРЫТИЯ</label>
-                    <select id="setting-double-round" class="cyber-select">
-                        <option value="2">Со 2-го раунда</option>
-                        <option value="3" selected>С 3-го раунда</option>
-                        <option value="4">С 4-го раунда</option>
-                        <option value="99">Никогда</option>
-                    </select>
-                </div>
-
-                <div class="setting-row mt-15" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
-                    <div>
-                        <label style="font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
-                            Угрозы из Пустоши 
-                            <span class="help-icon" title="Изгнанные игроки получают доступ к терминалу саботажа и могут мешать выжившим" style="background: rgba(0,229,255,0.2); width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 0.8rem; cursor: help; color: white;">?</span>
-                        </label>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Мертвые не молчат.</div>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="setting-threats">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="setting-row mt-10 mb-20" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
-                    <div>
-                        <label style="font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; color: var(--warning); display: flex; align-items: center; gap: 8px;">
-                            Случайные Кризисы
-                            <span class="help-icon" title="Каждый раунд может произойти ЧП, требующее определенных профессий или вещей в Общем складе (В разработке)" style="background: rgba(255,171,0,0.2); width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 0.8rem; cursor: help; color: white;">?</span>
-                        </label>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Система бункера нестабильна.</div>
-                    </div>
-                    <label class="toggle-switch warning-toggle">
-                        <input type="checkbox" id="setting-crises">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <button class="btn-primary full-width glow-hover" onclick="confirmSetup()">СГЕНЕРИРОВАТЬ МИР</button>
-            </div>
-        </div>
-
-        <div id="guest-setup-screen" class="screen">
-            <div style="text-align: center; width: 100%;">
-                <svg viewBox="0 0 24 24" width="60" height="60" fill="var(--text-muted)" style="margin-bottom: 20px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                <h2 class="font-header text-muted mb-10" style="letter-spacing: 2px;">ОЖИДАНИЕ ХОСТА</h2>
-                <p class="text-muted">Лидер настраивает параметры симуляции...</p>
-            </div>
-        </div>
-
-        <div id="game-screen" class="screen" style="padding-top: 0; display: flex; flex-direction: column;">
-            <div class="status-banner">
-                <div class="round-info" id="ui-round-info">РАУНД 1</div>
-                <div class="turn-info font-header" id="ui-turn-info">ОЖИДАНИЕ</div>
+    </div>
+    
+    <div id="setup-screen" class="screen">
+        <div class="glass-panel" style="max-width: 500px; width: 100%;">
+            <div class="panel-header mb-20" style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">
+                <h2 class="font-header text-accent" style="font-size: 1.8rem;">ПАРАМЕТРЫ СИМУЛЯЦИИ</h2>
             </div>
 
-            <div class="tabs-nav">
-                <button class="tab-btn active" id="tab-btn-me" onclick="switchTab('tab-me')">МОЁ ДОСЬЕ</button>
-                <button class="tab-btn" id="tab-btn-world" onclick="switchTab('tab-world')">МИР И БУНКЕР</button>
-                <button class="tab-btn" id="tab-btn-players" onclick="switchTab('tab-players')">ВЫЖИВШИЕ</button>
+            <div class="form-group mb-20">
+                <label class="text-muted mb-10" style="display: block; font-size: 0.85rem; text-transform: uppercase;">Первое изгнание начиная с:</label>
+                <select id="setting-first-vote-round" class="cyber-select hover-sound">
+                    <option value="1">Раунда 1</option>
+                    <option value="2" selected>Раунда 2</option>
+                    <option value="3">Раунда 3</option>
+                    <option value="4">Раунда 4</option>
+                    <option value="5">Раунда 5</option>
+                </select>
             </div>
-
-            <div class="tabs-container">
-                <div id="tab-me" class="tab-content active">
-                    <p class="font-header text-muted text-center mb-15" id="ui-my-turn-hint" style="letter-spacing: 1px;">Дождитесь своей очереди</p>
-                    <div id="my-cards-container" class="cards-grid"></div>
-                </div>
-
-                <div id="tab-world" class="tab-content">
-                    <div class="world-grid mb-20">
-                        <div class="interactive-world-panel danger-bg" onclick="showWorldDetail('catastrophe')">
-                            <span class="label text-danger font-header">КАТАСТРОФА</span>
-                            <span class="value" id="ui-catastrophe">...</span>
-                            <div class="click-hint">НАЖМИТЕ ДЛЯ ДЕТАЛЕЙ</div>
-                        </div>
-                        <div class="interactive-world-panel primary-bg" onclick="showWorldDetail('bunker')">
-                            <span class="label text-accent font-header">УБЕЖИЩЕ</span>
-                            <span class="value" id="ui-bunker">...</span>
-                            <div class="click-hint">НАЖМИТЕ ДЛЯ ДЕТАЛЕЙ</div>
-                        </div>
-                    </div>
-                    <div class="capacity-block">
-                        <div class="capacity-title font-header text-accent">СВОБОДНЫХ МЕСТ В БУНКЕРЕ</div>
-                        <div class="capacity-number" id="ui-capacity">0</div>
-                    </div>
-                </div>
-
-                <div id="tab-players" class="tab-content">
-                    <div id="ingame-players-list" class="players-list"></div>
-                </div>
-            </div>
-        </div>
-
-        <div id="action-cinema-screen" class="screen action-cinema">
-            <h1 class="font-header text-accent mb-20" id="cinema-title" style="font-size: 2.5rem; text-shadow: 0 0 20px var(--accent-glow); letter-spacing: 4px;">ПРОТОКОЛ ДЕЙСТВИЯ</h1>
             
-            <div id="cinema-card-phase" class="cinema-phase active">
-                <div class="cinema-card-big glass-panel" style="display: flex; justify-content: center; align-items: center; padding: 30px;">
-                    <div id="cinema-card-text" style="font-size: 1.4rem; text-align: center; color: var(--text-main); font-weight: 500;">...</div>
-                </div>
+            <div class="form-group mb-20">
+                <label class="text-muted mb-10" style="display: block; font-size: 0.85rem; text-transform: uppercase;">Открывать по 2 карты начиная с:</label>
+                <select id="setting-double-round" class="cyber-select hover-sound">
+                    <option value="2">Раунда 2</option>
+                    <option value="3" selected>Раунда 3</option>
+                    <option value="4">Раунда 4</option>
+                    <option value="99">Никогда</option>
+                </select>
             </div>
 
-            <div id="cinema-effect-phase" class="cinema-phase">
-                <div class="effect-container">
-                    <div class="effect-player" id="effect-p1">
-                        <img id="ep1-avatar" src="" alt="P1">
-                        <div class="font-header" id="ep1-name" style="font-size: 1.5rem; margin-bottom: 5px;">...</div>
-                        <div id="ep1-trait-box" class="aesthetic-trait-row mt-10"><span class="trait-value text-center" id="ep1-trait" style="width: 100%; color: var(--accent-cyan); font-size: 0.9rem;">...</span></div>
-                    </div>
-                    <div class="effect-center-icon" id="effect-center-icon"></div>
-                    <div class="effect-player" id="effect-p2">
-                        <img id="ep2-avatar" src="" alt="P2">
-                        <div class="font-header" id="ep2-name" style="font-size: 1.5rem; margin-bottom: 5px;">...</div>
-                        <div id="ep2-trait-box" class="aesthetic-trait-row mt-10"><span class="trait-value text-center" id="ep2-trait" style="width: 100%; color: var(--warning); font-size: 0.9rem;">...</span></div>
-                    </div>
+            <div class="setting-row mt-15" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <div>
+                    <label style="font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+                        Угрозы из Пустоши 
+                        <span class="help-icon" title="Изгнанные игроки получают доступ к терминалу саботажа и могут мешать выжившим" style="background: rgba(0,229,255,0.2); width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 0.8rem; cursor: help; color: white;">?</span>
+                    </label>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Мертвые не молчат.</div>
                 </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="setting-threats">
+                    <span class="toggle-slider"></span>
+                </label>
             </div>
+
+            <div class="setting-row mt-10 mb-20" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <div>
+                    <label style="font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; color: var(--warning); display: flex; align-items: center; gap: 8px;">
+                        Случайные Кризисы
+                        <span class="help-icon" title="Каждый раунд может произойти ЧП, требующее профессий или вещей в Общем складе" style="background: rgba(255,171,0,0.2); width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 0.8rem; cursor: help; color: white;">?</span>
+                    </label>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Система бункера нестабильна.</div>
+                </div>
+                <label class="toggle-switch warning-toggle">
+                    <input type="checkbox" id="setting-crises">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <button onclick="confirmSetup()" class="btn-primary full-width mt-10 glow-hover click-sound" style="font-size: 1.2rem; padding: 18px;">СГЕНЕРИРОВАТЬ БУНКЕР</button>
         </div>
-
-        <div id="exile-screen" class="screen" style="background: rgba(255, 51, 102, 0.05); display: flex; flex-direction: column; justify-content: center; align-items: center;">
-            <div class="exile-avatar-container mb-20">
-                <img id="exile-avatar" src="" alt="Изгнан">
-                <div class="cross-overlay"></div>
-            </div>
-            <h1 class="font-header text-danger glitch-text mb-10" style="font-size: 3rem; letter-spacing: 5px; text-shadow: 0 0 30px var(--danger-glow);">ИЗГНАН</h1>
-            <h2 id="exile-name" class="font-header text-main" style="font-size: 2rem;">...</h2>
+    </div>
+    
+    <div id="guest-setup-screen" class="screen">
+        <div class="loader-container">
+            <div class="spinner"></div>
+            <h3 class="font-header text-accent mt-20" style="letter-spacing: 2px;">ОЖИДАНИЕ ЛИДЕРА</h3>
         </div>
-
-        <div id="end-screen" class="screen" style="padding: 20px; align-items: center; overflow-y: auto;">
-            <div class="end-screen-container">
-                <h1 class="font-header text-success mb-5 text-center" style="font-size: 3rem; text-shadow: 0 0 20px rgba(0, 230, 118, 0.4); letter-spacing: 5px;">СИМУЛЯЦИЯ ЗАВЕРШЕНА</h1>
-                <p class="text-muted text-center mb-25" style="font-size: 1.1rem;">Гермодвери бункера заблокированы.</p>
-                
-                <h2 class="font-header text-accent mb-15 border-bottom pb-10" style="font-size: 1.5rem;">СОСТАВ БУНКЕРА</h2>
-                <div id="winners-list" class="players-list mb-30"></div>
-
-                <div class="ai-story-box mb-20">
-                    <h3 class="font-header text-warning mb-15" style="display: flex; align-items: center; gap: 10px;">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2zM7.5 13A1.5 1.5 0 0 0 6 14.5a1.5 1.5 0 0 0 1.5 1.5 1.5 1.5 0 0 0 1.5-1.5A1.5 1.5 0 0 0 7.5 13zm9 0a1.5 1.5 0 0 0-1.5 1.5 1.5 1.5 0 0 0 1.5 1.5 1.5 1.5 0 0 0 1.5-1.5A1.5 1.5 0 0 0 16.5 13z"/></svg>
-                        ОТЧЕТ ИИ О ВЫЖИВАНИИ
-                    </h3>
-                    <div id="ai-story-text" class="story-text">Ожидание данных...</div>
+    </div>
+    
+    <div id="exile-screen" class="screen" style="background: rgba(10, 0, 0, 0.95); z-index: 900;">
+        <div class="text-center">
+            <h2 class="text-danger font-header mb-20" style="font-size: 2rem; letter-spacing: 6px;">ПРОТОКОЛ ИЗГНАНИЯ ЗАВЕРШЕН</h2>
+            <div class="exile-avatar-container mb-20"><img id="exile-avatar" src="" alt="avatar"><div class="cross-overlay"></div></div>
+            <h1 id="exile-name" class="font-header glitch-text" style="font-size: 4rem; color: var(--danger); text-shadow: 0 0 40px var(--danger);">ИМЯ ИГРОКА</h1>
+            <p class="text-muted mt-15 font-header" style="font-size: 1.5rem; letter-spacing: 4px; color: #ff88a0;">ОТПРАВЛЕН НА ПОВЕРХНОСТЬ</p>
+        </div>
+    </div>
+    
+    <div id="end-screen" class="screen" style="overflow-y: auto; align-items: flex-start;">
+        <div class="glass-panel end-screen-container">
+            <h1 class="text-success font-header mb-10 text-center" style="font-size: 3rem; line-height: 1;">СИМУЛЯЦИЯ ЗАВЕРШЕНА</h1>
+            <p class="text-muted mb-20 text-center">Гермодвери заблокированы. Вы в безопасности.</p>
+            
+            <div id="ai-story-container" class="ai-story-box mb-20">
+                <h3 class="font-header text-accent mb-10 border-bottom pb-10">ОТЧЕТ НЕЙРОСЕТИ О ВЫЖИВАНИИ</h3>
+                <div id="ai-story-text" class="story-text">
+                    <div class="spinner" style="width: 30px; height: 30px; border-width: 2px; margin-bottom: 10px;"></div>
+                    Установка связи с ИИ. Идет анализ характеристик выживших...
                 </div>
+            </div>
 
-                <button id="btn-exit-lobby" class="btn-danger full-width glow-hover" style="display: none; font-size: 1.2rem; padding: 18px;" onclick="exitToLobby()">ВЕРНУТЬСЯ В ЛОББИ</button>
+            <h3 class="font-header text-muted mb-15 text-center" style="font-size: 1.5rem;">СПИСОК ВЫЖИВШИХ</h3>
+            <div id="winners-list" class="players-list mb-20"></div>
+            
+            <button id="btn-exit-lobby" class="btn-primary btn-danger full-width glow-hover mt-10 click-sound" onclick="exitToLobby()" style="display: none; padding: 18px;">ВЕРНУТЬСЯ В ЛОББИ</button>
+        </div>
+    </div>
+
+    <button class="logs-btn" onclick="toggleLogs()" title="Журнал событий">
+        <svg viewBox="0 0 24 24" class="svg-icon" style="width: 24px; height: 24px;"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+    </button>
+    <div id="logs-panel" class="logs-panel glass-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+            <h3 class="font-header text-accent">ЖУРНАЛ СОБЫТИЙ</h3>
+            <button class="btn-primary" style="padding: 5px 10px;" onclick="toggleLogs()">X</button>
+        </div>
+        <div id="logs-container" class="logs-container"></div>
+    </div>
+
+    <div id="game-screen" class="screen" style="padding: 0;">
+        <div class="game-layout">
+            <div class="tabs-nav">
+                <button class="tab-btn active font-header" onclick="switchTab('tab-world')">СВОДКА</button>
+                <button class="tab-btn font-header" onclick="switchTab('tab-me')">МОИ ДАННЫЕ</button>
+                <button class="tab-btn font-header" onclick="switchTab('tab-players')">ВЫЖИВШИЕ</button>
+            </div>
+            
+            <div class="status-banner" id="status-banner">
+                <div class="round-info font-header" id="ui-round-info">РАУНД 1</div>
+                <div class="turn-info" id="ui-turn-info">Ожидание...</div>
+            </div>
+            
+            <div class="tabs-container">
+                <div id="tab-world" class="tab-content active">
+                    <div class="glass-panel premium-shadow">
+                        <div class="world-grid mb-20">
+                            <div class="world-item danger-bg interactive-world-panel" onclick="showWorldDetail('catastrophe')">
+                                <span class="label text-danger font-header">УГРОЗА</span>
+                                <span id="ui-catastrophe" class="value font-header" style="font-size: 1.4rem;">...</span>
+                                <div class="click-hint">ПОДРОБНЕЕ ➔</div>
+                            </div>
+                            <div class="world-item primary-bg interactive-world-panel" onclick="showWorldDetail('bunker')">
+                                <span class="label text-accent font-header">УБЕЖИЩЕ</span>
+                                <span id="ui-bunker" class="value font-header" style="font-size: 1.4rem;">...</span>
+                                <div class="click-hint">ПОДРОБНЕЕ ➔</div>
+                            </div>
+                        </div>
+                        <div class="capacity-block">
+                            <div class="capacity-title font-header text-accent">МЕСТ</div>
+                            <div class="capacity-number font-header" id="ui-capacity">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="tab-me" class="tab-content">
+                    <div class="glass-panel premium-shadow">
+                        <div class="panel-header mb-20">
+                            <h2 class="font-header text-accent">ДОСЬЕ</h2>
+                            <span class="hint" id="ui-my-turn-hint">Ваш рюкзак</span>
+                        </div>
+                        <div id="my-cards-container" class="cards-grid"></div>
+                    </div>
+                </div>
+                <div id="tab-players" class="tab-content">
+                    <div class="glass-panel premium-shadow" style="padding: 20px;">
+                        <div id="ingame-players-list" class="players-list"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <div id="world-detail-modal" class="modal-overlay">
-        <div class="modal-content glass-panel premium-shadow" style="max-width: 500px;">
-            <div class="panel-header mb-15">
-                <h2 id="world-detail-title" class="font-header text-accent" style="font-size: 1.6rem;">...</h2>
-                <button class="btn-danger" style="padding: 6px 12px; font-size: 0.8rem;" onclick="closeWorldDetail()">X</button>
-            </div>
-            <p id="world-detail-desc" style="color: var(--text-main); line-height: 1.6; font-size: 1rem;"></p>
+        <div class="glass-panel modal-content premium-shadow" style="max-width: 500px;">
+            <h2 id="world-detail-title" class="font-header text-accent mb-15" style="font-size: 2rem;">ЗАГОЛОВОК</h2>
+            <div id="world-detail-desc" class="text-main mb-20" style="font-size: 1.1rem; line-height: 1.6; white-space: pre-wrap;">Описание...</div>
+            <button class="btn-primary full-width" onclick="closeWorldDetail()">ЗАКРЫТЬ ДОСЬЕ</button>
         </div>
     </div>
 
     <div id="target-selection-modal" class="modal-overlay">
-        <div class="modal-content glass-panel" style="max-width: 450px;">
-            <h2 class="font-header text-accent mb-10" style="font-size: 1.8rem; text-align: center;">ВЫБОР ЦЕЛИ</h2>
-            <p class="text-center text-muted mb-20" id="target-action-name">...</p>
-            <div id="target-players-list" class="voting-list"></div>
-            <button class="btn-danger full-width mt-15" onclick="closeTargetSelection()">ОТМЕНА</button>
+        <div class="glass-panel modal-content premium-shadow" style="border-color: var(--accent-cyan);">
+            <h2 class="text-accent font-header mb-10 text-center" style="font-size: 2rem;">ВЫБЕРИТЕ ЦЕЛЬ</h2>
+            <p class="text-muted text-center mb-20">Для применения: <span id="target-action-name" class="text-main"></span></p>
+            <div id="target-players-list" class="players-list"></div>
+            <button class="btn-danger mt-20 full-width click-sound" onclick="closeTargetSelection()">ОТМЕНА</button>
+        </div>
+    </div>
+
+    <div id="action-cinema-screen" class="screen action-cinema" style="z-index: 1000;">
+        <div id="cinema-card-phase" class="cinema-phase active" style="position: relative;">
+            <h2 id="cinema-title" class="font-header text-accent glitch-text" style="font-size: 3rem; letter-spacing: 3px; margin-bottom: 120px; margin-top: -100px;">ПРОТОКОЛ</h2>
+            <div id="cinema-card" class="bunker-card revealed-card cinema-card-big">
+                <div class="card-content-wrapper">
+                    <div class="type">КАРТА ДЕЙСТВИЯ</div>
+                    <div id="cinema-card-text" class="value" style="font-size: 1.5rem; max-height: unset; white-space: normal;">Текст...</div>
+                </div>
+            </div>
+        </div>
+        <div id="cinema-effect-phase" class="cinema-phase">
+            <div class="effect-container">
+                <div class="effect-player" id="effect-p1">
+                    <img id="ep1-avatar" src="" alt="P1">
+                    <h3 id="ep1-name" class="font-header text-accent mt-10">Игрок 1</h3>
+                    <div id="ep1-trait-box" class="aesthetic-trait-row mt-10">
+                        <span id="ep1-trait" class="trait-value" style="text-align: center; width: 100%;">Трейт 1</span>
+                    </div>
+                </div>
+                <div id="effect-center-icon" class="effect-center-icon">⚡</div>
+                <div class="effect-player" id="effect-p2" style="display: none;">
+                    <img id="ep2-avatar" src="" alt="P2">
+                    <h3 id="ep2-name" class="font-header text-danger mt-10">Игрок 2</h3>
+                    <div id="ep2-trait-box" class="aesthetic-trait-row mt-10">
+                        <span id="ep2-trait" class="trait-value" style="text-align: center; width: 100%;">Трейт 2</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="discussion-modal" class="modal-overlay">
-        <div class="modal-content glass-panel" style="max-width: 600px; padding: 20px;">
-            <h2 class="font-header text-warning mb-10 text-center" style="font-size: 2rem; letter-spacing: 3px;">ФАЗА ДЕБАТОВ</h2>
-            <p class="text-center text-muted mb-15">Обсудите вскрытую информацию.</p>
-            
-            <div id="discussion-players-list" class="discussion-list mb-15"></div>
-            
-            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 12px; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 8px;">
-                    <span class="text-muted font-header">ГОТОВНОСТЬ ГРУППЫ</span>
-                    <span class="text-success font-header"><span id="ui-ready-count">0</span> / <span id="ui-alive-count">0</span></span>
-                </div>
-                <div class="ready-bar"><div class="ready-bar-fill" id="ui-ready-bar-fill"></div></div>
+        <div class="glass-panel modal-content premium-shadow" style="border-color: rgba(0, 230, 118, 0.4); max-width: 600px;">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <h2 class="text-success font-header" style="font-size: 2rem; letter-spacing: 2px;">ФАЗА ОБСУЖДЕНИЯ</h2>
+                <p class="text-muted">Проведите дебаты.</p>
             </div>
-
-            <button id="btn-ready" class="btn-primary full-width glow-hover" onclick="toggleReady()" style="font-size: 1.1rem;">ПОДТВЕРДИТЬ ГОТОВНОСТЬ</button>
+            <div id="discussion-players-list" class="discussion-list mb-25"></div>
+            <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 20px;">
+                <button id="btn-ready" class="btn-primary glow-hover full-width click-sound" style="font-size: 1.1rem; padding: 16px;" onclick="toggleReady()">ПОДТВЕРДИТЬ ГОТОВНОСТЬ</button>
+                <div class="ready-tracker mt-15">
+                    <div class="ready-bar"><div id="ui-ready-bar-fill" class="ready-bar-fill"></div></div>
+                    <div class="text-muted mt-5" style="font-size: 0.8rem; text-align: right;">Готово: <span id="ui-ready-count" class="text-main">0</span> / <span id="ui-alive-count">0</span></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="voting-modal" class="modal-overlay">
-        <div class="modal-content glass-panel" style="max-width: 500px; padding: 20px; border-color: rgba(255, 51, 102, 0.3);">
+        <div class="glass-panel modal-content premium-shadow" style="border-color: rgba(255, 42, 85, 0.3); position: relative;">
+            <div id="voting-counter" class="font-header text-accent" style="position: absolute; top: 25px; right: 25px; font-size: 1.1rem; letter-spacing: 2px;">0 / 0</div>
             <div style="text-align: center; margin-bottom: 20px;">
-                <h2 class="font-header text-danger glitch-text mb-5" style="font-size: 2.2rem; letter-spacing: 4px;">ПРОТОКОЛ ИЗГНАНИЯ</h2>
-                <div class="text-danger" style="font-size: 1.5rem; font-weight: bold; margin-bottom: 10px;" id="voting-timer">60</div>
-                <p class="text-muted font-header" style="letter-spacing: 1px;">ОТДАНО ГОЛОСОВ: <span id="voting-counter" class="text-main">0 / 0</span></p>
+                <h2 class="text-danger font-header" style="font-size: 2rem; letter-spacing: 2px;">ПРОТОКОЛ ИЗГНАНИЯ</h2>
+                <div class="timer-container mb-20 mt-15"><div id="voting-timer" class="font-header text-danger" style="font-size: 3.5rem; line-height: 1;">60</div></div>
             </div>
-            
             <div id="voting-players" class="voting-list"></div>
         </div>
     </div>
@@ -239,11 +258,8 @@
             </div>
             <h2 id="cam-title" class="font-header mb-10" style="font-size: 1.8rem; letter-spacing: 2px;">ПОДТВЕРЖДЕНИЕ</h2>
             <p id="cam-desc" class="text-muted mb-20">Вы собираетесь вскрыть эту информацию для всех выживших. Действие необратимо.</p>
-            
-            <div id="cam-buttons" style="display: flex; flex-direction: column; gap: 10px;">
-                </div>
-            
-            <button class="btn-danger full-width mt-10" onclick="closeCardModal()" style="background: transparent; border-color: rgba(255,255,255,0.1); color: var(--text-muted);">ОТМЕНА</button>
+            <div id="cam-buttons" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            <button class="btn-danger full-width mt-10 click-sound" onclick="closeCardModal()" style="background: transparent; border-color: rgba(255,255,255,0.1); color: var(--text-muted);">ОТМЕНА</button>
         </div>
     </div>
 
@@ -251,20 +267,8 @@
         <h2 class="roulette-title">ЖРЕБИЙ СМЕРТИ</h2>
         <div class="roulette-window">
             <div class="roulette-pointer"></div>
-            <div id="roulette-track" class="roulette-track">
-                </div>
+            <div id="roulette-track" class="roulette-track"></div>
         </div>
-    </div>
-
-    <div class="logs-btn" onclick="toggleLogs()">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
-    </div>
-    <div id="logs-panel" class="logs-panel glass-panel">
-        <div class="panel-header mb-10">
-            <span class="font-header text-accent" style="font-size: 1.2rem;">ЖУРНАЛ СИСТЕМЫ</span>
-            <button onclick="toggleLogs()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.2rem;">&times;</button>
-        </div>
-        <div id="logs-container" class="logs-container"></div>
     </div>
 
     <script src="extensions.js"></script>
