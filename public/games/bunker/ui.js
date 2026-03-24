@@ -63,7 +63,7 @@ function generatePlayerTraitsList(pData) {
         CARD_ORDER.forEach(key => { 
             if (pData.cards[key]?.isOpen) {
                 traitsHTML += `
-                <div class="aesthetic-trait-row">
+                <div class="aesthetic-trait-row survivor-trait">
                     <span class="trait-label">${pData.cards[key].label}</span>
                     <span class="trait-value">${pData.cards[key].value}</span>
                 </div>`; 
@@ -88,7 +88,7 @@ function handleDiscussionUI() {
     const logic = globalState.gameLogic;
     if (logic.phase !== 'discussion') return;
 
-    const myData = globalState.playersData?.[myUserId] || {};
+    const myData = globalState.playersData?.[window.myUserId] || {};
     const isKicked = myData.kicked;
 
     document.getElementById('discussion-modal').classList.add('active');
@@ -136,7 +136,7 @@ function handleDiscussionUI() {
     } else {
         btn.style.opacity = '1';
         btn.style.pointerEvents = 'auto';
-        if (readyMap[myUserId]) {
+        if (readyMap[window.myUserId]) {
             btn.innerText = "ОТМЕНИТЬ ГОТОВНОСТЬ";
             btn.className = 'btn-danger full-width';
         } else {
@@ -149,15 +149,15 @@ function handleDiscussionUI() {
 let votingInterval;
 function handleVotingUI() {
     const logic = globalState.gameLogic;
-    const myData = globalState.playersData?.[myUserId] || {};
+    const myData = globalState.playersData?.[window.myUserId] || {};
     const isKicked = myData.kicked;
-    const isQuarantined = logic.quarantinedPlayers?.[myUserId];
+    const isQuarantined = logic.quarantinedPlayers?.[window.myUserId];
 
     if (logic.phase === 'voting' && globalState.voting?.active) {
         document.getElementById('voting-modal').classList.add('active');
         const alive = getAlivePlayers();
         const results = globalState.voting.results || {};
-        const myVote = results[myUserId];
+        const myVote = results[window.myUserId];
         
         let votedCount = Object.keys(results).length;
         const quarantinedCount = Object.keys(logic.quarantinedPlayers || {}).length;
@@ -192,7 +192,7 @@ function handleVotingUI() {
 
         if (!isKicked) {
             votingHTML += alive.map(id => {
-                const isMe = id === myUserId;
+                const isMe = id === window.myUserId;
                 const isSelected = myVote === id;
                 const isShielded = logic.shieldedPlayers?.[id];
                 
@@ -219,7 +219,7 @@ function handleVotingUI() {
             
             if (left <= 0 || (votedCount >= expectedVotes && expectedVotes > 0)) {
                 clearInterval(votingInterval);
-                if (isHost && globalState.voting.active) executeExile();
+                if (window.isHost && globalState.voting.active) executeExile();
             }
         }, 1000);
     } else {
@@ -228,129 +228,11 @@ function handleVotingUI() {
     }
 }
 
-function playActionCinema(actionData) {
-    if (!actionData) return;
-    
-    document.getElementById('cinema-card-text').innerHTML = actionData.cardText;
-    document.getElementById('cinema-card-phase').classList.add('active');
-    document.getElementById('cinema-effect-phase').classList.remove('active');
-    
-    const effectPhase = document.getElementById('cinema-effect-phase');
-    effectPhase.className = 'cinema-phase'; 
-    
-    const box1 = document.getElementById('ep1-trait-box');
-    const box2 = document.getElementById('ep2-trait-box');
-    box1.className = 'aesthetic-trait-row mt-10';
-    box2.className = 'aesthetic-trait-row mt-10';
-    box1.style = ''; box2.style = '';
-
-    setTimeout(() => {
-        document.getElementById('cinema-card-phase').classList.remove('active');
-        effectPhase.classList.add('active');
-        effectPhase.classList.add(`anim-${actionData.type}`);
-
-        document.getElementById('ep1-avatar').src = globalState.playerAvatars?.[actionData.sourceId] || FALLBACK_AVATAR_UI;
-        document.getElementById('ep1-name').innerText = globalState.playerNames?.[actionData.sourceId] || 'ИГРОК 1';
-        
-        document.getElementById('ep2-avatar').src = globalState.playerAvatars?.[actionData.targetId] || FALLBACK_AVATAR_UI;
-        document.getElementById('ep2-name').innerText = globalState.playerNames?.[actionData.targetId] || 'ИГРОК 2';
-
-        let svgIcon = ""; let text1 = "ИНИЦИАТОР"; let text2 = "ЦЕЛЬ";
-
-        if (actionData.type === 'swap') {
-            svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
-            document.getElementById('effect-p2').style.display = 'flex';
-            setTimeout(() => {
-                const rect1 = box1.getBoundingClientRect(); const rect2 = box2.getBoundingClientRect();
-                const dX = (rect2.left + rect2.width / 2) - (rect1.left + rect1.width / 2);
-                const dY = (rect2.top + rect2.height / 2) - (rect1.top + rect1.height / 2);
-                
-                box1.style.setProperty('--target-x', dX + 'px'); box1.style.setProperty('--target-y', dY + 'px'); box1.style.setProperty('--swap-color', 'var(--accent-cyan)');
-                box2.style.setProperty('--target-x', -dX + 'px'); box2.style.setProperty('--target-y', -dY + 'px'); box2.style.setProperty('--swap-color', 'var(--warning)');
-                box1.classList.add('anim-swap-dynamic'); box2.classList.add('anim-swap-dynamic');
-            }, 100);
-        } else {
-            if (actionData.type === 'reveal') { svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`; } 
-            else if (actionData.type === 'quarantine') { svgIcon = SVG_BIOHAZARD; text1 = "ИЗОЛЯЦИЯ"; text2 = "БЛОКИРОВКА ГОЛОСА"; document.getElementById('ep2-name').classList.add('text-danger'); } 
-            else if (actionData.type === 'raid') { svgIcon = SVG_RAID; text1 = `ПОЛУЧЕНО: ${actionData.targetOldVal}`; text2 = "ПУСТО"; } 
-            else if (actionData.type === 'scavenge') { svgIcon = SVG_SCAVENGE; text1 = `СЛУТАНО: ${actionData.targetOldVal}`; text2 = "МЕРТВ"; } 
-            else if (actionData.type === 'reroll') { svgIcon = SVG_REROLL; text1 = `СБРОШЕНО: ${actionData.targetOldVal}`; text2 = `ОБНОВЛЕНИЕ: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-swap-dynamic'); }, 100); }
-            else if (actionData.type === 'shield') { svgIcon = SVG_SHIELD; text1 = "АКТИВАЦИЯ"; text2 = "ИММУНИТЕТ ОТ ИЗГНАНИЯ"; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-shield-pulse'); }, 100); }
-            else if (actionData.type === 'heal') { svgIcon = SVG_HEAL; text1 = "СИСТЕМА ЖИЗНЕОБЕСПЕЧЕНИЯ"; text2 = `ИЗЛЕЧЕН: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--success)'); box2.classList.add('anim-heal-pulse'); }, 100); }
-            else if (actionData.type === 'sabotage') { svgIcon = SVG_SABOTAGE; text1 = "ВИРУСНАЯ АТАКА"; text2 = `ДОБАВЛЕНО: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', '#aa00ff'); box2.classList.add('anim-sabotage-glitch'); }, 100); }
-            else if (actionData.type === 'shuffle') { svgIcon = SVG_SHUFFLE; text1 = "ИЗЪЯТИЕ ДАННЫХ"; text2 = "ПЕРЕРАСПРЕДЕЛЕНИЕ..."; document.getElementById('effect-p2').style.display = 'none'; }
-            else if (actionData.type === 'dictator_veto') { svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; document.getElementById('effect-p2').style.display = 'none'; }
-            else if (actionData.type === 'dictator_gag') { svgIcon = SVG_DICTATOR; text1 = "ЦЕНЗУРА"; text2 = "КЛЯП: БЛОКИРОВКА ДЕЙСТВИЙ"; document.getElementById('ep2-name').classList.add('text-danger'); }
-
-            if (!['shuffle', 'dictator_veto'].includes(actionData.type)) document.getElementById('effect-p2').style.display = 'flex';
-        }
-
-        document.getElementById('effect-center-icon').innerHTML = svgIcon;
-        document.getElementById('ep1-trait').innerHTML = text1;
-        document.getElementById('ep2-trait').innerHTML = text2;
-
-        setTimeout(() => {
-            if (isHost && globalState.gameLogic.nextPhase) {
-                window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/phase': globalState.gameLogic.nextPhase } }, '*');
-            }
-        }, 4000); 
-    }, 2500);
-}
-
-let aiStoryGenerated = false;
-async function renderEndScreen() {
-    const aliveIds = getAlivePlayers();
-    
-    document.getElementById('winners-list').innerHTML = aliveIds.map(id => `
-        <div class="player-item mb-10" style="border-color:rgba(0,230,118,0.5);background:rgba(0, 230, 118, 0.05);padding:12px">
-            <div class="player-header-row">
-                <img src="${globalState.playerAvatars?.[id]}" onerror="this.src='${FALLBACK_AVATAR_UI}'" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">
-                <div class="font-header" style="font-size:1.4rem;color:var(--success)">${globalState.playerNames?.[id]}</div>
-            </div>
-        </div>`).join('');
-        
-    if (isHost) document.getElementById('btn-exit-lobby').style.display = 'block';
-
-    const storyEl = document.getElementById('ai-story-text');
-
-    if (globalState.gameLogic?.aiStory) {
-        if (storyEl.getAttribute('data-loaded') !== 'true') {
-            storyEl.setAttribute('data-loaded', 'true');
-            if (!isHost) {
-                storyEl.innerText = "";
-                let i = 0;
-                const text = globalState.gameLogic.aiStory;
-                const typeInterval = setInterval(() => {
-                    storyEl.innerText += text.charAt(i); i++;
-                    const screen = document.getElementById('end-screen'); screen.scrollTop = screen.scrollHeight;
-                    if (i >= text.length) clearInterval(typeInterval);
-                }, 15);
-            } else {
-                storyEl.innerText = globalState.gameLogic.aiStory;
-            }
-        }
-        return;
-    }
-
-    if (!aiStoryGenerated) {
-        aiStoryGenerated = true; 
-        if (isHost) {
-            storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
-            const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, globalState.world, (newText) => {
-                storyEl.innerText = newText;
-                const screen = document.getElementById('end-screen'); screen.scrollTop = screen.scrollHeight;
-            });
-            window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStory': finalText } }, '*');
-        } else {
-            storyEl.innerHTML = `<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin-bottom: 10px;"></div> <br>Ожидание отчета от лидера...`;
-        }
-    }
-}
-
+// Меню действий с картами
 let currentTargetCard = null;
 
 window.openCardMenu = function(cardKey) {
-    const card = globalState.playersData[myUserId].cards[cardKey];
+    const card = globalState.playersData[window.myUserId].cards[cardKey];
     currentTargetCard = cardKey;
     
     document.getElementById('cam-title').innerText = card.label;
@@ -395,7 +277,7 @@ window.confirmRevealCard = function() {
 
 window.donateToStash = function() {
     if (currentTargetCard !== 'baggage') return;
-    const itemValue = globalState.playersData[myUserId].cards.baggage.value;
+    const itemValue = globalState.playersData[window.myUserId].cards.baggage.value;
     const logic = globalState.gameLogic; 
     const required = getRoundRules(logic.round).revealsRequired;
     let newCount = (logic.revealedThisTurn || 0) + 1;
@@ -403,10 +285,10 @@ window.donateToStash = function() {
     
     const updates = {};
     updates['world/sharedStash'] = [...currentStash, itemValue]; 
-    updates[`playersData/${myUserId}/cards/baggage/isOpen`] = true;
-    updates[`playersData/${myUserId}/cards/baggage/value`] = "<span class='text-warning'>Отдано в Общак</span>";
+    updates[`playersData/${window.myUserId}/cards/baggage/isOpen`] = true;
+    updates[`playersData/${window.myUserId}/cards/baggage/value`] = "<span class='text-warning'>Отдано в Общак</span>";
     
-    if (typeof addLog === 'function') addLog(`${myName} пожертвовал [${itemValue}] в Общий склад!`, "success");
+    if (typeof addLog === 'function') addLog(`${window.myName} пожертвовал [${itemValue}] в Общий склад!`, "success");
 
     if (newCount >= required) {
         let nextIdx = logic.activePlayerIndex + 1;

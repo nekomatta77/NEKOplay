@@ -51,7 +51,6 @@ window.addEventListener('message', (event) => {
 // ГЛОБАЛЬНЫЙ РОУТЕР СОСТОЯНИЙ
 // ==========================================
 function handleStateChange() {
-    // Проверка ложной тревоги (из extensions.js)
     if (typeof checkThreats === 'function') checkThreats();
 
     if (!globalState.status || globalState.status === 'waiting') { 
@@ -80,13 +79,15 @@ function handleStateChange() {
 
         if (globalState.gameLogic.phase === 'action_animation') {
             showScreen('action-cinema-screen');
-            playActionCinema(globalState.gameLogic.activeAction);
+            if (typeof playActionCinema === 'function') {
+                playActionCinema(globalState.gameLogic.activeAction);
+            }
             return;
         }
         
         if (globalState.gameLogic.phase === 'ended') { 
             showScreen('end-screen'); 
-            renderEndScreen(); 
+            if (typeof renderEndScreen === 'function') renderEndScreen(); 
             return; 
         }
         
@@ -224,7 +225,6 @@ function renderGame() {
         document.getElementById('status-banner').className = 'status-banner';
     }
 
-    // Отрисовка ОБЩЕГО СКЛАДА
     let stashHTML = '';
     if (world.sharedStash && world.sharedStash.length > 0) {
         stashHTML = `
@@ -266,7 +266,6 @@ function renderGame() {
     const cardsContainer = document.getElementById('my-cards-container');
 
     if (myData?.kicked) {
-        // ИНТЕРФЕЙС ИЗГНАННОГО ИГРОКА
         hintEl.style.display = 'none'; 
         cardsContainer.innerHTML = `
             <div class="isolation-panel">
@@ -296,7 +295,6 @@ function renderGame() {
             const closedCards = CARD_ORDER.filter(key => myData.cards[key] && !myData.cards[key].isOpen);
             let cardsHTML = '';
             
-            // ЕСЛИ НЕЧЕГО ОТКРЫВАТЬ - КНОПКА ПРОПУСКА ХОДА
             if (isMyTurn && closedCards.length === 0) {
                 cardsHTML += `
                     <div class="full-width aesthetic-player-card text-center mb-15" style="grid-column: 1 / -1; border-color: var(--success); box-shadow: 0 0 20px rgba(0,230,118,0.2);">
@@ -547,7 +545,7 @@ window.executeAction = function(targetId) {
 };
 
 // ==========================================
-// ЛОГИКА ГОЛОСОВАНИЯ
+// ЛОГИКА ГОЛОСОВАНИЯ И ИЗГНАНИЯ
 // ==========================================
 window.submitVote = function(targetId) {
     if (globalState.playersData?.[window.myUserId]?.kicked) return; 
@@ -578,22 +576,33 @@ window.executeExile = function() {
             tiedPlayers.push(tId); 
         } 
     });
-    
-    let availableForKick = tiedPlayers.length > 0 
-        ? tiedPlayers.filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id])) 
-        : getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
-        
-    if (availableForKick.length === 0) { 
-        availableForKick = getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id])); 
+
+    // ИСПРАВЛЕНО: Улучшенная логика ничьей (исключаем игроков со щитом из потенциальной рулетки)
+    let vulnerableTied = tiedPlayers.filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
+    let availableForKick;
+    let isRoulette = false;
+
+    if (vulnerableTied.length > 1) {
+        // Настоящая ничья между уязвимыми
+        availableForKick = vulnerableTied;
+        isRoulette = true;
+    } else if (vulnerableTied.length === 1) {
+        // Ничья была, но у второго игрока оказался щит
+        availableForKick = vulnerableTied;
+    } else {
+        // Все кто был в ничьей имели щит, либо никто не голосовал вообще
+        availableForKick = getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
         if (availableForKick.length === 0) {
-            availableForKick = getAlivePlayers(); 
+            availableForKick = getAlivePlayers(); // Ни у кого нет уязвимости, выбираем из всех
+        }
+        if (tiedPlayers.length === 0 && availableForKick.length > 1) {
+            isRoulette = true; // Если вообще никто не голосовал - запускаем случайную рулетку
         }
     }
-        
-    let targetToKick = availableForKick.length > 0 ? getRandom(availableForKick) : getRandom(getAlivePlayers());
 
-    // ЕСЛИ НИЧЬЯ - ЗАПУСКАЕМ РУЛЕТКУ (extensions.js)
-    if (tiedPlayers.length > 1) {
+    let targetToKick = getRandom(availableForKick);
+
+    if (isRoulette) {
         const updates = {};
         updates['gameLogic/phase'] = 'tie_roulette';
         updates['gameLogic/rouletteData'] = { tiedPlayers: availableForKick, loserId: targetToKick };
@@ -643,7 +652,6 @@ window.exitToLobby = function() {
 // ИИ-ГЕНЕРАТОР СЮЖЕТА И ФИНАЛ
 // ==========================================
 function getApiKey() {
-    // Вставь сюда свой зашифрованный ключ или храни в .env на сервере
     const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
     try { return atob(SECRET_KEY_BASE64); } catch(e) { return ""; }
 }
@@ -752,8 +760,6 @@ const StoryGenerator = {
     }
 };
 
-let aiStoryGenerated = false;
-
 window.renderEndScreen = async function() {
     const aliveIds = getAlivePlayers();
     
@@ -791,18 +797,19 @@ window.renderEndScreen = async function() {
         return;
     }
 
-    if (!aiStoryGenerated) {
-        aiStoryGenerated = true; 
-        if (window.isHost) {
-            storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
-            const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, globalState.world, (newText) => {
-                storyEl.innerText = newText;
-                const screen = document.getElementById('end-screen'); 
-                screen.scrollTop = screen.scrollHeight;
-            });
-            window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStory': finalText } }, '*');
-        } else {
-            storyEl.innerHTML = `<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin-bottom: 10px;"></div> <br>Ожидание отчета от лидера...`;
-        }
+    // Блокируем множественные запросы
+    if (window.aiStoryGenerating) return;
+
+    if (!globalState.gameLogic?.aiStory && window.isHost) {
+        window.aiStoryGenerating = true; 
+        storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
+        const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, globalState.world, (newText) => {
+            storyEl.innerText = newText;
+            const screen = document.getElementById('end-screen'); 
+            screen.scrollTop = screen.scrollHeight;
+        });
+        window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStory': finalText } }, '*');
+    } else if (!window.isHost) {
+        storyEl.innerHTML = `<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin-bottom: 10px;"></div> <br>Ожидание отчета от лидера...`;
     }
 };
