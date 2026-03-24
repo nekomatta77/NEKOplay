@@ -35,7 +35,10 @@ function showWorldDetail(type) {
     document.getElementById('world-detail-desc').innerText = data.description;
     document.getElementById('world-detail-modal').classList.add('active');
 }
-function closeWorldDetail() { document.getElementById('world-detail-modal').classList.remove('active'); }
+
+function closeWorldDetail() { 
+    document.getElementById('world-detail-modal').classList.remove('active'); 
+}
 
 function toggleLogs() {
     const panel = document.getElementById('logs-panel');
@@ -219,7 +222,7 @@ function handleVotingUI() {
             
             if (left <= 0 || (votedCount >= expectedVotes && expectedVotes > 0)) {
                 clearInterval(votingInterval);
-                if (window.isHost && globalState.voting.active) executeExile();
+                if (window.isHost && globalState.voting.active) window.executeExile();
             }
         }, 1000);
     } else {
@@ -228,7 +231,75 @@ function handleVotingUI() {
     }
 }
 
-// Меню действий с картами
+function playActionCinema(actionData) {
+    if (!actionData) return;
+    
+    document.getElementById('cinema-card-text').innerHTML = actionData.cardText;
+    document.getElementById('cinema-card-phase').classList.add('active');
+    document.getElementById('cinema-effect-phase').classList.remove('active');
+    
+    const effectPhase = document.getElementById('cinema-effect-phase');
+    effectPhase.className = 'cinema-phase'; 
+    
+    const box1 = document.getElementById('ep1-trait-box');
+    const box2 = document.getElementById('ep2-trait-box');
+    box1.className = 'aesthetic-trait-row mt-10';
+    box2.className = 'aesthetic-trait-row mt-10';
+    box1.style = ''; box2.style = '';
+
+    setTimeout(() => {
+        document.getElementById('cinema-card-phase').classList.remove('active');
+        effectPhase.classList.add('active');
+        effectPhase.classList.add(`anim-${actionData.type}`);
+
+        document.getElementById('ep1-avatar').src = globalState.playerAvatars?.[actionData.sourceId] || FALLBACK_AVATAR_UI;
+        document.getElementById('ep1-name').innerText = globalState.playerNames?.[actionData.sourceId] || 'ИГРОК 1';
+        
+        document.getElementById('ep2-avatar').src = globalState.playerAvatars?.[actionData.targetId] || FALLBACK_AVATAR_UI;
+        document.getElementById('ep2-name').innerText = globalState.playerNames?.[actionData.targetId] || 'ИГРОК 2';
+
+        let svgIcon = ""; let text1 = "ИНИЦИАТОР"; let text2 = "ЦЕЛЬ";
+
+        if (actionData.type === 'swap') {
+            svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
+            document.getElementById('effect-p2').style.display = 'flex';
+            setTimeout(() => {
+                const rect1 = box1.getBoundingClientRect(); const rect2 = box2.getBoundingClientRect();
+                const dX = (rect2.left + rect2.width / 2) - (rect1.left + rect1.width / 2);
+                const dY = (rect2.top + rect2.height / 2) - (rect1.top + rect1.height / 2);
+                
+                box1.style.setProperty('--target-x', dX + 'px'); box1.style.setProperty('--target-y', dY + 'px'); box1.style.setProperty('--swap-color', 'var(--accent-cyan)');
+                box2.style.setProperty('--target-x', -dX + 'px'); box2.style.setProperty('--target-y', -dY + 'px'); box2.style.setProperty('--swap-color', 'var(--warning)');
+                box1.classList.add('anim-swap-dynamic'); box2.classList.add('anim-swap-dynamic');
+            }, 100);
+        } else {
+            if (actionData.type === 'reveal') { svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`; } 
+            else if (actionData.type === 'quarantine') { svgIcon = SVG_BIOHAZARD; text1 = "ИЗОЛЯЦИЯ"; text2 = "БЛОКИРОВКА ГОЛОСА"; document.getElementById('ep2-name').classList.add('text-danger'); } 
+            else if (actionData.type === 'raid') { svgIcon = SVG_RAID; text1 = `ПОЛУЧЕНО: ${actionData.targetOldVal}`; text2 = "ПУСТО"; } 
+            else if (actionData.type === 'scavenge') { svgIcon = SVG_SCAVENGE; text1 = `СЛУТАНО: ${actionData.targetOldVal}`; text2 = "МЕРТВ"; } 
+            else if (actionData.type === 'reroll') { svgIcon = SVG_REROLL; text1 = `СБРОШЕНО: ${actionData.targetOldVal}`; text2 = `ОБНОВЛЕНИЕ: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-swap-dynamic'); }, 100); }
+            else if (actionData.type === 'shield') { svgIcon = SVG_SHIELD; text1 = "АКТИВАЦИЯ"; text2 = "ИММУНИТЕТ ОТ ИЗГНАНИЯ"; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-shield-pulse'); }, 100); }
+            else if (actionData.type === 'heal') { svgIcon = SVG_HEAL; text1 = "СИСТЕМА ЖИЗНЕОБЕСПЕЧЕНИЯ"; text2 = `ИЗЛЕЧЕН: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--success)'); box2.classList.add('anim-heal-pulse'); }, 100); }
+            else if (actionData.type === 'sabotage') { svgIcon = SVG_SABOTAGE; text1 = "ВИРУСНАЯ АТАКА"; text2 = `ДОБАВЛЕНО: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', '#aa00ff'); box2.classList.add('anim-sabotage-glitch'); }, 100); }
+            else if (actionData.type === 'shuffle') { svgIcon = SVG_SHUFFLE; text1 = "ИЗЪЯТИЕ ДАННЫХ"; text2 = "ПЕРЕРАСПРЕДЕЛЕНИЕ..."; document.getElementById('effect-p2').style.display = 'none'; }
+            else if (actionData.type === 'dictator_veto') { svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; document.getElementById('effect-p2').style.display = 'none'; }
+            else if (actionData.type === 'dictator_gag') { svgIcon = SVG_DICTATOR; text1 = "ЦЕНЗУРА"; text2 = "КЛЯП: БЛОКИРОВКА ДЕЙСТВИЙ"; document.getElementById('ep2-name').classList.add('text-danger'); }
+
+            if (!['shuffle', 'dictator_veto'].includes(actionData.type)) document.getElementById('effect-p2').style.display = 'flex';
+        }
+
+        document.getElementById('effect-center-icon').innerHTML = svgIcon;
+        document.getElementById('ep1-trait').innerHTML = text1;
+        document.getElementById('ep2-trait').innerHTML = text2;
+
+        setTimeout(() => {
+            if (window.isHost && globalState.gameLogic.nextPhase) {
+                window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/phase': globalState.gameLogic.nextPhase } }, '*');
+            }
+        }, 4000); 
+    }, 2500);
+}
+
 let currentTargetCard = null;
 
 window.openCardMenu = function(cardKey) {
@@ -272,7 +343,7 @@ window.confirmRevealCard = function() {
     if (!currentTargetCard) return;
     const key = currentTargetCard;
     closeCardModal();
-    if (typeof revealCard === 'function') revealCard(key);
+    if (typeof window.revealCard === 'function') window.revealCard(key);
 };
 
 window.donateToStash = function() {
