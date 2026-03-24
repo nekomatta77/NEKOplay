@@ -7,6 +7,54 @@
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="extensions.css">
+    
+    <style>
+        /* Фикс журнала событий для мобилок */
+        @media (max-width: 768px) {
+            .logs-panel {
+                width: 90vw !important;
+                right: 5vw !important;
+                left: 5vw !important;
+                bottom: 80px !important;
+                max-height: 50vh !important;
+                box-sizing: border-box;
+            }
+        }
+        
+        /* Улучшение карточек досье для эстетики на мобилках */
+        .card-content-wrapper {
+            word-break: break-word; /* Текст больше не вылезает за края */
+            overflow-wrap: break-word;
+        }
+        @media (max-width: 480px) {
+            .cards-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 10px !important;
+            }
+            .bunker-card {
+                padding: 10px !important;
+                min-height: 120px;
+            }
+            .card-content-wrapper .value {
+                font-size: 1.1rem !important; /* Уменьшаем шрифт значений на мобилках */
+                line-height: 1.3;
+            }
+            .card-content-wrapper .type {
+                font-size: 0.8rem !important;
+            }
+        }
+
+        /* Фикс смещения анимации применения карточки действия на ПК */
+        .effect-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            margin: 0 auto;
+            gap: 30px; /* Расстояние между игроками в анимации */
+            flex-wrap: wrap; /* Чтобы на мобилках красиво переносилось */
+        }
+    </style>
 </head>
 <body>
     <div id="loading-screen" class="screen active">
@@ -48,7 +96,7 @@
                 <div>
                     <label style="font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
                         Угрозы из Пустоши 
-                        <span class="help-icon" title="Изгнанные игроки получают доступ к терминалу саботажа и могут мешать выжившим" style="background: rgba(0,229,255,0.2); width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 0.8rem; cursor: help; color: white;">?</span>
+                        <span class="help-icon" onclick="showHelp('Угрозы из Пустоши', 'Изгнанные игроки получают доступ к терминалу саботажа и могут мешать выжившим. Мертвые не молчат.')" style="background: rgba(0,229,255,0.2); width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 0.8rem; cursor: pointer; color: white;">?</span>
                     </label>
                     <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Мертвые не молчат.</div>
                 </div>
@@ -62,7 +110,7 @@
                 <div>
                     <label style="font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; color: var(--warning); display: flex; align-items: center; gap: 8px;">
                         Случайные Кризисы
-                        <span class="help-icon" title="Каждый раунд может произойти ЧП, требующее профессий или вещей в Общем складе" style="background: rgba(255,171,0,0.2); width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 0.8rem; cursor: help; color: white;">?</span>
+                        <span class="help-icon" onclick="showHelp('Случайные Кризисы', 'Каждый раунд может произойти ЧП, требующее определенных профессий или вещей в Общем складе (Общаке) для решения. Система бункера нестабильна.')" style="background: rgba(255,171,0,0.2); width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px; font-size: 0.8rem; cursor: pointer; color: white;">?</span>
                     </label>
                     <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Система бункера нестабильна.</div>
                 </div>
@@ -179,7 +227,7 @@
         <div class="glass-panel modal-content premium-shadow" style="max-width: 500px;">
             <h2 id="world-detail-title" class="font-header text-accent mb-15" style="font-size: 2rem;">ЗАГОЛОВОК</h2>
             <div id="world-detail-desc" class="text-main mb-20" style="font-size: 1.1rem; line-height: 1.6; white-space: pre-wrap;">Описание...</div>
-            <button class="btn-primary full-width" onclick="closeWorldDetail()">ЗАКРЫТЬ ДОСЬЕ</button>
+            <button class="btn-primary full-width" onclick="closeWorldDetail()">ПОНЯТНО</button>
         </div>
     </div>
 

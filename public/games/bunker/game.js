@@ -684,14 +684,29 @@ window.renderEndScreen = async function() {
         return;
     }
 
-    // Блокируем множественные запросы
     if (window.aiStoryGenerating) return;
 
     if (!globalState.gameLogic?.aiStory && window.isHost) {
         window.aiStoryGenerating = true; 
         storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
-        // Здесь мы теперь безопасно используем StoryGenerator, который объявлен только в globals.js
-        const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, globalState.world, (newText) => {
+        
+        // --- ДИНАМИЧЕСКИ ДОБАВЛЯЕМ ОБЩАК В ПРОМПТ ПЕРЕД ГЕНЕРАЦИЕЙ ---
+        const worldData = globalState.world;
+        const stashInfo = (worldData.sharedStash && worldData.sharedStash.length > 0) 
+            ? worldData.sharedStash.join(', ') 
+            : "Пусто";
+        
+        // Модифицируем объект мира перед передачей его в StoryGenerator, 
+        // чтобы ИИ обязательно это учел. (В самом генераторе globals.js он считывает bunker и catastrophe, но мы можем подменить описание бункера)
+        const modifiedWorld = {
+            ...worldData,
+            bunker: {
+                ...worldData.bunker,
+                description: `${worldData.bunker.description}. \nВАЖНОЕ УТОЧНЕНИЕ: В Общем складе бункера лежат вещи, пожертвованные выжившими: [${stashInfo}]. Обязательно опиши, как эти вещи помогли или помешали им выжить!`
+            }
+        };
+
+        const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, modifiedWorld, (newText) => {
             storyEl.innerText = newText;
             const screen = document.getElementById('end-screen'); 
             screen.scrollTop = screen.scrollHeight;

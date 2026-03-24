@@ -28,6 +28,13 @@ function switchTab(tabId) {
     document.getElementById(tabId).classList.add('active');
 }
 
+// Новая функция для вызова подсказок/вопросиков
+window.showHelp = function(title, desc) {
+    document.getElementById('world-detail-title').innerText = title;
+    document.getElementById('world-detail-desc').innerText = desc;
+    document.getElementById('world-detail-modal').classList.add('active');
+};
+
 function showWorldDetail(type) {
     const data = globalState.world?.[type];
     if (!data) return;
@@ -374,4 +381,69 @@ window.donateToStash = function() {
     
     closeCardModal();
     window.parent.postMessage({ type: 'update_state', updates }, '*');
+};
+
+// Функция Рулетки (переопределяет ту, что в extensions)
+// ПОЛНОСТЬЮ БЕЗ ЗВУКА
+window.playRoulette = function(rouletteData) {
+    const overlay = document.getElementById('roulette-overlay');
+    const track = document.getElementById('roulette-track');
+    if (!overlay || !track) return;
+
+    overlay.classList.add('active');
+    track.innerHTML = '';
+
+    const allItems = [];
+    // Делаем длинную ленту для прокрутки
+    for (let i = 0; i < 40; i++) {
+        let pId = rouletteData.tiedPlayers[i % rouletteData.tiedPlayers.length];
+        allItems.push(pId);
+    }
+    
+    // Подменяем 35-й элемент на того, кто реально проиграл
+    allItems[35] = rouletteData.loserId;
+
+    track.innerHTML = allItems.map(id => `
+        <div class="roulette-item">
+            <img src="${globalState.playerAvatars?.[id] || FALLBACK_AVATAR_UI}">
+            <div>${globalState.playerNames?.[id] || "Аноним"}</div>
+        </div>
+    `).join('');
+
+    // Сбрасываем позицию
+    track.style.transition = 'none';
+    track.style.transform = `translateX(0px)`;
+
+    setTimeout(() => {
+        // Прокручиваем до 35-го элемента
+        track.style.transition = 'transform 6s cubic-bezier(0.15, 0.85, 0.15, 1)';
+        track.style.transform = `translateX(-${35 * 120 - 40}px)`; // 120px ширина аватара, 40 центровка
+    }, 100);
+
+    setTimeout(() => {
+        overlay.classList.remove('active');
+        if (window.isHost) {
+            const updates = {};
+            updates[`playersData/${rouletteData.loserId}/kicked`] = true; 
+            updates['gameLogic/phase'] = 'exile_animation'; 
+            updates['gameLogic/exiledPlayer'] = rouletteData.loserId;
+            updates['gameLogic/quarantinedPlayers'] = {}; 
+            updates['gameLogic/shieldedPlayers'] = {}; 
+            updates['gameLogic/vetoPlayers'] = {};
+            
+            const capacity = globalState.world.capacity;
+            updates['gameLogic/nextPhase'] = (getAlivePlayers().length - 1 <= capacity) ? 'ended' : 'reveal';
+            if (updates['gameLogic/nextPhase'] === 'reveal') {
+                updates['gameLogic/round'] = globalState.gameLogic.round + 1; 
+                updates['gameLogic/activePlayerIndex'] = 0; 
+                updates['gameLogic/revealedThisTurn'] = 0; 
+                updates['gameLogic/readyPlayers'] = null; 
+            }
+            window.parent.postMessage({ type: 'update_state', updates }, '*');
+            
+            setTimeout(() => { 
+                window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/phase': globalState.gameLogic.nextPhase } }, '*'); 
+            }, 5000);
+        }
+    }, 7000);
 };
