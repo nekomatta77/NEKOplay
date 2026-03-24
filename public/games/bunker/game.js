@@ -50,6 +50,8 @@ window.addEventListener('message', (event) => {
 // ==========================================
 // ГЛОБАЛЬНЫЙ РОУТЕР СОСТОЯНИЙ
 // ==========================================
+let currentPhase = null; // Для предотвращения случайного закрытия модальных окон
+
 function handleStateChange() {
     if (typeof checkThreats === 'function') checkThreats();
 
@@ -66,7 +68,11 @@ function handleStateChange() {
             return; 
         }
 
-        hideAllModals(); 
+        // Закрываем модалки ТОЛЬКО при смене фазы игры, чтобы не прерывать действие игрока
+        if (currentPhase !== globalState.gameLogic.phase) {
+            hideAllModals();
+            currentPhase = globalState.gameLogic.phase;
+        }
         
         if (globalState.gameLogic.phase === 'tie_roulette') {
             showScreen('game-screen');
@@ -160,6 +166,7 @@ window.confirmSetup = function() {
                 shieldedPlayers: {}, 
                 vetoPlayers: {}, 
                 gaggedTargets: {},
+                threatsUsed: {}, // Трекинг использованного саботажа
                 settings: { threats: threatsEnabled, crises: crisesEnabled },
                 rules: { firstVoteRound: firstVoteRound, doubleRevealRound: doubleRound } 
             },
@@ -197,6 +204,26 @@ function checkHostAutomations() {
         }
     }
 }
+
+// ==========================================
+// ЛОГИКА САБОТАЖА ДЛЯ ИЗГНАННЫХ
+// ==========================================
+window.executeSabotageUI = function(type) {
+    if (globalState.gameLogic?.threatsUsed?.[window.myUserId]) return;
+    
+    const updates = {};
+    updates[`gameLogic/threatsUsed/${window.myUserId}`] = true;
+    
+    // Если есть функция от разработчика - вызываем, иначе просто шлем лог
+    if (typeof window.triggerThreat === 'function') {
+        window.triggerThreat(type); 
+    } else {
+        addLog(`Внимание! Произошел саботаж: Ложная Тревога!`, "danger");
+    }
+    
+    window.parent.postMessage({ type: 'update_state', updates }, '*');
+};
+
 
 // ==========================================
 // РЕНДЕР ОСНОВНОГО ИНТЕРФЕЙСА ИГРЫ
@@ -244,11 +271,16 @@ function renderGame() {
         const name = globalState.playerNames?.[id] || "Аноним";
         
         let badges = "";
+        const isShielded = logic.shieldedPlayers?.[id];
+        
         if (logic.quarantinedPlayers?.[id]) badges += `<span class="quarantine-badge">КАРАНТИН</span>`;
-        if (logic.shieldedPlayers?.[id]) badges += `<span class="shield-badge" style="background:var(--accent-cyan);color:#000;padding:3px 8px;border-radius:4px;font-size:0.7rem;font-weight:bold;margin-left:10px;vertical-align:middle;">ИММУНИТЕТ</span>`;
+        if (isShielded) badges += `<span class="shield-badge" style="background:var(--accent-cyan);color:#000;padding:3px 8px;border-radius:4px;font-size:0.7rem;font-weight:bold;margin-left:10px;vertical-align:middle;">ИММУНИТЕТ</span>`;
+        
+        // Добавляем красивую рамку для защищенных иммунитетом игроков
+        const shieldedBorderStyle = isShielded ? "border: 2px solid var(--accent-cyan); box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);" : "";
         
         return `
-            <div class="player-item aesthetic-player-card ${id === activePlayerId && logic.phase === 'reveal' ? 'active-turn' : ''}">
+            <div class="player-item aesthetic-player-card ${id === activePlayerId && logic.phase === 'reveal' ? 'active-turn' : ''}" style="${shieldedBorderStyle}">
                 <div class="player-header-row mb-10">
                     <img src="${globalState.playerAvatars?.[id]}" onerror="this.src=''">
                     <div>
@@ -267,6 +299,8 @@ function renderGame() {
 
     if (myData?.kicked) {
         hintEl.style.display = 'none'; 
+        const usedSabotage = logic.threatsUsed?.[window.myUserId];
+        
         cardsContainer.innerHTML = `
             <div class="isolation-panel">
                 <div class="isolation-icon">
@@ -280,7 +314,10 @@ function renderGame() {
                 ${logic.settings?.threats ? `
                     <div style="background: rgba(255, 0, 0, 0.1); padding: 15px; border-radius: 12px; border: 1px dashed var(--danger); max-width: 400px; z-index: 5;">
                         <h4 class="text-danger mb-10 font-header" style="font-size: 1.2rem;">ТЕРМИНАЛ САБОТАЖА</h4>
-                        <button class="btn-danger full-width glow-hover" onclick="triggerThreat('false_alarm')">⚠ ЛОЖНАЯ ТРЕВОГА</button>
+                        ${usedSabotage 
+                            ? `<button class="btn-danger full-width" disabled style="opacity: 0.5; border-color: #555;">СИГНАЛ ОТПРАВЛЕН</button>`
+                            : `<button class="btn-danger full-width glow-hover" onclick="executeSabotageUI('false_alarm')">⚠ ЛОЖНАЯ ТРЕВОГА</button>`
+                        }
                     </div>
                 ` : ''}
 
@@ -421,10 +458,21 @@ window.startActionTargeting = function() {
         availableTargets = availableTargets.filter(id => id !== window.myUserId); 
     }
 
-    availableTargets = availableTargets.filter(id => !(globalState.gameLogic?.gaggedTargets?.[window.myUserId]?.[id]));
+    // Применяем фильтры (цензура и уже открытые карты)
+    availableTargets = availableTargets.filter(id => {
+        if (globalState.gameLogic?.gaggedTargets?.[window.myUserId]?.[id]) return false;
+        
+        // ФИЛЬТР: Если действие - "вскрыть", то игнорируем игроков, у которых эта карта уже открыта
+        if (actionCard.type === 'reveal' && actionCard.targetTrait) {
+            const targetCard = globalState.playersData[id]?.cards[actionCard.targetTrait];
+            if (targetCard && targetCard.isOpen) return false;
+        }
+        
+        return true;
+    });
 
     if (availableTargets.length === 0) { 
-        alert("Нет доступных целей для этого действия."); 
+        alert("Нет доступных целей для этого действия. Игроки уже вскрыли этот атрибут или недоступны."); 
         return; 
     }
 
@@ -690,14 +738,11 @@ window.renderEndScreen = async function() {
         window.aiStoryGenerating = true; 
         storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
         
-        // --- ДИНАМИЧЕСКИ ДОБАВЛЯЕМ ОБЩАК В ПРОМПТ ПЕРЕД ГЕНЕРАЦИЕЙ ---
         const worldData = globalState.world;
         const stashInfo = (worldData.sharedStash && worldData.sharedStash.length > 0) 
             ? worldData.sharedStash.join(', ') 
             : "Пусто";
         
-        // Модифицируем объект мира перед передачей его в StoryGenerator, 
-        // чтобы ИИ обязательно это учел. (В самом генераторе globals.js он считывает bunker и catastrophe, но мы можем подменить описание бункера)
         const modifiedWorld = {
             ...worldData,
             bunker: {

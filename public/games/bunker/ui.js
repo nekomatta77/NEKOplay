@@ -28,7 +28,6 @@ function switchTab(tabId) {
     document.getElementById(tabId).classList.add('active');
 }
 
-// Новая функция для вызова подсказок/вопросиков
 window.showHelp = function(title, desc) {
     document.getElementById('world-detail-title').innerText = title;
     document.getElementById('world-detail-desc').innerText = desc;
@@ -270,6 +269,7 @@ function playActionCinema(actionData) {
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
             document.getElementById('effect-p2').style.display = 'flex';
+            document.getElementById('effect-center-icon').style.display = '';
             setTimeout(() => {
                 const rect1 = box1.getBoundingClientRect(); const rect2 = box2.getBoundingClientRect();
                 const dX = (rect2.left + rect2.width / 2) - (rect1.left + rect1.width / 2);
@@ -288,11 +288,18 @@ function playActionCinema(actionData) {
             else if (actionData.type === 'shield') { svgIcon = SVG_SHIELD; text1 = "АКТИВАЦИЯ"; text2 = "ИММУНИТЕТ ОТ ИЗГНАНИЯ"; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-shield-pulse'); }, 100); }
             else if (actionData.type === 'heal') { svgIcon = SVG_HEAL; text1 = "СИСТЕМА ЖИЗНЕОБЕСПЕЧЕНИЯ"; text2 = `ИЗЛЕЧЕН: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--success)'); box2.classList.add('anim-heal-pulse'); }, 100); }
             else if (actionData.type === 'sabotage') { svgIcon = SVG_SABOTAGE; text1 = "ВИРУСНАЯ АТАКА"; text2 = `ДОБАВЛЕНО: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', '#aa00ff'); box2.classList.add('anim-sabotage-glitch'); }, 100); }
-            else if (actionData.type === 'shuffle') { svgIcon = SVG_SHUFFLE; text1 = "ИЗЪЯТИЕ ДАННЫХ"; text2 = "ПЕРЕРАСПРЕДЕЛЕНИЕ..."; document.getElementById('effect-p2').style.display = 'none'; }
-            else if (actionData.type === 'dictator_veto') { svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; document.getElementById('effect-p2').style.display = 'none'; }
+            else if (actionData.type === 'shuffle') { svgIcon = SVG_SHUFFLE; text1 = "ИЗЪЯТИЕ ДАННЫХ"; text2 = "ПЕРЕРАСПРЕДЕЛЕНИЕ..."; }
+            else if (actionData.type === 'dictator_veto') { svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; }
             else if (actionData.type === 'dictator_gag') { svgIcon = SVG_DICTATOR; text1 = "ЦЕНЗУРА"; text2 = "КЛЯП: БЛОКИРОВКА ДЕЙСТВИЙ"; document.getElementById('ep2-name').classList.add('text-danger'); }
 
-            if (!['shuffle', 'dictator_veto'].includes(actionData.type)) document.getElementById('effect-p2').style.display = 'flex';
+            // Если это массовое действие (одиночная цель - Бункер), прячем второго игрока И иконку для идеального центра
+            if (['shuffle', 'dictator_veto'].includes(actionData.type)) {
+                document.getElementById('effect-p2').style.display = 'none';
+                document.getElementById('effect-center-icon').style.display = 'none';
+            } else {
+                document.getElementById('effect-p2').style.display = 'flex';
+                document.getElementById('effect-center-icon').style.display = '';
+            }
         }
 
         document.getElementById('effect-center-icon').innerHTML = svgIcon;
@@ -383,8 +390,7 @@ window.donateToStash = function() {
     window.parent.postMessage({ type: 'update_state', updates }, '*');
 };
 
-// Функция Рулетки (переопределяет ту, что в extensions)
-// ПОЛНОСТЬЮ БЕЗ ЗВУКА
+// Функция Рулетки с динамическим расчетом под любой экран
 window.playRoulette = function(rouletteData) {
     const overlay = document.getElementById('roulette-overlay');
     const track = document.getElementById('roulette-track');
@@ -394,13 +400,11 @@ window.playRoulette = function(rouletteData) {
     track.innerHTML = '';
 
     const allItems = [];
-    // Делаем длинную ленту для прокрутки
     for (let i = 0; i < 40; i++) {
         let pId = rouletteData.tiedPlayers[i % rouletteData.tiedPlayers.length];
         allItems.push(pId);
     }
     
-    // Подменяем 35-й элемент на того, кто реально проиграл
     allItems[35] = rouletteData.loserId;
 
     track.innerHTML = allItems.map(id => `
@@ -410,14 +414,21 @@ window.playRoulette = function(rouletteData) {
         </div>
     `).join('');
 
-    // Сбрасываем позицию
     track.style.transition = 'none';
     track.style.transform = `translateX(0px)`;
 
     setTimeout(() => {
-        // Прокручиваем до 35-го элемента
+        // Вычисляем ширину элемента и экрана налету для идеальной центровки
+        const firstItem = track.querySelector('.roulette-item');
+        const itemW = firstItem ? firstItem.offsetWidth : 120;
+        const windowElem = document.querySelector('.roulette-window');
+        const windowW = windowElem ? windowElem.offsetWidth : window.innerWidth;
+        
+        // 35-й элемент - целевой. Высчитываем смещение так, чтобы он был точно посередине
+        const targetX = (35 * itemW) - (windowW / 2) + (itemW / 2);
+        
         track.style.transition = 'transform 6s cubic-bezier(0.15, 0.85, 0.15, 1)';
-        track.style.transform = `translateX(-${35 * 120 - 40}px)`; // 120px ширина аватара, 40 центровка
+        track.style.transform = `translateX(-${targetX}px)`;
     }, 100);
 
     setTimeout(() => {
