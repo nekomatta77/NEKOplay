@@ -77,17 +77,11 @@ function generatePlayerTraitsList(pData) {
 
 window.getPlayerTraitsHTML = generatePlayerTraitsList;
 
-// ИСПРАВЛЕНО: Безопасное разворачивание (работает даже если шеврона нет)
 window.toggleAccordion = function(id) {
     const content = document.getElementById(`disc-content-${id}`);
     const chevron = document.getElementById(`disc-chevron-${id}`);
-    
-    if (content) {
-        content.classList.toggle('expanded');
-    }
-    if (chevron) {
-        chevron.classList.toggle('expanded');
-    }
+    if (content) content.classList.toggle('expanded');
+    if (chevron) chevron.classList.toggle('expanded');
 };
 
 function handleDiscussionUI() {
@@ -107,7 +101,6 @@ function handleDiscussionUI() {
         const isReady = readyMap[id];
         if (isReady) readyCount++;
         
-        // ИСПРАВЛЕНО: Теперь, если игрок готов, мы рисуем И галочку, И стрелочку
         return `
             <div class="player-item aesthetic-player-card ${isReady ? 'ready-pulse' : ''}" style="padding: 15px;">
                 <div class="player-header-row" onclick="toggleAccordion('${id}')" style="cursor: pointer; position: relative;">
@@ -249,8 +242,7 @@ function playActionCinema(actionData) {
     const box2 = document.getElementById('ep2-trait-box');
     box1.className = 'aesthetic-trait-row mt-10';
     box2.className = 'aesthetic-trait-row mt-10';
-    box1.style = ''; 
-    box2.style = '';
+    box1.style = ''; box2.style = '';
 
     setTimeout(() => {
         document.getElementById('cinema-card-phase').classList.remove('active');
@@ -263,81 +255,34 @@ function playActionCinema(actionData) {
         document.getElementById('ep2-avatar').src = globalState.playerAvatars?.[actionData.targetId] || FALLBACK_AVATAR_UI;
         document.getElementById('ep2-name').innerText = globalState.playerNames?.[actionData.targetId] || 'ИГРОК 2';
 
-        let svgIcon = "";
-        let text1 = "ИНИЦИАТОР";
-        let text2 = "ЦЕЛЬ";
+        let svgIcon = ""; let text1 = "ИНИЦИАТОР"; let text2 = "ЦЕЛЬ";
 
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
             document.getElementById('effect-p2').style.display = 'flex';
             setTimeout(() => {
-                const rect1 = box1.getBoundingClientRect();
-                const rect2 = box2.getBoundingClientRect();
-                const center1X = rect1.left + (rect1.width / 2);
-                const center1Y = rect1.top + (rect1.height / 2);
-                const center2X = rect2.left + (rect2.width / 2);
-                const center2Y = rect2.top + (rect2.height / 2);
-                const dX = center2X - center1X;
-                const dY = center2Y - center1Y;
+                const rect1 = box1.getBoundingClientRect(); const rect2 = box2.getBoundingClientRect();
+                const dX = (rect2.left + rect2.width / 2) - (rect1.left + rect1.width / 2);
+                const dY = (rect2.top + rect2.height / 2) - (rect1.top + rect1.height / 2);
                 
-                box1.style.setProperty('--target-x', dX + 'px');
-                box1.style.setProperty('--target-y', dY + 'px');
-                box1.style.setProperty('--swap-color', 'var(--accent-cyan)');
-                
-                box2.style.setProperty('--target-x', -dX + 'px');
-                box2.style.setProperty('--target-y', -dY + 'px');
-                box2.style.setProperty('--swap-color', 'var(--warning)');
-                
-                box1.classList.add('anim-swap-dynamic');
-                box2.classList.add('anim-swap-dynamic');
+                box1.style.setProperty('--target-x', dX + 'px'); box1.style.setProperty('--target-y', dY + 'px'); box1.style.setProperty('--swap-color', 'var(--accent-cyan)');
+                box2.style.setProperty('--target-x', -dX + 'px'); box2.style.setProperty('--target-y', -dY + 'px'); box2.style.setProperty('--swap-color', 'var(--warning)');
+                box1.classList.add('anim-swap-dynamic'); box2.classList.add('anim-swap-dynamic');
             }, 100);
-
         } else {
-            if (actionData.type === 'reveal') {
-                svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`;
-            } 
-            else if (actionData.type === 'quarantine') {
-                svgIcon = SVG_BIOHAZARD; text1 = "ИЗОЛЯЦИЯ"; text2 = "БЛОКИРОВКА ГОЛОСА";
-                document.getElementById('ep2-name').classList.add('text-danger');
-            } 
-            else if (actionData.type === 'raid') {
-                svgIcon = SVG_RAID; text1 = `ПОЛУЧЕНО: ${actionData.targetOldVal}`; text2 = "ПУСТО";
-            } 
-            else if (actionData.type === 'scavenge') {
-                svgIcon = SVG_SCAVENGE; text1 = `СЛУТАНО: ${actionData.targetOldVal}`; text2 = "МЕРТВ";
-            } 
-            else if (actionData.type === 'reroll') {
-                svgIcon = SVG_REROLL; text1 = `СБРОШЕНО: ${actionData.targetOldVal}`; text2 = `ОБНОВЛЕНИЕ: ${actionData.targetNewVal}`;
-                setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-swap-dynamic'); }, 100);
-            }
-            else if (actionData.type === 'shield') { 
-                svgIcon = SVG_SHIELD; text1 = "АКТИВАЦИЯ"; text2 = "ИММУНИТЕТ ОТ ИЗГНАНИЯ"; 
-                setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-shield-pulse'); }, 100); 
-            }
-            else if (actionData.type === 'heal') { 
-                svgIcon = SVG_HEAL; text1 = "СИСТЕМА ЖИЗНЕОБЕСПЕЧЕНИЯ"; text2 = `ИЗЛЕЧЕН: ${actionData.targetNewVal}`; 
-                setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--success)'); box2.classList.add('anim-heal-pulse'); }, 100); 
-            }
-            else if (actionData.type === 'sabotage') { 
-                svgIcon = SVG_SABOTAGE; text1 = "ВИРУСНАЯ АТАКА"; text2 = `ДОБАВЛЕНО: ${actionData.targetNewVal}`; 
-                setTimeout(() => { box2.style.setProperty('--swap-color', '#aa00ff'); box2.classList.add('anim-sabotage-glitch'); }, 100); 
-            }
-            else if (actionData.type === 'shuffle') { 
-                svgIcon = SVG_SHUFFLE; text1 = "ИЗЪЯТИЕ ДАННЫХ"; text2 = "ПЕРЕРАСПРЕДЕЛЕНИЕ..."; 
-                document.getElementById('effect-p2').style.display = 'none'; 
-            }
-            else if (actionData.type === 'dictator_veto') { 
-                svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; 
-                document.getElementById('effect-p2').style.display = 'none'; 
-            }
-            else if (actionData.type === 'dictator_gag') { 
-                svgIcon = SVG_DICTATOR; text1 = "ЦЕНЗУРА"; text2 = "КЛЯП: БЛОКИРОВКА ДЕЙСТВИЙ"; 
-                document.getElementById('ep2-name').classList.add('text-danger'); 
-            }
+            if (actionData.type === 'reveal') { svgIcon = SVG_REVEAL; text1 = "СКАНИРОВАНИЕ..."; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`; } 
+            else if (actionData.type === 'quarantine') { svgIcon = SVG_BIOHAZARD; text1 = "ИЗОЛЯЦИЯ"; text2 = "БЛОКИРОВКА ГОЛОСА"; document.getElementById('ep2-name').classList.add('text-danger'); } 
+            else if (actionData.type === 'raid') { svgIcon = SVG_RAID; text1 = `ПОЛУЧЕНО: ${actionData.targetOldVal}`; text2 = "ПУСТО"; } 
+            else if (actionData.type === 'scavenge') { svgIcon = SVG_SCAVENGE; text1 = `СЛУТАНО: ${actionData.targetOldVal}`; text2 = "МЕРТВ"; } 
+            else if (actionData.type === 'reroll') { svgIcon = SVG_REROLL; text1 = `СБРОШЕНО: ${actionData.targetOldVal}`; text2 = `ОБНОВЛЕНИЕ: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-swap-dynamic'); }, 100); }
+            else if (actionData.type === 'shield') { svgIcon = SVG_SHIELD; text1 = "АКТИВАЦИЯ"; text2 = "ИММУНИТЕТ ОТ ИЗГНАНИЯ"; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--accent-cyan)'); box2.classList.add('anim-shield-pulse'); }, 100); }
+            else if (actionData.type === 'heal') { svgIcon = SVG_HEAL; text1 = "СИСТЕМА ЖИЗНЕОБЕСПЕЧЕНИЯ"; text2 = `ИЗЛЕЧЕН: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--success)'); box2.classList.add('anim-heal-pulse'); }, 100); }
+            else if (actionData.type === 'sabotage') { svgIcon = SVG_SABOTAGE; text1 = "ВИРУСНАЯ АТАКА"; text2 = `ДОБАВЛЕНО: ${actionData.targetNewVal}`; setTimeout(() => { box2.style.setProperty('--swap-color', '#aa00ff'); box2.classList.add('anim-sabotage-glitch'); }, 100); }
+            else if (actionData.type === 'shuffle') { svgIcon = SVG_SHUFFLE; text1 = "ИЗЪЯТИЕ ДАННЫХ"; text2 = "ПЕРЕРАСПРЕДЕЛЕНИЕ..."; document.getElementById('effect-p2').style.display = 'none'; }
+            else if (actionData.type === 'dictator_veto') { svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; document.getElementById('effect-p2').style.display = 'none'; }
+            else if (actionData.type === 'dictator_gag') { svgIcon = SVG_DICTATOR; text1 = "ЦЕНЗУРА"; text2 = "КЛЯП: БЛОКИРОВКА ДЕЙСТВИЙ"; document.getElementById('ep2-name').classList.add('text-danger'); }
 
-            if (!['shuffle', 'dictator_veto'].includes(actionData.type)) {
-                document.getElementById('effect-p2').style.display = 'flex';
-            }
+            if (!['shuffle', 'dictator_veto'].includes(actionData.type)) document.getElementById('effect-p2').style.display = 'flex';
         }
 
         document.getElementById('effect-center-icon').innerHTML = svgIcon;
@@ -353,7 +298,6 @@ function playActionCinema(actionData) {
 }
 
 let aiStoryGenerated = false;
-
 async function renderEndScreen() {
     const aliveIds = getAlivePlayers();
     
@@ -402,3 +346,79 @@ async function renderEndScreen() {
         }
     }
 }
+
+let currentTargetCard = null;
+
+window.openCardMenu = function(cardKey) {
+    const card = globalState.playersData[myUserId].cards[cardKey];
+    currentTargetCard = cardKey;
+    
+    document.getElementById('cam-title').innerText = card.label;
+    const btnsContainer = document.getElementById('cam-buttons');
+    
+    if (cardKey === 'baggage') {
+        document.getElementById('cam-desc').innerText = "Вы можете вскрыть багаж как личное имущество, либо отдать его в Общий склад бункера (он останется там даже если вас выгонят).";
+        btnsContainer.innerHTML = `
+            <button class="btn-primary full-width glow-hover" onclick="confirmRevealCard()">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="margin-right: 8px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                ВСКРЫТЬ ЛИЧНО
+            </button>
+            <button class="btn-primary full-width glow-hover" onclick="donateToStash()" style="background: rgba(255, 171, 0, 0.1); color: var(--warning); border-color: rgba(255, 171, 0, 0.3);">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="margin-right: 8px;"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8z"/></svg>
+                СДАТЬ В ОБЩАК
+            </button>
+        `;
+    } else {
+        document.getElementById('cam-desc').innerText = "Вы собираетесь вскрыть эту информацию для всех выживших. Действие необратимо.";
+        btnsContainer.innerHTML = `
+            <button class="btn-primary full-width glow-hover" onclick="confirmRevealCard()">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="margin-right: 8px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                ОТКРЫТЬ ${card.label.toUpperCase()}
+            </button>
+        `;
+    }
+    
+    document.getElementById('card-action-modal').classList.add('active');
+};
+
+window.closeCardModal = function() {
+    document.getElementById('card-action-modal').classList.remove('active');
+    currentTargetCard = null;
+};
+
+window.confirmRevealCard = function() {
+    if (!currentTargetCard) return;
+    const key = currentTargetCard;
+    closeCardModal();
+    if (typeof revealCard === 'function') revealCard(key);
+};
+
+window.donateToStash = function() {
+    if (currentTargetCard !== 'baggage') return;
+    const itemValue = globalState.playersData[myUserId].cards.baggage.value;
+    const logic = globalState.gameLogic; 
+    const required = getRoundRules(logic.round).revealsRequired;
+    let newCount = (logic.revealedThisTurn || 0) + 1;
+    const currentStash = globalState.world.sharedStash || [];
+    
+    const updates = {};
+    updates['world/sharedStash'] = [...currentStash, itemValue]; 
+    updates[`playersData/${myUserId}/cards/baggage/isOpen`] = true;
+    updates[`playersData/${myUserId}/cards/baggage/value`] = "<span class='text-warning'>Отдано в Общак</span>";
+    
+    if (typeof addLog === 'function') addLog(`${myName} пожертвовал [${itemValue}] в Общий склад!`, "success");
+
+    if (newCount >= required) {
+        let nextIdx = logic.activePlayerIndex + 1;
+        if (nextIdx >= getAlivePlayers().length) { 
+            updates['gameLogic/phase'] = 'discussion'; updates['gameLogic/readyPlayers'] = null; 
+        } else { 
+            updates['gameLogic/activePlayerIndex'] = nextIdx; updates['gameLogic/revealedThisTurn'] = 0; 
+        }
+    } else { 
+        updates['gameLogic/revealedThisTurn'] = newCount; 
+    }
+    
+    closeCardModal();
+    window.parent.postMessage({ type: 'update_state', updates }, '*');
+};
