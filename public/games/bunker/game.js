@@ -577,26 +577,22 @@ window.executeExile = function() {
         } 
     });
 
-    // ИСПРАВЛЕНО: Улучшенная логика ничьей (исключаем игроков со щитом из потенциальной рулетки)
     let vulnerableTied = tiedPlayers.filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
     let availableForKick;
     let isRoulette = false;
 
     if (vulnerableTied.length > 1) {
-        // Настоящая ничья между уязвимыми
         availableForKick = vulnerableTied;
         isRoulette = true;
     } else if (vulnerableTied.length === 1) {
-        // Ничья была, но у второго игрока оказался щит
         availableForKick = vulnerableTied;
     } else {
-        // Все кто был в ничьей имели щит, либо никто не голосовал вообще
         availableForKick = getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
         if (availableForKick.length === 0) {
-            availableForKick = getAlivePlayers(); // Ни у кого нет уязвимости, выбираем из всех
+            availableForKick = getAlivePlayers();
         }
         if (tiedPlayers.length === 0 && availableForKick.length > 1) {
-            isRoulette = true; // Если вообще никто не голосовал - запускаем случайную рулетку
+            isRoulette = true;
         }
     }
 
@@ -651,115 +647,6 @@ window.exitToLobby = function() {
 // ==========================================
 // ИИ-ГЕНЕРАТОР СЮЖЕТА И ФИНАЛ
 // ==========================================
-function getApiKey() {
-    const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
-    try { return atob(SECRET_KEY_BASE64); } catch(e) { return ""; }
-}
-
-const StoryGenerator = {
-    async generate(aliveIds, playersData, world, onChunk) {
-        const apiKey = getApiKey();
-        if (!apiKey || apiKey.length < 10) {
-            return "СИСТЕМНАЯ ОШИБКА: Ключ API не найден. Проверьте настройки.";
-        }
-
-        if (!world.catastrophe || !world.bunker) return "Данные о мире утеряны...";
-
-        let survivorsInfo = aliveIds.map(id => {
-            const p = playersData[id].cards;
-            return `ИГРОК: ${globalState.playerNames?.[id]}
-            - Биография: ${p.bio?.value || 'Неизвестно'}
-            - Профессия: ${p.prof?.value || 'Неизвестно'}
-            - Здоровье: ${p.health?.value || 'Неизвестно'}
-            - Багаж: ${p.baggage?.value || 'Пусто'}
-            - Фобия: ${p.phobia?.value || 'Нет'}
-            - Хобби: ${p.hobby?.value || 'Нет'}
-            - Факт/Особенность: ${p.fact?.value || 'Нет'}`;
-        }).join("\n\n");
-
-        const prompt = `Ты — суровый ИИ-рассказчик, пишущий детализированные, мрачные или реалистичные концовки для игры "Бункер".
-        САМОЕ ГЛАВНОЕ ПРАВИЛО: ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ! НИКАКОГО АНГЛИЙСКОГО!
-
-        ДАННЫЕ О МИРЕ:
-        Катастрофа на поверхности: ${world.catastrophe.title} (${world.catastrophe.description}).
-        Характеристики бункера: ${world.bunker.title} (${world.bunker.description}).
-        
-        ВЫЖИВШИЕ ВНУТРИ:
-        ${survivorsInfo}
-        
-        ЗАДАЧА:
-        Напиши логичную, захватывающую и атмосферную концовку на 3-4 абзаца. Ты должен сплести все эти элементы воедино:
-        1. Хватит ли им ресурсов именно этого бункера, чтобы пережить именно эту катастрофу? 
-        2. Обязательно опиши, как пригодились (или помешали) их профессии и багаж для выживания.
-        3. Учти их здоровье, фобии, факты и хобби. Если в бункере есть тяжелобольные — опиши, смогли ли их вылечить или они стали обузой. 
-        4. Не делай концовку всегда счастливой. Если набор выживших ужасен — они должны столкнуться с суровыми проблемами.
-        
-        Пиши художественным текстом в стиле постапокалипсиса. Не используй списки, жирный шрифт или звездочки.`;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); 
-
-        try {
-            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                    'HTTP-Referer': window.location.href,
-                    'X-Title': 'Bunker Simulation'
-                },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    model: 'arcee-ai/trinity-large-preview:free', 
-                    messages: [{ role: 'user', content: prompt }], 
-                    max_tokens: 1000,
-                    temperature: 0.8,
-                    stream: true
-                })
-            });
-
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                return `ОШИБКА: Нейросеть недоступна (Код ${response.status}).`;
-            }
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let fullText = "";
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
-                
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
-                        try {
-                            const data = JSON.parse(trimmedLine.slice(6));
-                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
-                                fullText += data.choices[0].delta.content;
-                                if (onChunk) onChunk(fullText);
-                            }
-                        } catch(e) {}
-                    }
-                }
-            }
-            
-            if (!fullText || fullText.trim() === "") {
-                return "Связь с поверхностью прервана. ИИ-система не смогла передать отчет. Дальнейшая судьба выживших неизвестна.";
-            }
-            return fullText;
-        } catch (e) {
-            clearTimeout(timeoutId);
-            return "Связь с ИИ-системой прервана. Проверьте интернет.";
-        }
-    }
-};
-
 window.renderEndScreen = async function() {
     const aliveIds = getAlivePlayers();
     
@@ -803,6 +690,7 @@ window.renderEndScreen = async function() {
     if (!globalState.gameLogic?.aiStory && window.isHost) {
         window.aiStoryGenerating = true; 
         storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
+        // Здесь мы теперь безопасно используем StoryGenerator, который объявлен только в globals.js
         const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, globalState.world, (newText) => {
             storyEl.innerText = newText;
             const screen = document.getElementById('end-screen'); 
