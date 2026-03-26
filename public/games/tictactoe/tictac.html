@@ -31,13 +31,28 @@
     <div class="cooldown-fill" id="cooldown"></div>
   </div>
 
+  <div class="overlay active" id="lobbyOverlay">
+    <div class="lobby-panel">
+      <h2>ЛОББИ</h2>
+      <div class="players-list" id="playersList">
+        <div class="player-item">Вы: <span id="lobbyMyName" style="color: var(--my-color)"></span></div>
+        <div class="player-item">Всего мест: <span id="lobbyCount" style="color: #fff"></span></div>
+      </div>
+      <button class="restart-btn" id="startBtn" style="display: none;">НАЧАТЬ ИГРУ</button>
+      <div id="waitHostText" class="wait-text" style="display: none;">ОЖИДАЕМ ХОСТА...</div>
+    </div>
+  </div>
+
   <div class="overlay" id="countdownOverlay">
     <div class="countdown-text" id="countdownText">3</div>
   </div>
 
   <div class="overlay" id="winnerOverlay">
     <div class="winner-text" id="winnerText">ПОБЕДА!</div>
-    <button class="restart-btn" id="restartBtn">ИГРАТЬ ЕЩЕ РАЗ</button>
+    <div class="winner-buttons">
+      <button class="restart-btn" id="restartBtn">ЕЩЕ РАЗ</button>
+      <button class="restart-btn secondary" id="toLobbyBtn">В ЛОББИ</button>
+    </div>
   </div>
 
   <script src="rules.js"></script>
