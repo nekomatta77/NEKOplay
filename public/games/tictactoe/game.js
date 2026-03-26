@@ -3,6 +3,9 @@ const playersCount = parseInt(urlParams.get('players')) || 2;
 const myName = urlParams.get('name') || 'Аноним';
 const isHost = urlParams.get('isHost') === 'true'; 
 
+// Уникальный ID для защиты от двойного выполнения (эха от сервера)
+const myId = Math.random().toString(36).substring(2, 9);
+
 let BOARD_SIZE = 4;
 let WIN_STREAK = 3;
 
@@ -37,9 +40,26 @@ document.documentElement.style.setProperty('--my-color', myColor);
 const boardEl = document.getElementById('board');
 const cooldownEl = document.getElementById('cooldown');
 
-// Функция-помощник для отправки сообщений 
+// === НОВАЯ СИСТЕМА ОТПРАВКИ СООБЩЕНИЙ ===
 function broadcast(action) {
+    action.senderId = myId; // Помечаем пакет нашим ID
     window.parent.postMessage({ type: 'game_action', action }, '*');
+    
+    // Применяем действие у себя моментально, не дожидаясь ответа сервера
+    handleGameAction(action); 
+}
+
+// Распределитель входящих действий
+function handleGameAction(action) {
+    if (action.type === 'move') {
+      applyMove(action.x, action.y, action.color, action.playerName);
+    }
+    else if (action.type === 'tick') {
+      applyTick(action.count);
+    }
+    else if (action.type === 'to_lobby') {
+      initLobby();
+    }
 }
 
 function initBoard() {
@@ -77,19 +97,25 @@ function initLobby() {
     if (isHost) {
         startBtn.style.display = 'inline-block';
         waitText.style.display = 'none';
-        startBtn.onclick = () => hostStartCountdownTimer(); // Хост запускает отсчет
+        startBtn.onclick = () => hostStartCountdownTimer();
     } else {
         startBtn.style.display = 'none';
         waitText.style.display = 'block';
     }
 }
 
-// === 2. ТАЙМЕР (СИНХРОНИЗАЦИЯ ЧЕРЕЗ ХОСТА) ===
-let countdownInterval;
+// === 2. ТАЙМЕР ===
+let countdownInterval = null;
 function hostStartCountdownTimer() {
+    // Защита от спама кнопкой
+    if (gameState === 'countdown') return; 
+    
+    // Очищаем старые интервалы на всякий случай
+    if (countdownInterval) clearInterval(countdownInterval);
+
     let count = 3;
-    // Хост шлет "тики" всем участникам (включая себя)
-    broadcast({ type: 'tick', count });
+    broadcast({ type: 'tick', count }); // Это теперь запустит таймер и у нас, и у клиентов
+
     countdownInterval = setInterval(() => {
         count--;
         broadcast({ type: 'tick', count });
@@ -99,13 +125,11 @@ function hostStartCountdownTimer() {
     }, 1000);
 }
 
-// Применяется, когда приходит сообщение 'tick'
 function applyTick(count) {
     gameState = 'countdown';
     document.getElementById('lobbyOverlay').classList.remove('active');
     document.getElementById('winnerOverlay').classList.remove('active');
     
-    // Сброс доски на первом тике
     if (count === 3) {
         boardState = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
         initBoard();
@@ -126,20 +150,15 @@ function applyTick(count) {
         textEl.innerText = "БОЙ!";
     } else {
         overlay.classList.remove('active');
-        gameState = 'playing'; // Игра началась!
+        gameState = 'playing'; 
     }
 }
 
-// === 3. ИГРА И ФИКС РАССИНХРОНИЗАЦИИ ===
+// === 3. ИГРА ===
 function handleCellClick(x, y) {
-  // Блокируем клик, если не этап 'playing', идет откат, или клетка занята у нас
   if (gameState !== 'playing' || isOnCooldown || boardState[y][x]) return;
 
-  // ИЗМЕНЕНИЕ: Мы больше не ставим токен сразу! (Убрано placeToken)
-  // Мы просто запускаем локальный кулдаун-бар от спама...
   startCooldownBar();
-
-  // ...и отправляем сообщение о ходе всем.
   broadcast({ type: 'move', x, y, color: myColor, playerName: myName });
 }
 
@@ -157,10 +176,9 @@ function startCooldownBar() {
   }, 100);
 }
 
-// Эта функция сработает ТОЛЬКО когда мы получим действие от родителя
 function applyMove(x, y, color, playerName) {
-    // ВАЖНО: Если двое нажали почти одновременно, первый ход закрасит клетку. 
-    // Когда придет второй запрос, проверка ниже отменит его:
+    // Защита от запоздалых пакетов (если кто-то уже победил, ходы не принимаются)
+    if (gameState !== 'playing') return; 
     if (boardState[y][x]) return; 
 
     boardState[y][x] = color;
@@ -174,7 +192,6 @@ function applyMove(x, y, color, playerName) {
     token.style.backgroundColor = color + '40'; 
     cell.appendChild(token);
 
-    // Проверяем победу
     checkWin(x, y, color, playerName);
 }
 
@@ -199,7 +216,7 @@ function checkWin(x, y, color, winnerName) {
   }
 }
 
-// === 4. МЕНЮ ОКОНЧАНИЯ ===
+// === 4. КОНЕЦ ИГРЫ ===
 function showWinner(color, winnerName) {
   gameState = 'ended';
   const overlay = document.getElementById('winnerOverlay');
@@ -214,11 +231,11 @@ function showWinner(color, winnerName) {
   if (isHost) {
       restartBtn.innerText = "ЕЩЕ РАЗ";
       restartBtn.disabled = false;
-      restartBtn.onclick = () => hostStartCountdownTimer(); // Хост запускает рестарт напрямую
+      restartBtn.onclick = () => hostStartCountdownTimer(); 
 
       toLobbyBtn.innerText = "В ЛОББИ";
       toLobbyBtn.disabled = false;
-      toLobbyBtn.onclick = () => broadcast({ type: 'to_lobby' }); // Хост отправляет всех в лобби
+      toLobbyBtn.onclick = () => broadcast({ type: 'to_lobby' }); 
   } else {
       restartBtn.innerText = "ОЖИДАЕМ ХОСТА...";
       restartBtn.disabled = true;
@@ -234,20 +251,15 @@ function leaveGame() {
   window.parent.postMessage({ type: 'leave_game' }, '*');
 }
 
-// === 5. ОБРАБОТЧИК СООБЩЕНИЙ ===
+// === 5. СЕТЕВОЙ СЛУШАТЕЛЬ ===
 window.addEventListener('message', (event) => {
   if (event.data?.type === 'game_action') {
     const action = event.data.action;
     
-    if (action.type === 'move') {
-      applyMove(action.x, action.y, action.color, action.playerName);
-    }
-    else if (action.type === 'tick') {
-      applyTick(action.count);
-    }
-    else if (action.type === 'to_lobby') {
-      initLobby();
-    }
+    // Игнорируем свое же сообщение, если сервер вернул нам его обратно (предотвращает дублирование)
+    if (action.senderId === myId) return; 
+
+    handleGameAction(action);
   }
 });
 
@@ -255,7 +267,7 @@ let isInitialized = false;
 function runInit() {
     if (isInitialized) return;
     isInitialized = true;
-    initLobby(); // Начинаем теперь всегда с лобби
+    initLobby(); 
 }
 window.addEventListener('DOMContentLoaded', runInit);
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
