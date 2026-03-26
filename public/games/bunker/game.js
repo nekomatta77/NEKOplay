@@ -50,7 +50,7 @@ window.addEventListener('message', (event) => {
 // ==========================================
 // ГЛОБАЛЬНЫЙ РОУТЕР СОСТОЯНИЙ
 // ==========================================
-let currentPhase = null; // Для предотвращения случайного закрытия модальных окон
+let currentPhase = null;
 
 function handleStateChange() {
     if (typeof checkThreats === 'function') checkThreats();
@@ -68,7 +68,6 @@ function handleStateChange() {
             return; 
         }
 
-        // Закрываем модалки ТОЛЬКО при смене фазы игры, чтобы не прерывать действие игрока
         if (currentPhase !== globalState.gameLogic.phase) {
             hideAllModals();
             currentPhase = globalState.gameLogic.phase;
@@ -166,7 +165,7 @@ window.confirmSetup = function() {
                 shieldedPlayers: {}, 
                 vetoPlayers: {}, 
                 gaggedTargets: {},
-                threatsUsed: {}, // Трекинг использованного саботажа
+                threatsUsed: {},
                 settings: { threats: threatsEnabled, crises: crisesEnabled },
                 rules: { firstVoteRound: firstVoteRound, doubleRevealRound: doubleRound } 
             },
@@ -214,7 +213,6 @@ window.executeSabotageUI = function(type) {
     const updates = {};
     updates[`gameLogic/threatsUsed/${window.myUserId}`] = true;
     
-    // Если есть функция от разработчика - вызываем, иначе просто шлем лог
     if (typeof window.triggerThreat === 'function') {
         window.triggerThreat(type); 
     } else {
@@ -223,7 +221,6 @@ window.executeSabotageUI = function(type) {
     
     window.parent.postMessage({ type: 'update_state', updates }, '*');
 };
-
 
 // ==========================================
 // РЕНДЕР ОСНОВНОГО ИНТЕРФЕЙСА ИГРЫ
@@ -276,7 +273,6 @@ function renderGame() {
         if (logic.quarantinedPlayers?.[id]) badges += `<span class="quarantine-badge">КАРАНТИН</span>`;
         if (isShielded) badges += `<span class="shield-badge" style="background:var(--accent-cyan);color:#000;padding:3px 8px;border-radius:4px;font-size:0.7rem;font-weight:bold;margin-left:10px;vertical-align:middle;">ИММУНИТЕТ</span>`;
         
-        // Добавляем красивую рамку для защищенных иммунитетом игроков
         const shieldedBorderStyle = isShielded ? "border: 2px solid var(--accent-cyan); box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);" : "";
         
         return `
@@ -458,11 +454,9 @@ window.startActionTargeting = function() {
         availableTargets = availableTargets.filter(id => id !== window.myUserId); 
     }
 
-    // Применяем фильтры (цензура и уже открытые карты)
     availableTargets = availableTargets.filter(id => {
         if (globalState.gameLogic?.gaggedTargets?.[window.myUserId]?.[id]) return false;
         
-        // ФИЛЬТР: Если действие - "вскрыть", то игнорируем игроков, у которых эта карта уже открыта
         if (actionCard.type === 'reveal' && actionCard.targetTrait) {
             const targetCard = globalState.playersData[id]?.cards[actionCard.targetTrait];
             if (targetCard && targetCard.isOpen) return false;
@@ -625,6 +619,7 @@ window.executeExile = function() {
         } 
     });
 
+    // ИСПРАВЛЕНО: Безопасная обработка иммунитетов
     let vulnerableTied = tiedPlayers.filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
     let availableForKick;
     let isRoulette = false;
@@ -635,13 +630,10 @@ window.executeExile = function() {
     } else if (vulnerableTied.length === 1) {
         availableForKick = vulnerableTied;
     } else {
-        availableForKick = getAlivePlayers().filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
-        if (availableForKick.length === 0) {
-            availableForKick = getAlivePlayers();
-        }
-        if (tiedPlayers.length === 0 && availableForKick.length > 1) {
-            isRoulette = true;
-        }
+        // Если у всех кандидатов на выбывание есть щит - пробиваем щит всем
+        availableForKick = tiedPlayers;
+        if (availableForKick.length === 0) availableForKick = getAlivePlayers();
+        if (availableForKick.length > 1) isRoulette = true;
     }
 
     let targetToKick = getRandom(availableForKick);
@@ -732,10 +724,17 @@ window.renderEndScreen = async function() {
         return;
     }
 
-    if (window.aiStoryGenerating) return;
-
+    // ИСПРАВЛЕНО: Безопасное восстановление генерации, если хост обновил страницу
     if (!globalState.gameLogic?.aiStory && window.isHost) {
+        if (globalState.gameLogic?.aiStoryGenerating && !window.aiStoryGenerating) {
+            // Если в стейте записано что мы генерируем, но локальный флаг false, значит была перезагрузка страницы.
+            // Продолжаем логику и перезапускаем промис к OpenRouter.
+        } else if (window.aiStoryGenerating) {
+            return; // Генерация уже идет в этом окне
+        }
+
         window.aiStoryGenerating = true; 
+        window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStoryGenerating': true } }, '*');
         storyEl.innerText = "Подключение к нейросети... Генерация отчета..."; 
         
         const worldData = globalState.world;
@@ -756,7 +755,7 @@ window.renderEndScreen = async function() {
             const screen = document.getElementById('end-screen'); 
             screen.scrollTop = screen.scrollHeight;
         });
-        window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStory': finalText } }, '*');
+        window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStory': finalText, 'gameLogic/aiStoryGenerating': false } }, '*');
     } else if (!window.isHost) {
         storyEl.innerHTML = `<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin-bottom: 10px;"></div> <br>Ожидание отчета от лидера...`;
     }

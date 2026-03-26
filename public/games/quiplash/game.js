@@ -90,7 +90,6 @@ async function speakText(text) {
         });
     };
     
-    // Исправлено: если облачный TTS недоступен, фолбэк на локальный синтезатор
     try {
         const googleUrl = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=ru&q=${encodeURIComponent(cleanText)}`;
         await playCloud(googleUrl);
@@ -171,6 +170,8 @@ async function fetchFromAI(systemPrompt) {
 }
 
 const FALLBACK_PROMPTS = ["Худшее, что можно крикнуть во время застолья?", "Неожиданная находка в кармане старой куртки?", "Секретный ингредиент в бургерах?", "Самая тупая причина для развода:"];
+// ИСПРАВЛЕНО: Резервный пул для финала
+const FALLBACK_PROMPTS_ROUND_3 = ["Три вещи, которые лучше не находить под кроватью:", "Три худших подарка на свадьбу:", "Три причины уволиться прямо сейчас:"];
 
 async function generatePrompts(round, count, playerNamesList = [], theme = "") {
     let namesStr = playerNamesList.length > 0 ? playerNamesList.join(', ') : "";
@@ -197,7 +198,9 @@ ${themeStr}
     try {
         res = res.replace(/```json/gi, '').replace(/```/g, '').trim(); let parsed = JSON.parse(res);
         if (Array.isArray(parsed) && parsed.length >= count) return parsed.slice(0, count); throw new Error("Format");
-    } catch(e) { return Array(count).fill(0).map((_, i) => (theme ? `[${theme}] ` : '') + FALLBACK_PROMPTS[i % FALLBACK_PROMPTS.length]); }
+    } catch(e) { 
+        return Array(count).fill(0).map((_, i) => (theme ? `[${theme}] ` : '') + (round === 3 ? FALLBACK_PROMPTS_ROUND_3[i % FALLBACK_PROMPTS_ROUND_3.length] : FALLBACK_PROMPTS[i % FALLBACK_PROMPTS.length])); 
+    }
 }
 
 async function generateBotAnswer(promptText, isRound3) {
@@ -431,9 +434,14 @@ window.checkAnswersFilled = function() {
     document.getElementById('btn-submit-answers').disabled = !Array.from(inputs).every(inp => inp.value.trim().length > 0);
 };
 
+// ИСПРАВЛЕНО: Блокируем инпуты после отправки
 window.submitAnswers = function() {
     const gd = globalState.gameData || {}; const updates = {};
     const timeTakes = Math.floor((Date.now() - myPhaseStartTime) / 1000); 
+    
+    document.querySelectorAll('input[id^="answer-input-"]').forEach(inp => inp.disabled = true);
+    const submitBtn = document.getElementById('btn-submit-answers');
+    if (submitBtn) submitBtn.disabled = true;
     
     for (let qIdx in gd.assignments) {
         if (gd.assignments[qIdx].includes(myUserId)) {
@@ -451,6 +459,7 @@ window.submitAnswers = function() {
     sendUpdate(updates);
 };
 
+// ИСПРАВЛЕНО: Фикс для зависания ожидания, если expectedVotes = 0
 function renderVotingPhase() {
     showPhase('voting-phase');
     globalState._transitioningToResult = false; 
@@ -496,7 +505,7 @@ function renderVotingPhase() {
         }
 
         const expectedVotes = Math.max(0, (globalState.activePlayersList || []).length - authors.length);
-        if (expectedVotes > 0 && Object.keys(votes).length >= expectedVotes && !globalState._transitioningToResult) {
+        if (expectedVotes >= 0 && Object.keys(votes).length >= expectedVotes && !globalState._transitioningToResult) {
             clearInterval(currentTimerInterval); currentTimerId = null;  globalState._transitioningToResult = true;
             setTimeout(() => sendUpdate({ phase: 'voting_result' }), 1000);
         }
@@ -505,6 +514,7 @@ function renderVotingPhase() {
 
 window.submitVote = function(targetId) { sendUpdate({ [`gameData/votes/${(globalState.gameData || {}).currentVoteIndex || 0}/${myUserId}`]: targetId }); };
 
+// ИСПРАВЛЕНО: Бонус за "Единогласно" выдается только если голосов больше 1
 function renderVotingResultPhase() {
     showPhase('voting-result-phase');
     setDisplay('btn-next-vote', 'none'); 
@@ -521,7 +531,7 @@ function renderVotingResultPhase() {
         authors.forEach(a => {
             if (!newScores[a]) newScores[a] = 0;
             newScores[a] += (voteCounts[a] * 100 * mult);
-            if (totalVotes > 0 && voteCounts[a] === totalVotes) newScores[a] += (250 * mult);
+            if (totalVotes > 1 && voteCounts[a] === totalVotes) newScores[a] += (250 * mult); // Фикс для 3 игроков
             let otherVotes = authors.find(o => o !== a) ? voteCounts[authors.find(o => o !== a)] : 0;
             if (voteCounts[a] > otherVotes) {
                 const secs = gd.answerTimes?.[a] || 30; 
@@ -531,7 +541,6 @@ function renderVotingResultPhase() {
             }
         });
         
-        // Исправлено: замена жесткого setTimeout на управляемый таймер, который восстанавливается, даже если хост моргнет
         const targetDeadline = Date.now() + 7000;
         sendUpdate({'gameData/scores': newScores, [`gameData/scoresCalculated/${vIdx}`]: true, 'gameData/resultPhaseDeadline': targetDeadline});
         
@@ -545,7 +554,6 @@ function renderVotingResultPhase() {
             else sendUpdate({ phase: 'voting', 'gameData/currentVoteIndex': nextIdx, 'gameData/deadline': Date.now() + 20000 });
         }, 'result_timer');
     } else if (isHost && gd.scoresCalculated?.[vIdx] && gd.resultPhaseDeadline) {
-        // Подхватываем таймер, если хост обновил страницу в процессе
         startLocalTimer(gd.resultPhaseDeadline, 'some-dummy-id', () => {
             document.getElementById('result-answers-grid').removeAttribute('data-rendered-idx');
             let nextIdx = vIdx + 1;
@@ -655,7 +663,7 @@ window.nextRound = async function() {
         if (nextRoundNum === 3) {
             for(let i=0; i < activeP.length; i+=2) { 
                 let pairIdx = i/2;
-                prompts[pairIdx] = aiPrompts[pairIdx] || FALLBACK_PROMPTS[0]; 
+                prompts[pairIdx] = aiPrompts[pairIdx] || FALLBACK_PROMPTS_ROUND_3[0]; 
                 assignments[pairIdx] = [activeP[i], activeP[i+1]]; 
             }
         } else {

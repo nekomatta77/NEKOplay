@@ -292,7 +292,6 @@ function playActionCinema(actionData) {
             else if (actionData.type === 'dictator_veto') { svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; }
             else if (actionData.type === 'dictator_gag') { svgIcon = SVG_DICTATOR; text1 = "ЦЕНЗУРА"; text2 = "КЛЯП: БЛОКИРОВКА ДЕЙСТВИЙ"; document.getElementById('ep2-name').classList.add('text-danger'); }
 
-            // Если это массовое действие (одиночная цель - Бункер), прячем второго игрока И иконку для идеального центра
             if (['shuffle', 'dictator_veto'].includes(actionData.type)) {
                 document.getElementById('effect-p2').style.display = 'none';
                 document.getElementById('effect-center-icon').style.display = 'none';
@@ -360,37 +359,41 @@ window.confirmRevealCard = function() {
     if (typeof window.revealCard === 'function') window.revealCard(key);
 };
 
+// ИСПРАВЛЕНО: Добавлена микро-задержка для защиты от гонки данных при отправке в стейт 
 window.donateToStash = function() {
     if (currentTargetCard !== 'baggage') return;
-    const itemValue = globalState.playersData[window.myUserId].cards.baggage.value;
-    const logic = globalState.gameLogic; 
-    const required = getRoundRules(logic.round).revealsRequired;
-    let newCount = (logic.revealedThisTurn || 0) + 1;
-    const currentStash = globalState.world.sharedStash || [];
-    
-    const updates = {};
-    updates['world/sharedStash'] = [...currentStash, itemValue]; 
-    updates[`playersData/${window.myUserId}/cards/baggage/isOpen`] = true;
-    updates[`playersData/${window.myUserId}/cards/baggage/value`] = "<span class='text-warning'>Отдано в Общак</span>";
-    
-    if (typeof addLog === 'function') addLog(`${window.myName} пожертвовал [${itemValue}] в Общий склад!`, "success");
-
-    if (newCount >= required) {
-        let nextIdx = logic.activePlayerIndex + 1;
-        if (nextIdx >= getAlivePlayers().length) { 
-            updates['gameLogic/phase'] = 'discussion'; updates['gameLogic/readyPlayers'] = null; 
-        } else { 
-            updates['gameLogic/activePlayerIndex'] = nextIdx; updates['gameLogic/revealedThisTurn'] = 0; 
-        }
-    } else { 
-        updates['gameLogic/revealedThisTurn'] = newCount; 
-    }
-    
     closeCardModal();
-    window.parent.postMessage({ type: 'update_state', updates }, '*');
+    
+    setTimeout(() => {
+        const itemValue = globalState.playersData[window.myUserId].cards.baggage.value;
+        const logic = globalState.gameLogic; 
+        const required = getRoundRules(logic.round).revealsRequired;
+        let newCount = (logic.revealedThisTurn || 0) + 1;
+        const currentStash = globalState.world.sharedStash || [];
+        
+        const updates = {};
+        updates['world/sharedStash'] = [...currentStash, itemValue]; 
+        updates[`playersData/${window.myUserId}/cards/baggage/isOpen`] = true;
+        updates[`playersData/${window.myUserId}/cards/baggage/value`] = "<span class='text-warning'>Отдано в Общак</span>";
+        
+        if (typeof addLog === 'function') addLog(`${window.myName} пожертвовал [${itemValue}] в Общий склад!`, "success");
+
+        if (newCount >= required) {
+            let nextIdx = logic.activePlayerIndex + 1;
+            if (nextIdx >= getAlivePlayers().length) { 
+                updates['gameLogic/phase'] = 'discussion'; updates['gameLogic/readyPlayers'] = null; 
+            } else { 
+                updates['gameLogic/activePlayerIndex'] = nextIdx; updates['gameLogic/revealedThisTurn'] = 0; 
+            }
+        } else { 
+            updates['gameLogic/revealedThisTurn'] = newCount; 
+        }
+        
+        window.parent.postMessage({ type: 'update_state', updates }, '*');
+    }, Math.random() * 800);
 };
 
-// Функция Рулетки с динамическим расчетом под любой экран
+// ИСПРАВЛЕНО: Использование setInterval вместо setTimeout для защиты от троттлинга свернутого браузера
 window.playRoulette = function(rouletteData) {
     const overlay = document.getElementById('roulette-overlay');
     const track = document.getElementById('roulette-track');
@@ -418,43 +421,46 @@ window.playRoulette = function(rouletteData) {
     track.style.transform = `translateX(0px)`;
 
     setTimeout(() => {
-        // Вычисляем ширину элемента и экрана налету для идеальной центровки
         const firstItem = track.querySelector('.roulette-item');
         const itemW = firstItem ? firstItem.offsetWidth : 120;
         const windowElem = document.querySelector('.roulette-window');
         const windowW = windowElem ? windowElem.offsetWidth : window.innerWidth;
         
-        // 35-й элемент - целевой. Высчитываем смещение так, чтобы он был точно посередине
         const targetX = (35 * itemW) - (windowW / 2) + (itemW / 2);
         
         track.style.transition = 'transform 6s cubic-bezier(0.15, 0.85, 0.15, 1)';
         track.style.transform = `translateX(-${targetX}px)`;
     }, 100);
 
-    setTimeout(() => {
-        overlay.classList.remove('active');
-        if (window.isHost) {
-            const updates = {};
-            updates[`playersData/${rouletteData.loserId}/kicked`] = true; 
-            updates['gameLogic/phase'] = 'exile_animation'; 
-            updates['gameLogic/exiledPlayer'] = rouletteData.loserId;
-            updates['gameLogic/quarantinedPlayers'] = {}; 
-            updates['gameLogic/shieldedPlayers'] = {}; 
-            updates['gameLogic/vetoPlayers'] = {};
+    const rouletteEndTime = Date.now() + 7000;
+    const rouletteInterval = setInterval(() => {
+        if (Date.now() >= rouletteEndTime) {
+            clearInterval(rouletteInterval);
+            overlay.classList.remove('active');
             
-            const capacity = globalState.world.capacity;
-            updates['gameLogic/nextPhase'] = (getAlivePlayers().length - 1 <= capacity) ? 'ended' : 'reveal';
-            if (updates['gameLogic/nextPhase'] === 'reveal') {
-                updates['gameLogic/round'] = globalState.gameLogic.round + 1; 
-                updates['gameLogic/activePlayerIndex'] = 0; 
-                updates['gameLogic/revealedThisTurn'] = 0; 
-                updates['gameLogic/readyPlayers'] = null; 
+            if (window.isHost) {
+                const updates = {};
+                updates[`playersData/${rouletteData.loserId}/kicked`] = true; 
+                updates['gameLogic/phase'] = 'exile_animation'; 
+                updates['gameLogic/exiledPlayer'] = rouletteData.loserId;
+                updates['gameLogic/quarantinedPlayers'] = {}; 
+                updates['gameLogic/shieldedPlayers'] = {}; 
+                updates['gameLogic/vetoPlayers'] = {};
+                
+                const capacity = globalState.world.capacity;
+                updates['gameLogic/nextPhase'] = (getAlivePlayers().length - 1 <= capacity) ? 'ended' : 'reveal';
+                if (updates['gameLogic/nextPhase'] === 'reveal') {
+                    updates['gameLogic/round'] = globalState.gameLogic.round + 1; 
+                    updates['gameLogic/activePlayerIndex'] = 0; 
+                    updates['gameLogic/revealedThisTurn'] = 0; 
+                    updates['gameLogic/readyPlayers'] = null; 
+                }
+                window.parent.postMessage({ type: 'update_state', updates }, '*');
+                
+                setTimeout(() => { 
+                    window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/phase': globalState.gameLogic.nextPhase } }, '*'); 
+                }, 5000);
             }
-            window.parent.postMessage({ type: 'update_state', updates }, '*');
-            
-            setTimeout(() => { 
-                window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/phase': globalState.gameLogic.nextPhase } }, '*'); 
-            }, 5000);
         }
-    }, 7000);
+    }, 200);
 };
