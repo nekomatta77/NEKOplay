@@ -91,3 +91,99 @@
     90% { transform: translate(2px, 2px) rotate(0deg); }
     100% { transform: translate(1px, -2px) rotate(-1deg); }
 }
+/* =========================================
+   НОВЫЕ МЕХАНИКИ: ИЗОЛЯЦИЯ, АККОРДЕОН И ЭФФЕКТЫ
+   ========================================= */
+
+/* 1. Аккордеон (Сворачивание карточек в фазе Дебатов) */
+.accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+.accordion-content.expanded {
+    max-height: 1200px; /* Достаточно места для всех характеристик */
+    opacity: 1;
+}
+.accordion-inner {
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    margin-top: 10px;
+}
+.accordion-chevron {
+    transition: transform 0.3s ease;
+}
+.accordion-chevron.expanded {
+    transform: rotate(180deg);
+}
+
+/* 2. Статусы и блокировки (Карантин, Броня) */
+.dimmed {
+    opacity: 0.4 !important;
+    pointer-events: none !important;
+    filter: grayscale(0.8);
+    transition: all 0.3s ease;
+}
+.quarantine-lockdown-panel {
+    background: rgba(255, 42, 85, 0.05);
+    border: 2px dashed rgba(255, 42, 85, 0.3);
+    border-radius: 12px;
+    padding: 30px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* 3. Анимации пульсации (Готовность и Спиритический сеанс) */
+.ready-pulse {
+    border-color: var(--success) !important;
+    animation: pulse-success-border 2s infinite;
+}
+@keyframes pulse-success-border {
+    0% { box-shadow: 0 0 5px rgba(0, 230, 118, 0.1); }
+    50% { box-shadow: 0 0 20px rgba(0, 230, 118, 0.4); }
+    100% { box-shadow: 0 0 5px rgba(0, 230, 118, 0.1); }
+}
+
+/* 4. Глитч-эффект для мертвецов и изоляции */
+.glitch-text {
+    position: relative;
+    animation: glitch-anim 4s infinite;
+}
+@keyframes glitch-anim {
+    0%, 90%, 100% { text-shadow: none; transform: none; }
+    92% { text-shadow: 2px 0 var(--danger), -2px 0 var(--accent-cyan); transform: translate(1px, 1px); }
+    94% { text-shadow: -2px 0 var(--danger), 2px 0 var(--accent-cyan); transform: translate(-1px, -1px); }
+    96% { text-shadow: 2px 0 var(--danger), -2px 0 var(--accent-cyan); transform: translate(0px, 1px); }
+}
+
+/* Панель мертвого игрока */
+.isolation-panel {
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    padding: 40px 20px;
+    background: rgba(20, 0, 0, 0.6);
+    border: 1px solid rgba(255, 0, 0, 0.2);
+    border-radius: 12px;
+}
+.isolation-icon svg {
+    width: 80px;
+    height: 80px;
+    color: var(--danger);
+    opacity: 0.8;
+}
+.isolation-scanline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 5px;
+    background: rgba(255, 42, 85, 0.4);
+    opacity: 0.5;
+    animation: scanline 3s linear infinite;
+}
+@keyframes scanline {
+    0% { top: -10%; }
+    100% { top: 110%; }
+}

@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="extensions.css">
     
     <style>
-        /* Фикс журнала событий для мобилок */
         @media (max-width: 768px) {
             .logs-panel {
                 width: 90vw !important;
@@ -20,66 +19,20 @@
                 box-sizing: border-box;
             }
         }
-        
-        /* Улучшение карточек досье для эстетики на мобилках */
-        .card-content-wrapper {
-            word-break: break-word; 
-            overflow-wrap: break-word;
-        }
+        .card-content-wrapper { word-break: break-word; overflow-wrap: break-word; }
         @media (max-width: 480px) {
-            .cards-grid {
-                grid-template-columns: repeat(2, 1fr) !important;
-                gap: 10px !important;
-            }
-            .bunker-card {
-                padding: 10px !important;
-                min-height: 120px;
-            }
-            .card-content-wrapper .value {
-                font-size: 1.1rem !important; 
-                line-height: 1.3;
-            }
-            .card-content-wrapper .type {
-                font-size: 0.8rem !important;
-            }
+            .cards-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+            .bunker-card { padding: 10px !important; min-height: 120px; }
+            .card-content-wrapper .value { font-size: 1.1rem !important; line-height: 1.3; }
+            .card-content-wrapper .type { font-size: 0.8rem !important; }
         }
-
-        /* Фикс смещения анимации применения карточки действия на ПК */
-        .effect-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            margin: 0 auto;
-            gap: 30px; 
-            flex-wrap: wrap; 
-        }
-
-        /* Эстетика рулетки (Жребий Смерти) для мобильных устройств */
+        .effect-container { display: flex; justify-content: center; align-items: center; width: 100%; margin: 0 auto; gap: 30px; flex-wrap: wrap; }
         @media (max-width: 600px) {
-            .roulette-window {
-                width: 95vw !important;
-                height: 130px !important;
-                border-width: 2px !important;
-            }
-            .roulette-item {
-                width: 100px !important;
-                padding: 10px 5px !important;
-            }
-            .roulette-item img {
-                width: 65px !important;
-                height: 65px !important;
-            }
-            .roulette-item div {
-                font-size: 0.85rem !important;
-                margin-top: 8px !important;
-            }
-            .roulette-pointer {
-                border-top: 15px solid var(--danger) !important;
-                border-left: 10px solid transparent !important;
-                border-right: 10px solid transparent !important;
-                top: -15px !important;
-            }
+            .roulette-window { width: 95vw !important; height: 130px !important; border-width: 2px !important; }
+            .roulette-item { width: 100px !important; padding: 10px 5px !important; }
+            .roulette-item img { width: 65px !important; height: 65px !important; }
+            .roulette-item div { font-size: 0.85rem !important; margin-top: 8px !important; }
+            .roulette-pointer { border-top: 15px solid var(--danger) !important; border-left: 10px solid transparent !important; border-right: 10px solid transparent !important; top: -15px !important; }
         }
     </style>
 </head>
@@ -343,6 +296,45 @@
         <div class="roulette-window">
             <div class="roulette-pointer"></div>
             <div id="roulette-track" class="roulette-track"></div>
+        </div>
+    </div>
+
+    <div id="fake-doc-trait-modal" class="modal-overlay">
+        <div class="glass-panel modal-content premium-shadow" style="border-color: var(--accent-cyan);">
+            <h2 class="text-accent font-header mb-10 text-center">ЧТО ПОДДЕЛЫВАЕМ?</h2>
+            <div id="fake-doc-traits-list" class="players-list"></div>
+            <button class="btn-danger mt-20 full-width click-sound" onclick="closeExtraModals()">ОТМЕНА</button>
+        </div>
+    </div>
+    
+    <div id="fake-doc-options-modal" class="modal-overlay">
+        <div class="glass-panel modal-content premium-shadow" style="border-color: var(--success);">
+            <h2 class="text-success font-header mb-10 text-center">ВЫБЕРИТЕ ФАЛЬШИВКУ</h2>
+            <div id="fake-doc-options-list" class="players-list"></div>
+            </div>
+    </div>
+
+    <div id="infection-trait-modal" class="modal-overlay">
+        <div class="glass-panel modal-content premium-shadow" style="border-color: var(--warning);">
+            <h2 class="text-warning font-header mb-10 text-center">ЧТО ПЕРЕДАЕМ?</h2>
+            <div id="infection-traits-list" class="players-list"></div>
+            <button class="btn-danger mt-20 full-width click-sound" onclick="closeExtraModals()">ОТМЕНА</button>
+        </div>
+    </div>
+
+    <div id="revenge-player-modal" class="modal-overlay">
+        <div class="glass-panel modal-content premium-shadow" style="border-color: var(--danger);">
+            <h2 class="text-danger font-header mb-10 text-center">КОМУ МСТИМ?</h2>
+            <div id="revenge-players-list" class="players-list"></div>
+            <button class="btn-danger mt-20 full-width click-sound" onclick="closeExtraModals()">ОТМЕНА</button>
+        </div>
+    </div>
+    
+    <div id="revenge-trait-modal" class="modal-overlay">
+        <div class="glass-panel modal-content premium-shadow" style="border-color: var(--danger);">
+            <h2 class="text-danger font-header mb-10 text-center">КАКУЮ КАРТУ ОТКРЫТЬ?</h2>
+            <div id="revenge-traits-list" class="players-list"></div>
+            <button class="btn-danger mt-20 full-width click-sound" onclick="closeExtraModals()">ОТМЕНА</button>
         </div>
     </div>
 

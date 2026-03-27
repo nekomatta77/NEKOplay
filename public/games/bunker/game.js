@@ -11,8 +11,9 @@ Promise.all([
     fetch('baggages.json').then(res => res.json()),
     fetch('traits.json').then(res => res.json()),
     fetch('catastrophes.json').then(res => res.json()),
-    fetch('bunkers.json').then(res => res.json())
-]).then(([actionsData, bioData, profData, healthData, hobbiesData, phobiasData, baggagesData, traitsData, catastrophesData, bunkersData]) => { 
+    fetch('bunkers.json').then(res => res.json()),
+    fetch('secrets.json').then(res => res.json()) // Загружаем базу секретов
+]).then(([actionsData, bioData, profData, healthData, hobbiesData, phobiasData, baggagesData, traitsData, catastrophesData, bunkersData, secretsData]) => { 
     Object.assign(database, {
         actionCards: actionsData,
         bio: bioData,
@@ -23,7 +24,8 @@ Promise.all([
         baggages: baggagesData,
         traits: traitsData,
         catastrophes: catastrophesData,
-        bunkers: bunkersData
+        bunkers: bunkersData,
+        secrets: secretsData // Добавляем секреты в базу
     });
     
     try {
@@ -136,6 +138,7 @@ window.confirmSetup = function() {
                 phobia: { label: 'Фобия', value: getRandom(database.phobias), isOpen: false },
                 fact: { label: 'Факты', value: getRandom(database.traits), isOpen: false },
                 baggage: { label: 'Багаж', value: getRandom(database.baggages), isOpen: false },
+                secret: { label: 'Секрет', value: getRandom(database.secrets), isOpen: false }, // Добавлена характеристика Секрет
                 action: { ...getRandom(database.actionCards), isOpen: false }
             }
         };
@@ -166,6 +169,11 @@ window.confirmSetup = function() {
                 vetoPlayers: {}, 
                 gaggedTargets: {},
                 threatsUsed: {},
+                mirrorArmor: {}, 
+                puppeteers: {}, 
+                doubleExilePhase: 0, 
+                revengeReady: {}, 
+                lockdownActive: false,
                 settings: { threats: threatsEnabled, crises: crisesEnabled },
                 rules: { firstVoteRound: firstVoteRound, doubleRevealRound: doubleRound } 
             },
@@ -186,11 +194,21 @@ function checkHostAutomations() {
             const updates = {};
             
             if (rule.hasVoting) {
-                updates['gameLogic/phase'] = 'voting'; 
-                updates['voting/active'] = true; 
-                updates['voting/results'] = null; 
-                updates['voting/endTime'] = Date.now() + 60000;
-                addLog("Запущено голосование.", "danger");
+                if (logic.lockdownActive) {
+                    updates['gameLogic/phase'] = 'reveal'; 
+                    updates['gameLogic/round'] = logic.round + 1; 
+                    updates['gameLogic/activePlayerIndex'] = 0; 
+                    updates['gameLogic/revealedThisTurn'] = 0; 
+                    updates['gameLogic/readyPlayers'] = null;
+                    updates['gameLogic/lockdownActive'] = false;
+                    addLog("Изгнание отменено из-за Герметизации Бункера.", "warning");
+                } else {
+                    updates['gameLogic/phase'] = 'voting'; 
+                    updates['voting/active'] = true; 
+                    updates['voting/results'] = null; 
+                    updates['voting/endTime'] = Date.now() + 60000;
+                    addLog("Запущено голосование.", "danger");
+                }
             } else {
                 updates['gameLogic/phase'] = 'reveal'; 
                 updates['gameLogic/round'] = logic.round + 1; 
@@ -272,6 +290,7 @@ function renderGame() {
         
         if (logic.quarantinedPlayers?.[id]) badges += `<span class="quarantine-badge">КАРАНТИН</span>`;
         if (isShielded) badges += `<span class="shield-badge" style="background:var(--accent-cyan);color:#000;padding:3px 8px;border-radius:4px;font-size:0.7rem;font-weight:bold;margin-left:10px;vertical-align:middle;">ИММУНИТЕТ</span>`;
+        if (logic.mirrorArmor?.[id] && id === window.myUserId) badges += `<span class="shield-badge" style="background:#aa00ff;color:#fff;padding:3px 8px;border-radius:4px;font-size:0.7rem;font-weight:bold;margin-left:10px;vertical-align:middle;">БРОНЯ АКТИВНА</span>`;
         
         const shieldedBorderStyle = isShielded ? "border: 2px solid var(--accent-cyan); box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);" : "";
         
@@ -296,6 +315,7 @@ function renderGame() {
     if (myData?.kicked) {
         hintEl.style.display = 'none'; 
         const usedSabotage = logic.threatsUsed?.[window.myUserId];
+        const hasRevenge = logic.revengeReady?.[window.myUserId];
         
         cardsContainer.innerHTML = `
             <div class="isolation-panel">
@@ -307,8 +327,15 @@ function renderGame() {
                 <h2 class="isolation-title glitch-text">СИСТЕМА ЗАБЛОКИРОВАНА</h2>
                 <p class="isolation-desc mb-20">Протокол изгнания завершен. Вы покинули бункер.<br>Доступ к терминалу и личным карточкам навсегда закрыт.</p>
                 
+                ${hasRevenge ? `
+                    <div style="background: rgba(255, 0, 0, 0.2); padding: 15px; border-radius: 12px; border: 2px solid var(--danger); box-shadow: 0 0 20px var(--danger); animation: pulse 2s infinite; z-index: 5; max-width: 400px; margin: 0 auto 15px auto;">
+                        <h4 class="text-danger mb-10 glitch-text" style="font-size: 1.5rem;">СПИРИТИЧЕСКАЯ СВЯЗЬ АКТИВНА</h4>
+                        <button class="btn-danger full-width glow-hover" onclick="startRevengeTargeting()" style="font-size: 1.2rem; padding: 15px;">СОВЕРШИТЬ МЕСТЬ (ВСКРЫТЬ КАРТУ)</button>
+                    </div>
+                ` : ''}
+
                 ${logic.settings?.threats ? `
-                    <div style="background: rgba(255, 0, 0, 0.1); padding: 15px; border-radius: 12px; border: 1px dashed var(--danger); max-width: 400px; z-index: 5;">
+                    <div style="background: rgba(255, 0, 0, 0.1); padding: 15px; border-radius: 12px; border: 1px dashed var(--danger); max-width: 400px; z-index: 5; margin: 0 auto;">
                         <h4 class="text-danger mb-10 font-header" style="font-size: 1.2rem;">ТЕРМИНАЛ САБОТАЖА</h4>
                         ${usedSabotage 
                             ? `<button class="btn-danger full-width" disabled style="opacity: 0.5; border-color: #555;">СИГНАЛ ОТПРАВЛЕН</button>`
@@ -326,16 +353,14 @@ function renderGame() {
 
         if (myData && myData.cards) {
             const closedCards = CARD_ORDER.filter(key => myData.cards[key] && !myData.cards[key].isOpen);
-            // ФИКС 1: Выделяем обычные характеристики (без action)
             const closedTraits = closedCards.filter(key => key !== 'action');
             let cardsHTML = '';
             
-            // ФИКС 1: Если у игрока не осталось закрытых обычных характеристик, показываем кнопку пропуска
             if (isMyTurn && closedTraits.length === 0) {
                 cardsHTML += `
                     <div class="full-width aesthetic-player-card text-center mb-15" style="grid-column: 1 / -1; border-color: var(--success); box-shadow: 0 0 20px rgba(0,230,118,0.2);">
                         <h3 class="font-header text-success mb-10" style="font-size: 1.5rem;">ДОСЬЕ ПОЛНОСТЬЮ РАСКРЫТО</h3>
-                        <p class="text-muted mb-15">Все ваши характеристики открыты.${closedCards.includes('action') ? '<br>Вы можете разыграть Спец. Протокол или передать ход.' : ''}</p>
+                        <p class="text-muted mb-15">Все ваши характеристики открыты.${closedCards.includes('action') ? '<br>Вы можете разыграть Действие или передать ход.' : ''}</p>
                         <button class="btn-primary" onclick="skipRevealTurn()" style="margin: 0 auto; background: rgba(0,230,118,0.1); border-color: var(--success); color: var(--success);">ПЕРЕДАТЬ ХОД</button>
                     </div>
                 `;
@@ -428,6 +453,122 @@ window.toggleReady = function() {
 };
 
 // ==========================================
+// ЛОГИКА ФЕЙКОВЫХ ДОКУМЕНТОВ И МЕСТИ
+// ==========================================
+window.openFakeDocumentTraitSelect = function() {
+    const traits = ['bio', 'health', 'prof', 'hobby', 'phobia', 'fact', 'baggage', 'secret'];
+    document.getElementById('fake-doc-traits-list').innerHTML = traits.map(trait => `
+        <div class="vote-item" onclick="generateFakeOptions('${trait}')">
+            <span class="font-header" style="font-size: 1.2rem;">${globalState.playersData[window.myUserId].cards[trait].label}</span>
+        </div>
+    `).join('');
+    document.getElementById('fake-doc-trait-modal').classList.add('active');
+};
+
+window.generateFakeOptions = function(trait) {
+    document.getElementById('fake-doc-trait-modal').classList.remove('active');
+    let options = [];
+    for(let i=0; i<3; i++) {
+        if (trait === 'bio') options.push(generateBio());
+        else if (trait === 'health') options.push(getRandom(database.healths));
+        else if (trait === 'prof') options.push(getRandom(database.professions));
+        else if (trait === 'hobby') options.push(getRandom(database.hobbies));
+        else if (trait === 'phobia') options.push(getRandom(database.phobias));
+        else if (trait === 'fact') options.push(getRandom(database.traits));
+        else if (trait === 'baggage') options.push(getRandom(database.baggages));
+        else if (trait === 'secret') options.push(getRandom(database.secrets));
+    }
+    document.getElementById('fake-doc-options-list').innerHTML = options.map(opt => `
+        <div class="vote-item" onclick="confirmFakeDocument('${trait}', '${opt}')">
+            <span class="font-header" style="font-size: 1.1rem;">${opt}</span>
+        </div>
+    `).join('');
+    document.getElementById('fake-doc-options-modal').classList.add('active');
+};
+
+window.confirmFakeDocument = function(trait, newVal) {
+    document.getElementById('fake-doc-options-modal').classList.remove('active');
+    const oldVal = globalState.playersData[window.myUserId].cards[trait].value;
+    const updates = {};
+    
+    updates[`playersData/${window.myUserId}/cards/${trait}/value`] = newVal;
+    updates[`playersData/${window.myUserId}/cards/${trait}/isOpen`] = true;
+    updates[`playersData/${window.myUserId}/cards/action/isOpen`] = true;
+    
+    const activeAction = { 
+        sourceId: window.myUserId, targetId: window.myUserId, 
+        cardLabel: "Подделка документов", cardText: "Данные перезаписаны.", 
+        type: 'fake_document', trait: trait, 
+        sourceOldVal: oldVal, targetOldVal: newVal 
+    };
+    updates['gameLogic/phase'] = 'action_animation'; 
+    updates['gameLogic/activeAction'] = activeAction;
+    
+    // ИЗМЕНЕНИЕ: Не завершаем ход, игрок остается активным
+    updates['gameLogic/nextPhase'] = globalState.gameLogic.phase; 
+    
+    window.parent.postMessage({ type: 'update_state', updates }, '*');
+};
+
+let currentRevengeTarget = null;
+
+window.startRevengeTargeting = function() {
+    const availableTargets = getAlivePlayers();
+    document.getElementById('revenge-players-list').innerHTML = availableTargets.map(id => `
+        <div class="vote-item" onclick="selectRevengePlayer('${id}')">
+            <span class="font-header" style="font-size: 1.2rem;">${globalState.playerNames?.[id]}</span>
+        </div>
+    `).join('');
+    document.getElementById('revenge-player-modal').classList.add('active');
+};
+
+window.selectRevengePlayer = function(id) {
+    currentRevengeTarget = id; 
+    document.getElementById('revenge-player-modal').classList.remove('active');
+    
+    const pData = globalState.playersData[id];
+    const closedTraits = CARD_ORDER.filter(k => k !== 'action' && pData.cards[k] && !pData.cards[k].isOpen);
+    
+    if(closedTraits.length === 0) { 
+        alert("У этого игрока нет закрытых данных!"); 
+        return; 
+    }
+    
+    document.getElementById('revenge-traits-list').innerHTML = closedTraits.map(trait => `
+        <div class="vote-item" onclick="executeRevenge('${trait}')">
+            <span class="font-header" style="font-size: 1.2rem;">${pData.cards[trait].label}</span>
+        </div>
+    `).join('');
+    document.getElementById('revenge-trait-modal').classList.add('active');
+};
+
+window.executeRevenge = function(trait) {
+    document.getElementById('revenge-trait-modal').classList.remove('active');
+    const updates = {};
+    
+    updates[`playersData/${currentRevengeTarget}/cards/${trait}/isOpen`] = true;
+    updates[`gameLogic/revengeReady/${window.myUserId}`] = false;
+    
+    const activeAction = { 
+        sourceId: window.myUserId, targetId: currentRevengeTarget, 
+        cardLabel: "Спиритический сеанс", cardText: "Мертвые не молчат.", 
+        type: 'revenge', trait: trait, 
+        sourceOldVal: "—", targetOldVal: globalState.playersData[currentRevengeTarget].cards[trait].value 
+    };
+    
+    updates['gameLogic/phase'] = 'action_animation'; 
+    updates['gameLogic/activeAction'] = activeAction;
+    updates['gameLogic/nextPhase'] = globalState.gameLogic.phase; // Возвращаемся туда, где были
+    
+    window.parent.postMessage({ type: 'update_state', updates }, '*');
+};
+
+window.closeExtraModals = function() {
+    document.querySelectorAll('.modal-overlay').forEach(el => el.classList.remove('active'));
+    currentActionTargeting = null;
+};
+
+// ==========================================
 // ЛОГИКА ДЕЙСТВИЙ (ACTION КАРТЫ)
 // ==========================================
 let currentActionTargeting = null;
@@ -435,6 +576,22 @@ let currentActionTargeting = null;
 window.startActionTargeting = function() {
     const actionCard = globalState.playersData[window.myUserId].cards.action;
     currentActionTargeting = actionCard; 
+    
+    if (actionCard.type === 'fake_document') {
+        openFakeDocumentTraitSelect();
+        return;
+    }
+    
+    // ИЗМЕНЕНИЕ: Меню подтверждения для мгновенных действий
+    if (['mirror_armor', 'lockdown'].includes(actionCard.type)) {
+        document.getElementById('target-action-name').innerText = actionCard.value;
+        document.getElementById('target-players-list').innerHTML = `
+            <div class="vote-item" onclick="executeAction('${window.myUserId}')" style="text-align: center; border-color: var(--success); box-shadow: 0 0 10px rgba(0, 230, 118, 0.2);">
+                <span class="font-header text-success" style="font-size: 1.4rem;">ИСПОЛЬЗОВАТЬ ДЕЙСТВИЕ</span>
+            </div>`;
+        document.getElementById('target-selection-modal').classList.add('active');
+        return;
+    }
     
     document.getElementById('target-action-name').innerText = actionCard.value;
     
@@ -449,7 +606,7 @@ window.startActionTargeting = function() {
 
     let availableTargets = getAlivePlayers();
     
-    if (actionCard.type === 'scavenge') {
+    if (actionCard.type === 'scavenge' || actionCard.type === 'seance') {
         availableTargets = (globalState.players || []).filter(id => globalState.playersData[id].kicked);
     } else if (actionCard.type === 'shield') {
         availableTargets = getAlivePlayers(); 
@@ -469,27 +626,41 @@ window.startActionTargeting = function() {
     });
 
     if (availableTargets.length === 0) { 
-        alert("Нет доступных целей для этого действия. Игроки уже вскрыли этот атрибут или недоступны."); 
+        alert("Нет доступных целей для этого действия."); 
         return; 
     }
 
     document.getElementById('target-players-list').innerHTML = availableTargets.map(id => {
-        let namePrefix = actionCard.type === 'scavenge' ? "<span class='text-danger' style='margin-right:8px;'>[МЕРТВ]</span>" : "";
+        let namePrefix = ['scavenge', 'seance'].includes(actionCard.type) ? "<span class='text-danger' style='margin-right:8px;'>[МЕРТВ]</span>" : "";
         let isMe = id === window.myUserId ? "<span class='text-accent' style='margin-right:8px;'>[ВЫ САМИ]</span>" : "";
         return `
-        <div class="vote-item" onclick="executeAction('${id}')">
+        <div class="vote-item" onclick="handleTargetSelection('${id}')">
             <span class="font-header" style="font-size: 1.2rem;">${namePrefix}${isMe}${globalState.playerNames?.[id]}</span>
-            <button class="btn-primary" style="width: auto; padding: 10px;">ВЫБРАТЬ</button>
         </div>`
     }).join('');
     
     document.getElementById('target-selection-modal').classList.add('active');
 };
 
-window.closeTargetSelection = function() { 
-    document.getElementById('target-selection-modal').classList.remove('active'); 
-    currentActionTargeting = null; 
-};
+window.handleTargetSelection = function(id) {
+    if (currentActionTargeting.type === 'infection') {
+        closeExtraModals();
+        document.getElementById('infection-traits-list').innerHTML = ['bio', 'health', 'phobia', 'secret'].map(trait => `
+            <div class="vote-item" onclick="executeInfection('${id}', '${trait}')">
+                <span class="font-header" style="font-size: 1.2rem;">${globalState.playersData[window.myUserId].cards[trait].label}</span>
+            </div>
+        `).join('');
+        document.getElementById('infection-trait-modal').classList.add('active');
+    } else {
+        window.executeAction(id);
+    }
+}
+
+window.executeInfection = function(targetId, trait) {
+    document.getElementById('infection-trait-modal').classList.remove('active');
+    currentActionTargeting.targetTrait = trait;
+    window.executeAction(targetId);
+}
 
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) { 
@@ -500,13 +671,25 @@ function shuffleArray(array) {
 
 window.executeAction = function(targetId) {
     const action = currentActionTargeting; 
-    closeTargetSelection();
+    closeExtraModals();
 
-    const sourceCard = globalState.playersData[window.myUserId].cards[action.targetTrait];
-    const targetCard = globalState.playersData[targetId]?.cards[action.targetTrait];
+    // ЗЕРКАЛЬНАЯ БРОНЯ: Перехват цели
+    let actualTargetId = targetId;
+    let actualSourceId = window.myUserId;
+    const isNegativeAction = ['sabotage', 'infection', 'puppeteer', 'quarantine', 'raid'].includes(action.type);
+
+    if (isNegativeAction && globalState.gameLogic?.mirrorArmor?.[targetId]) {
+        actualTargetId = window.myUserId; // Целью становится атакующий
+        actualSourceId = targetId;
+        updates[`gameLogic/mirrorArmor/${targetId}`] = false; // Броня спадает
+        addLog(`Сработала Зеркальная Броня! Атака отражена в ${globalState.playerNames[window.myUserId]}.`, "warning");
+    }
+
+    const sourceCard = globalState.playersData[actualSourceId]?.cards[action.targetTrait];
+    const targetCard = globalState.playersData[actualTargetId]?.cards[action.targetTrait];
 
     const activeAction = {
-        sourceId: window.myUserId, targetId: targetId,
+        sourceId: actualSourceId, targetId: actualTargetId,
         cardLabel: action.label, cardText: action.value, 
         type: action.type, trait: action.targetTrait,
         sourceOldVal: sourceCard ? sourceCard.value : "—",
@@ -517,21 +700,21 @@ window.executeAction = function(targetId) {
     updates[`playersData/${window.myUserId}/cards/action/isOpen`] = true; 
     
     if (action.type === 'shield') {
-        updates[`gameLogic/shieldedPlayers/${targetId}`] = true;
+        updates[`gameLogic/shieldedPlayers/${actualTargetId}`] = true;
     } else if (action.type === 'heal' && targetCard) { 
         let val = action.targetTrait === 'health' ? "Абсолютно здоров" : "Отсутствуют (Излечен)"; 
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = val; 
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/value`] = val; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/isOpen`] = true; 
         activeAction.targetNewVal = val; 
     } else if (action.type === 'sabotage' && targetCard) { 
         let newIllness = action.targetTrait === 'health' ? getRandom(database.healths) : getRandom(database.phobias); 
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal + ` <br><span class='text-danger'>+ [${newIllness}]</span>`; 
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal + ` <br><span class='text-danger'>+ [${newIllness}]</span>`; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/isOpen`] = true; 
         activeAction.targetNewVal = newIllness; 
     } else if (action.type === 'dictator_veto') {
         updates[`gameLogic/vetoPlayers/${window.myUserId}`] = true;
     } else if (action.type === 'dictator_gag') {
-        updates[`gameLogic/gaggedTargets/${targetId}/${window.myUserId}`] = true;
+        updates[`gameLogic/gaggedTargets/${actualTargetId}/${window.myUserId}`] = true;
     } else if (action.type === 'shuffle') { 
         const alive = getAlivePlayers(); 
         let traitsPool = alive.map(id => globalState.playersData[id].cards[action.targetTrait].value); 
@@ -549,42 +732,54 @@ window.executeAction = function(targetId) {
         else if (action.targetTrait === 'phobia') newTraitValue = getRandom(database.phobias); 
         else if (action.targetTrait === 'fact') newTraitValue = getRandom(database.traits); 
         else if (action.targetTrait === 'baggage') newTraitValue = getRandom(database.baggages); 
+        else if (action.targetTrait === 'secret') newTraitValue = getRandom(database.secrets); 
         
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = newTraitValue; 
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/value`] = newTraitValue; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/isOpen`] = true; 
         activeAction.targetNewVal = newTraitValue; 
     } else if (action.type === 'swap' && sourceCard && targetCard && activeAction.sourceOldVal !== "—" && activeAction.targetOldVal !== "—") { 
-        updates[`playersData/${window.myUserId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal; 
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/value`] = activeAction.sourceOldVal; 
-        updates[`playersData/${window.myUserId}/cards/${action.targetTrait}/isOpen`] = true; 
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true; 
+        updates[`playersData/${actualSourceId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/value`] = activeAction.sourceOldVal; 
+        updates[`playersData/${actualSourceId}/cards/${action.targetTrait}/isOpen`] = true; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/isOpen`] = true; 
     } else if (action.type === 'reveal' && targetCard) {
-        updates[`playersData/${targetId}/cards/${action.targetTrait}/isOpen`] = true;
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/isOpen`] = true;
     } else if (action.type === 'quarantine') {
-        updates[`gameLogic/quarantinedPlayers/${targetId}`] = true;
+        updates[`gameLogic/quarantinedPlayers/${actualTargetId}`] = true;
     } else if (action.type === 'raid' || action.type === 'scavenge') { 
-        updates[`playersData/${window.myUserId}/cards/baggage/value`] = activeAction.sourceOldVal + " <br><span class='text-accent'>+ [" + activeAction.targetOldVal + "]</span>"; 
-        updates[`playersData/${targetId}/cards/baggage/value`] = "ПУСТО (Ограблен)"; 
+        updates[`playersData/${actualSourceId}/cards/baggage/value`] = activeAction.sourceOldVal + " <br><span class='text-accent'>+ [" + activeAction.targetOldVal + "]</span>"; 
+        updates[`playersData/${actualTargetId}/cards/baggage/value`] = "ПУСТО (Ограблен)"; 
+    } else if (action.type === 'mirror_armor') {
+        updates[`gameLogic/mirrorArmor/${window.myUserId}`] = true;
+    } else if (action.type === 'lockdown') {
+        updates['gameLogic/doubleExilePhase'] = 1; 
+        updates['gameLogic/lockdownActive'] = true; 
+    } else if (action.type === 'puppeteer') {
+        updates[`gameLogic/puppeteers/${window.myUserId}`] = actualTargetId;
+    } else if (action.type === 'seance') {
+        updates[`gameLogic/revengeReady/${actualTargetId}`] = true;
+    } else if (action.type === 'infection' && targetCard) {
+        let modifier = `[Заражение: ${activeAction.sourceOldVal}]`;
+        if (action.targetTrait === 'bio') {
+            const myAgeMatch = activeAction.sourceOldVal.match(/(\d+)/);
+            const targetAgeMatch = activeAction.targetOldVal.match(/(\d+)/);
+            if (myAgeMatch && targetAgeMatch) {
+                let myAge = parseInt(myAgeMatch[0]);
+                let targetAge = parseInt(targetAgeMatch[0]);
+                modifier = myAge < targetAge ? `[+ Омоложение до ${myAge}]` : `[+ Преждевременное старение до ${myAge}]`;
+            }
+        }
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/value`] = activeAction.targetOldVal + ` <br><span class='text-danger'>${modifier}</span>`; 
+        updates[`playersData/${actualTargetId}/cards/${action.targetTrait}/isOpen`] = true; 
+        activeAction.targetNewVal = modifier;
     }
 
     updates['gameLogic/phase'] = 'action_animation'; 
     updates['gameLogic/activeAction'] = activeAction;
 
-    let logic = globalState.gameLogic;
-    if ((logic.revealedThisTurn || 0) + 1 >= getRoundRules(logic.round).revealsRequired) {
-        let nextIdx = logic.activePlayerIndex + 1;
-        if (nextIdx >= getAlivePlayers().length) { 
-            updates['gameLogic/nextPhase'] = 'discussion'; 
-            updates['gameLogic/readyPlayers'] = null; 
-        } else { 
-            updates['gameLogic/nextPhase'] = 'reveal'; 
-            updates['gameLogic/activePlayerIndex'] = nextIdx; 
-            updates['gameLogic/revealedThisTurn'] = 0; 
-        }
-    } else { 
-        updates['gameLogic/nextPhase'] = 'reveal'; 
-        updates['gameLogic/revealedThisTurn'] = (logic.revealedThisTurn || 0) + 1; 
-    }
+    // ИЗМЕНЕНИЕ: Использование действия больше не завершает ход. 
+    // Игрок остается активным и должен открыть обычную характеристику.
+    updates['gameLogic/nextPhase'] = globalState.gameLogic.phase;
 
     window.parent.postMessage({ type: 'update_state', updates }, '*');
 };
@@ -603,8 +798,16 @@ window.submitVote = function(targetId) {
 window.executeExile = function() {
     const votes = globalState.voting?.results || {}; 
     const vetoes = globalState.gameLogic?.vetoPlayers || {};
+    const puppeteers = globalState.gameLogic?.puppeteers || {}; 
     const voteCounts = {};
     
+    // Перехват голосов кукловодами
+    Object.entries(puppeteers).forEach(([masterId, puppetId]) => {
+        if (votes[masterId]) {
+            votes[puppetId] = votes[masterId]; 
+        }
+    });
+
     Object.entries(votes).forEach(([voterId, tId]) => { 
         let weight = vetoes[voterId] ? 2 : 1; 
         voteCounts[tId] = (voteCounts[tId] || 0) + weight; 
@@ -622,7 +825,6 @@ window.executeExile = function() {
         } 
     });
 
-    // ИСПРАВЛЕНО: Безопасная обработка иммунитетов
     let vulnerableTied = tiedPlayers.filter(id => !(globalState.gameLogic?.shieldedPlayers?.[id]));
     let availableForKick;
     let isRoulette = false;
@@ -633,7 +835,6 @@ window.executeExile = function() {
     } else if (vulnerableTied.length === 1) {
         availableForKick = vulnerableTied;
     } else {
-        // Если у всех кандидатов на выбывание есть щит - пробиваем щит всем
         availableForKick = tiedPlayers;
         if (availableForKick.length === 0) availableForKick = getAlivePlayers();
         if (availableForKick.length > 1) isRoulette = true;
@@ -654,24 +855,48 @@ window.executeExile = function() {
         addLog(`Игрок ${globalState.playerNames?.[targetToKick]} изгнан большинством голосов.`, "danger");
     }
     
+    const targetCards = globalState.playersData[targetToKick]?.cards;
     const updates = {}; 
+    
+    if (targetCards?.action?.type === 'seance' && !targetCards.action.isOpen) {
+        updates[`gameLogic/revengeReady/${targetToKick}`] = true;
+        addLog(`Внимание! Изгнанный ${globalState.playerNames[targetToKick]} унес с собой Спиритический сеанс и жаждет мести...`, "danger");
+    }
+
     updates[`playersData/${targetToKick}/kicked`] = true; 
-    updates['voting/active'] = false; 
-    updates['gameLogic/phase'] = 'exile_animation'; 
-    updates['gameLogic/exiledPlayer'] = targetToKick;
     
-    updates['gameLogic/quarantinedPlayers'] = {}; 
-    updates['gameLogic/shieldedPlayers'] = {}; 
-    updates['gameLogic/vetoPlayers'] = {};
+    const doublePhase = globalState.gameLogic?.doubleExilePhase || 0;
     
-    const capacity = globalState.world.capacity;
-    updates['gameLogic/nextPhase'] = (getAlivePlayers().length - 1 <= capacity) ? 'ended' : 'reveal';
-    
-    if(updates['gameLogic/nextPhase'] === 'reveal') { 
-        updates['gameLogic/round'] = globalState.gameLogic.round + 1; 
-        updates['gameLogic/activePlayerIndex'] = 0; 
-        updates['gameLogic/revealedThisTurn'] = 0; 
-        updates['gameLogic/readyPlayers'] = null; 
+    if (doublePhase === 1) {
+        // Завершилась Фаза 1. Запускаем Фазу 2.
+        addLog(`Фаза 1 завершена. ${globalState.playerNames[targetToKick]} изгнан. Запуск Фазы 2!`, "danger");
+        updates['gameLogic/exiledPlayer'] = targetToKick;
+        updates['gameLogic/phase'] = 'exile_animation';
+        updates['voting/results'] = {}; 
+        updates['voting/endTime'] = Date.now() + 60000;
+        updates['gameLogic/doubleExilePhase'] = 2; 
+        updates['gameLogic/nextPhase'] = 'voting'; 
+    } else {
+        // Обычное изгнание или завершение Фазы 2
+        updates['voting/active'] = false; 
+        updates['gameLogic/phase'] = 'exile_animation'; 
+        updates['gameLogic/exiledPlayer'] = targetToKick;
+        
+        updates['gameLogic/quarantinedPlayers'] = {}; 
+        updates['gameLogic/shieldedPlayers'] = {}; 
+        updates['gameLogic/vetoPlayers'] = {};
+        updates['gameLogic/puppeteers'] = {}; 
+        updates['gameLogic/doubleExilePhase'] = 0;
+        
+        const capacity = globalState.world.capacity;
+        updates['gameLogic/nextPhase'] = (getAlivePlayers().length - 1 <= capacity) ? 'ended' : 'reveal';
+        
+        if(updates['gameLogic/nextPhase'] === 'reveal') { 
+            updates['gameLogic/round'] = globalState.gameLogic.round + 1; 
+            updates['gameLogic/activePlayerIndex'] = 0; 
+            updates['gameLogic/revealedThisTurn'] = 0; 
+            updates['gameLogic/readyPlayers'] = null; 
+        }
     }
 
     window.parent.postMessage({ type: 'update_state', updates }, '*');
@@ -727,13 +952,11 @@ window.renderEndScreen = async function() {
         return;
     }
 
-    // ИСПРАВЛЕНО: Безопасное восстановление генерации, если хост обновил страницу
     if (!globalState.gameLogic?.aiStory && window.isHost) {
         if (globalState.gameLogic?.aiStoryGenerating && !window.aiStoryGenerating) {
-            // Если в стейте записано что мы генерируем, но локальный флаг false, значит была перезагрузка страницы.
-            // Продолжаем логику и перезапускаем промис к OpenRouter.
+            // Перезагрузка страницы
         } else if (window.aiStoryGenerating) {
-            return; // Генерация уже идет в этом окне
+            return; 
         }
 
         window.aiStoryGenerating = true; 
@@ -753,12 +976,18 @@ window.renderEndScreen = async function() {
             }
         };
 
-        const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, modifiedWorld, (newText) => {
-            storyEl.innerText = newText;
-            const screen = document.getElementById('end-screen'); 
-            screen.scrollTop = screen.scrollHeight;
-        });
-        window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStory': finalText, 'gameLogic/aiStoryGenerating': false } }, '*');
+        // StoryGenerator берется из globals.js
+        if (typeof StoryGenerator !== 'undefined') {
+            const finalText = await StoryGenerator.generate(aliveIds, globalState.playersData, modifiedWorld, (newText) => {
+                storyEl.innerText = newText;
+                const screen = document.getElementById('end-screen'); 
+                screen.scrollTop = screen.scrollHeight;
+            });
+            window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStory': finalText, 'gameLogic/aiStoryGenerating': false } }, '*');
+        } else {
+            storyEl.innerText = "Ошибка: модуль генерации истории не найден.";
+            window.parent.postMessage({ type: 'update_state', updates: { 'gameLogic/aiStoryGenerating': false } }, '*');
+        }
     } else if (!window.isHost) {
         storyEl.innerHTML = `<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin-bottom: 10px;"></div> <br>Ожидание отчета от лидера...`;
     }

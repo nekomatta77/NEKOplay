@@ -10,6 +10,8 @@ const SVG_HEAL = `<svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-1.99.9-1.99 2
 const SVG_SABOTAGE = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
 const SVG_SHUFFLE = `<svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>`;
 const SVG_DICTATOR = `<svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 3.83L18.17 19H5.83L12 5.83zM11 10h2v5h-2v-5zm0 6h2v2h-2v-2z"/></svg>`;
+const SVG_LOCKDOWN = `<svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>`;
+const SVG_PUPPETEER = `<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>`;
 const FALLBACK_AVATAR_UI = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/></svg>";
 
 function showScreen(id) {
@@ -164,6 +166,16 @@ function handleVotingUI() {
 
     if (logic.phase === 'voting' && globalState.voting?.active) {
         document.getElementById('voting-modal').classList.add('active');
+        
+        // --- ДВОЙНАЯ ФАЗА ТЕКСТ ---
+        const doublePhase = logic.doubleExilePhase || 0;
+        let phaseTitle = "ПРОТОКОЛ ИЗГНАНИЯ";
+        if (doublePhase === 1) phaseTitle = "ПРОТОКОЛ ИЗГНАНИЯ: ФАЗА 1";
+        if (doublePhase === 2) phaseTitle = "ПРОТОКОЛ ИЗГНАНИЯ: ФАЗА 2 (ДВОЙНАЯ УГРОЗА)";
+        
+        const titleUi = document.getElementById('voting-title-ui');
+        if (titleUi) titleUi.innerText = phaseTitle;
+
         const alive = getAlivePlayers();
         const results = globalState.voting.results || {};
         const myVote = results[window.myUserId];
@@ -263,13 +275,17 @@ function playActionCinema(actionData) {
         
         document.getElementById('ep2-avatar').src = globalState.playerAvatars?.[actionData.targetId] || FALLBACK_AVATAR_UI;
         document.getElementById('ep2-name').innerText = globalState.playerNames?.[actionData.targetId] || 'ИГРОК 2';
+        
+        // Сброс классов цвета
+        document.getElementById('ep1-name').classList.remove('text-danger');
+        document.getElementById('ep2-name').classList.remove('text-danger');
 
         let svgIcon = ""; let text1 = "ИНИЦИАТОР"; let text2 = "ЦЕЛЬ";
+        document.getElementById('effect-p2').style.display = 'flex';
+        document.getElementById('effect-center-icon').style.display = '';
 
         if (actionData.type === 'swap') {
             svgIcon = SVG_SWAP; text1 = actionData.targetOldVal; text2 = actionData.sourceOldVal;
-            document.getElementById('effect-p2').style.display = 'flex';
-            document.getElementById('effect-center-icon').style.display = '';
             setTimeout(() => {
                 const rect1 = box1.getBoundingClientRect(); const rect2 = box2.getBoundingClientRect();
                 const dX = (rect2.left + rect2.width / 2) - (rect1.left + rect1.width / 2);
@@ -291,13 +307,19 @@ function playActionCinema(actionData) {
             else if (actionData.type === 'shuffle') { svgIcon = SVG_SHUFFLE; text1 = "ИЗЪЯТИЕ ДАННЫХ"; text2 = "ПЕРЕРАСПРЕДЕЛЕНИЕ..."; }
             else if (actionData.type === 'dictator_veto') { svgIcon = SVG_DICTATOR; text1 = "АБСОЛЮТНАЯ ВЛАСТЬ"; text2 = "ДВОЙНОЙ ГОЛОС ПРИНЯТ"; }
             else if (actionData.type === 'dictator_gag') { svgIcon = SVG_DICTATOR; text1 = "ЦЕНЗУРА"; text2 = "КЛЯП: БЛОКИРОВКА ДЕЙСТВИЙ"; document.getElementById('ep2-name').classList.add('text-danger'); }
+            
+            // НОВЫЕ ЭКШЕНЫ
+            else if (actionData.type === 'lockdown') { svgIcon = SVG_LOCKDOWN; text1 = "ПРОТОКОЛ АКТИВИРОВАН"; text2 = "ГЕРМЕТИЗАЦИЯ / ДВОЙНАЯ ФАЗА В СЛЕДУЮЩЕМ РАУНДЕ"; document.getElementById('ep2-name').innerText = "ВСЕ ВЫЖИВШИЕ"; }
+            else if (actionData.type === 'puppeteer') { svgIcon = SVG_PUPPETEER; text1 = "УПРАВЛЕНИЕ ПЕРЕХВАЧЕНО"; text2 = "МАРИОНЕТКА ПОДЧИНЕНА"; document.getElementById('ep2-name').classList.add('text-danger'); }
+            else if (actionData.type === 'infection') { svgIcon = SVG_BIOHAZARD; text1 = "НУЛЕВОЙ ПАЦИЕНТ"; text2 = actionData.targetNewVal; setTimeout(() => { box2.style.setProperty('--swap-color', 'var(--success)'); box2.classList.add('anim-sabotage-glitch'); }, 100); }
+            else if (actionData.type === 'seance') { svgIcon = SVG_EYE; text1 = "УСТАНОВЛЕНИЕ СВЯЗИ"; text2 = "ДОСТУП К МЕСТИ ОТКРЫТ"; }
+            else if (actionData.type === 'revenge') { svgIcon = SVG_REVEAL; text1 = "МЕРТВЫЕ НЕ МОЛЧАТ"; text2 = `ВСКРЫТО: ${actionData.targetOldVal}`; document.getElementById('ep1-name').classList.add('text-danger'); }
+            else if (actionData.type === 'mirror_armor') { svgIcon = SVG_SHIELD; text1 = "АКТИВАЦИЯ"; text2 = "ЗЕРКАЛЬНАЯ БРОНЯ В ДЕЛЕ"; document.getElementById('effect-p2').style.display = 'none'; document.getElementById('effect-center-icon').style.display = 'none'; }
+            else if (actionData.type === 'fake_document') { svgIcon = SVG_REROLL; text1 = "ПОДДЕЛКА..."; text2 = `ОБНОВЛЕНО: ${actionData.targetOldVal}`; document.getElementById('effect-p2').style.display = 'none'; document.getElementById('effect-center-icon').style.display = 'none'; }
 
             if (['shuffle', 'dictator_veto'].includes(actionData.type)) {
                 document.getElementById('effect-p2').style.display = 'none';
                 document.getElementById('effect-center-icon').style.display = 'none';
-            } else {
-                document.getElementById('effect-p2').style.display = 'flex';
-                document.getElementById('effect-center-icon').style.display = '';
             }
         }
 
@@ -359,7 +381,6 @@ window.confirmRevealCard = function() {
     if (typeof window.revealCard === 'function') window.revealCard(key);
 };
 
-// ИСПРАВЛЕНО: Добавлена микро-задержка для защиты от гонки данных при отправке в стейт 
 window.donateToStash = function() {
     if (currentTargetCard !== 'baggage') return;
     closeCardModal();
@@ -393,7 +414,6 @@ window.donateToStash = function() {
     }, Math.random() * 800);
 };
 
-// ИСПРАВЛЕНО: Использование setInterval вместо setTimeout для защиты от троттлинга свернутого браузера
 window.playRoulette = function(rouletteData) {
     const overlay = document.getElementById('roulette-overlay');
     const track = document.getElementById('roulette-track');
@@ -439,13 +459,21 @@ window.playRoulette = function(rouletteData) {
             overlay.classList.remove('active');
             
             if (window.isHost) {
+                const targetCards = globalState.playersData[rouletteData.loserId]?.cards;
                 const updates = {};
+                
+                if (targetCards?.action?.type === 'seance' && !targetCards.action.isOpen) {
+                    updates[`gameLogic/revengeReady/${rouletteData.loserId}`] = true;
+                    addLog(`Внимание! Изгнанный ${globalState.playerNames[rouletteData.loserId]} унес с собой Спиритический сеанс и жаждет мести...`, "danger");
+                }
+                
                 updates[`playersData/${rouletteData.loserId}/kicked`] = true; 
                 updates['gameLogic/phase'] = 'exile_animation'; 
                 updates['gameLogic/exiledPlayer'] = rouletteData.loserId;
                 updates['gameLogic/quarantinedPlayers'] = {}; 
                 updates['gameLogic/shieldedPlayers'] = {}; 
                 updates['gameLogic/vetoPlayers'] = {};
+                updates['gameLogic/puppeteers'] = {}; 
                 
                 const capacity = globalState.world.capacity;
                 updates['gameLogic/nextPhase'] = (getAlivePlayers().length - 1 <= capacity) ? 'ended' : 'reveal';
