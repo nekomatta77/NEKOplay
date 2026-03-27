@@ -1,7 +1,6 @@
 let animationFrameId = null; 
-let pendingRoundAdvance = 0; // Предохранитель от двойных прыжков раунда
+let pendingRoundAdvance = 0;
 
-// Добавляем динамические стили для эффектов
 const extraStyles = document.createElement('style');
 extraStyles.innerHTML = `
 @keyframes earthquakeShake {
@@ -58,8 +57,19 @@ let finishitBaseImg = new Image();
 setText('players-count-display', playersCountParam);
 setText('player-name-display', myName);
 
-if (isHost) setDisplay('host-controls', 'block');
-else setDisplay('guest-waiting', 'flex');
+// --- ОБНОВЛЕННАЯ ЛОГИКА ОТОБРАЖЕНИЯ ЛОББИ ---
+// Теперь вкладки режимов доступны всем, но кнопки запуска - только хосту
+if (isHost) {
+    setDisplay('tab-btn-settings', 'inline-block');
+    setDisplay('start-game-btn', 'block');
+    setDisplay('start-game-settings-btn', 'block');
+    setDisplay('guest-waiting-msg', 'none');
+} else {
+    setDisplay('tab-btn-settings', 'none');
+    setDisplay('start-game-btn', 'none');
+    setDisplay('start-game-settings-btn', 'none');
+    setDisplay('guest-waiting-msg', 'flex'); // Показываем крутилку ожидания
+}
 
 function leaveGame() { window.parent.postMessage({ type: 'leave_game' }, '*'); }
 function requestFullscreen() { window.parent.postMessage({ type: 'request_fullscreen' }, '*'); }
@@ -83,12 +93,20 @@ function switchTab(tabId) {
     if(tab) tab.classList.add('active');
 }
 
+// --- ОБНОВЛЕННАЯ ЛОГИКА ВЫБОРА РЕЖИМА ---
+function updateModeUI(mode) {
+    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+    const el = document.querySelector(`.mode-card[data-mode="${mode}"]`);
+    if (el) el.classList.add('active');
+}
+
 function selectMode(mode) {
-  if (!isHost) return;
+  if (!isHost) return; // Гости не могут переключить режим
   selectedMode = mode;
-  document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
-  const el = document.querySelector(`.mode-card[data-mode="${mode}"]`);
-  if (el) el.classList.add('active');
+  updateModeUI(mode);
+  
+  // Отправляем информацию о выбранном режиме всем игрокам, чтобы лобби синхронизировалось
+  window.parent.postMessage({ type: 'update_state', updates: { 'settings/mode': mode } }, '*');
 }
 
 function showModeInfo(e, mode) {
@@ -133,8 +151,6 @@ function initAudio() {
     if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
     if (audioCtx.state === 'suspended') audioCtx.resume();
 }
-
-// Инициализируем звук заранее, чтобы гости могли его слышать
 document.addEventListener('pointerdown', () => { initAudio(); }, { once: true });
 
 function playWarningBeep(pitchMult = 1) {
@@ -365,6 +381,11 @@ function handleStateChange() {
 
   if (!globalState.status || globalState.status === 'waiting') {
     resetLocalGameData();
+    // Синхронизация UI лобби с глобальным стейтом для гостей
+    if (globalState.settings?.mode) {
+        selectedMode = globalState.settings.mode;
+        updateModeUI(selectedMode);
+    }
     showPhase('lobby-screen'); 
     return;
   }
@@ -423,12 +444,11 @@ function handleStateChange() {
   }
 
   if (globalState.round > currentLocalRound) {
-      pendingRoundAdvance = 0; // Сбрасываем предохранитель перехода при новом раунде
+      pendingRoundAdvance = 0; 
       startRound(globalState.round, players);
   }
   updateWaitingScreen();
 
-  // Защита от двойного инкремента раунда
   if (isHost) {
     const currentSubs = globalState.submissions?.[`round_${globalState.round}`] || {};
     let activeReadyCount = players.filter(pid => typeof currentSubs[pid] === 'string' && currentSubs[pid].length > 0).length;
@@ -732,7 +752,6 @@ async function startRound(round, players) {
       showPhase('text-phase');
   }
 
-  // Запуск таймера СТРОГО ПОСЛЕ всех загрузок (для идеального синхрона с ИИ)
   startPhaseTimer(isDrawingPhase);
 }
 
@@ -948,7 +967,7 @@ function redrawFromStrokesSync(strokes, targetCtx, targetCanvas, isDark, clearBg
 }
 
 function animateStrokes(strokes, canvasEl, isDark, hasBg = false) {
-    if (animationFrameId) cancelAnimationFrame(animationFrameId); // Очистка старой анимации
+    if (animationFrameId) cancelAnimationFrame(animationFrameId); 
     const actx = canvasEl.getContext('2d');
     
     const clearCanvasFn = () => {
@@ -1013,7 +1032,7 @@ function saveState() {
     if (globalState.settings?.mode === 'hardcore' || globalState.settings?.mode === 'amnesia') return; 
     if (historyIndex < drawHistory.length - 1) { drawHistory.length = historyIndex + 1; strokesHistory.length = historyIndex + 1; } 
     drawHistory.push(canvas.toDataURL()); 
-    strokesHistory.push([...recordedStrokes]); // Исправлено: Быстрое копирование вместо тяжелого JSON парсинга
+    strokesHistory.push([...recordedStrokes]);
     historyIndex++; 
 }
 function restoreState(index) { 
@@ -1062,14 +1081,37 @@ function clearCanvas() {
     recordedStrokes.push({ type: 'clear' }); saveState(); 
 }
 
+// --- ОБНОВЛЕННАЯ ЛОГИКА ОГРАНИЧЕНИЯ ЗУМА ---
 function resetCanvasTransform() { canvasTransform = { x: 0, y: 0, scale: 1 }; updateTransform(); }
-function updateTransform() { if (!zoomContainer) return; if (canvasTransform.scale <= 1) { canvasTransform.scale = 1; canvasTransform.x = 0; canvasTransform.y = 0; } zoomContainer.style.transformOrigin = `0 0`; zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; }
+
+function updateTransform() { 
+    if (!zoomContainer) return; 
+    
+    if (canvasTransform.scale <= 1) { 
+        canvasTransform.scale = 1; 
+        canvasTransform.x = 0; 
+        canvasTransform.y = 0; 
+    } else {
+        // Ограничиваем сдвиг экрана, чтобы нельзя было увести холст за пределы экрана
+        const wrapperRect = zoomContainer.parentElement.getBoundingClientRect();
+        
+        // Максимально допустимое смещение
+        const minX = wrapperRect.width - (wrapperRect.width * canvasTransform.scale);
+        const minY = wrapperRect.height - (wrapperRect.height * canvasTransform.scale);
+
+        canvasTransform.x = Math.max(minX, Math.min(0, canvasTransform.x));
+        canvasTransform.y = Math.max(minY, Math.min(0, canvasTransform.y));
+    }
+    
+    zoomContainer.style.transformOrigin = `0 0`; 
+    zoomContainer.style.transform = `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`; 
+}
+
 function getCoordinates(clientX, clientY) { const rect = canvas.getBoundingClientRect(); return { x: ((clientX - rect.left) / rect.width) * canvas.width, y: ((clientY - rect.top) / rect.height) * canvas.height }; }
 
 function startPosition(e) {
     activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    // Обработка мультитача и сохранения линии, чтобы она не пропадала 
     if (activePointers.size >= 2) {
         if (isDrawing || isDrawingShape) {
             if (isDrawingShape) {
@@ -1158,8 +1200,6 @@ function draw(e) {
       canvasTransform.y = localCy - (localCy - canvasTransform.y) * scaleRatio + dy;
       canvasTransform.scale = newScale; 
       
-      if (newScale === 1) { canvasTransform.x = 0; canvasTransform.y = 0; }
-      
       lastZoomCenter = { x: cx, y: cy }; 
       updateTransform(); 
       return;
@@ -1236,7 +1276,6 @@ canvas.addEventListener('pointermove', draw, {passive: false});
 canvas.addEventListener('pointercancel', endPosition);
 canvas.addEventListener('pointerout', endPosition);
 
-// Зум колесиком мыши (ПК)
 const wrapperEl = document.querySelector('.canvas-wrapper-outer');
 if (wrapperEl) {
     wrapperEl.addEventListener('wheel', (e) => {
@@ -1255,14 +1294,10 @@ if (wrapperEl) {
         canvasTransform.y = pointerY - (pointerY - canvasTransform.y) * (newScale / canvasTransform.scale);
         canvasTransform.scale = newScale;
         
-        if (newScale === 1) { canvasTransform.x = 0; canvasTransform.y = 0; }
-        updateTransform();
+        updateTransform(); // Функция ограничит вылет за границы
     }, {passive: false});
 }
 
-// ==========================================
-// ГОЛОСОВАНИЕ ПРЕДАТЕЛЯ И ЧАТ-ПРЕЗЕНТАЦИЯ
-// ==========================================
 let voices = []; window.speechSynthesis.onvoiceschanged = () => { voices = window.speechSynthesis.getVoices(); };
 function speakText(text) {
     if (!('speechSynthesis' in window)) return; window.speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'ru-RU';
@@ -1335,7 +1370,7 @@ function renderVotingResults() {
 
 let renderedPresentationState = '';
 function syncPresentationView(players) {
-    if (animationFrameId) cancelAnimationFrame(animationFrameId); // Очищаем холсты при загрузке новых данных
+    if (animationFrameId) cancelAnimationFrame(animationFrameId); 
 
     const pres = globalState.presentation; if (!pres) return;
     const currentStateId = `${pres.bookIndex}-${pres.round}-${globalState.settings?.seed || Math.random()}`; 
