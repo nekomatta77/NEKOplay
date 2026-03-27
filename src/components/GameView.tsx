@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Room, User } from '../types';
 import { ref, update, onValue, set, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
+// Импортируем нашу новую игру
+import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
 
 interface GameViewProps {
   room: Room;
@@ -12,10 +14,11 @@ interface GameViewProps {
 export default function GameView({ room, user, onLeave }: GameViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
-  // ИСПРАВЛЕНО: Флаг готовности iframe
   const [isIframeLoaded, setIsIframeLoaded] = useState(false);
-  // Сохраняем последний полученный стейт из базы, чтобы передать его после загрузки
   const pendingState = useRef<any>(null);
+  
+  // ДОБАВЛЕНО: Стейт для игр на React
+  const [reactGameState, setReactGameState] = useState<any>(null);
 
   const handleLeaveGame = async () => {
     if (document.fullscreenElement) {
@@ -44,6 +47,9 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
+      // Игнорируем сообщения от React-игр, так как они работают напрямую с Firebase
+      if (room.gameType === 'deadofwinter') return; 
+
       if (event.data?.type === 'request_fullscreen') {
         if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); }
       }
@@ -78,16 +84,18 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [room.id, user.id, room.players]);
+  }, [room.id, user.id, room.players, room.gameType]);
 
-  // ИСПРАВЛЕНО: Слушаем Firebase, но отправляем данные только если Iframe готов
   useEffect(() => {
     const stateRef = ref(db, `rooms/${room.id}/gameState`);
     const unsubscribe = onValue(stateRef, (snapshot) => {
       const state = snapshot.val() || {};
-      pendingState.current = state; // Сохраняем в кэш
+      pendingState.current = state; 
       
-      if (isIframeLoaded && iframeRef.current?.contentWindow) {
+      // ДОБАВЛЕНО: Сохраняем стейт для React компонента
+      setReactGameState(state);
+      
+      if (isIframeLoaded && iframeRef.current?.contentWindow && room.gameType !== 'deadofwinter') {
         iframeRef.current.contentWindow.postMessage({ 
           type: 'sync_state', 
           state: state,
@@ -96,9 +104,10 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
       }
     });
     return () => unsubscribe();
-  }, [room.id, room.players, isIframeLoaded]);
+  }, [room.id, room.players, isIframeLoaded, room.gameType]);
 
   useEffect(() => {
+    if (room.gameType === 'deadofwinter') return; // React-игры слушают экшены сами, если нужно
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
       const actionData = snapshot.val();
@@ -107,7 +116,19 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
       }
     });
     return () => unsubscribe();
-  }, [room.id, user.id, isIframeLoaded]);
+  }, [room.id, user.id, isIframeLoaded, room.gameType]);
+
+  // ДОБАВЛЕНО: Логика маршрутизации
+  if (room.gameType === 'deadofwinter') {
+    return (
+      <DeadOfWinterGame 
+        room={room} 
+        user={user} 
+        gameState={reactGameState} 
+        onLeave={handleLeaveGame} 
+      />
+    );
+  }
 
   const getGameUrl = () => {
     const playersCount = room.players?.length || 2;
@@ -118,7 +139,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return `/games/${gameId}/${fileName}?players=${playersCount}&name=${encodeURIComponent(user.name)}&userId=${user.id}&isHost=${isHost}`;
   };
 
-  // ИСПРАВЛЕНО: Когда Iframe загрузился, отправляем ему самый свежий стейт из кэша
   const handleIframeLoad = () => {
     setIsIframeLoaded(true);
     if (pendingState.current && iframeRef.current?.contentWindow) {

@@ -23,7 +23,16 @@ export const GAMES: Game[] = [
     name: 'Смехлыст',
     description: 'Битва шуток! Придумай самый смешной ответ на каверзный вопрос. Нейросеть генерирует уникальные вопросы каждую игру!',
     image: 'https://picsum.photos/seed/quiplash/400/300?blur=2',
-    minPlayers: 3, // Минимум 3, чтобы было кому голосовать
+    minPlayers: 3, 
     maxPlayers: 8,
+  },
+  // Наша новая игра на React
+  {
+    id: 'deadofwinter', 
+    name: 'Мертвые сезоны',
+    description: 'Сложная кооперативная игра на выживание с предателем. Собирайте ресурсы, убивайте зомби и не дайте колонии пасть!',
+    image: 'https://picsum.photos/seed/deadofwinter/400/300?blur=2',
+    minPlayers: 2, 
+    maxPlayers: 5,
   }
 ];
