@@ -25,13 +25,5 @@ export const GAMES: Game[] = [
     image: 'https://picsum.photos/seed/quiplash/400/300?blur=2',
     minPlayers: 3, // Минимум 3, чтобы было кому голосовать
     maxPlayers: 8,
-  },
-  {
-    id: 'fakenews', 
-    name: 'Фейковые новости',
-    description: 'Экстренный выпуск! Придумай самую правдоподобную ложь к безумным новостям, чтобы запутать друзей.',
-    image: 'https://picsum.photos/seed/fakenews/400/300?blur=2', // Потом заменишь на красивую обложку
-    minPlayers: 3,
-    maxPlayers: 10,
   }
 ];
