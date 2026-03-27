@@ -258,6 +258,11 @@ body {
 .voting-list::-webkit-scrollbar { width: 6px; }
 .voting-list::-webkit-scrollbar-thumb { background: rgba(255, 51, 102, 0.3); border-radius: 4px; }
 
+/* ФИКС 2: Добавляем скролл для окна выбора цели для спец.протоколов */
+#target-players-list { display: flex; flex-direction: column; gap: 10px; max-height: 50vh; overflow-y: auto; padding-right: 5px; }
+#target-players-list::-webkit-scrollbar { width: 6px; }
+#target-players-list::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, 0.3); border-radius: 4px; }
+
 .vote-item { 
     display: block; background: rgba(0,0,0,0.4); padding: 14px 22px; border-radius: 16px; 
     border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px; transition: 0.3s; cursor: pointer; box-sizing: border-box; 

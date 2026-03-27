@@ -326,13 +326,16 @@ function renderGame() {
 
         if (myData && myData.cards) {
             const closedCards = CARD_ORDER.filter(key => myData.cards[key] && !myData.cards[key].isOpen);
+            // ФИКС 1: Выделяем обычные характеристики (без action)
+            const closedTraits = closedCards.filter(key => key !== 'action');
             let cardsHTML = '';
             
-            if (isMyTurn && closedCards.length === 0) {
+            // ФИКС 1: Если у игрока не осталось закрытых обычных характеристик, показываем кнопку пропуска
+            if (isMyTurn && closedTraits.length === 0) {
                 cardsHTML += `
                     <div class="full-width aesthetic-player-card text-center mb-15" style="grid-column: 1 / -1; border-color: var(--success); box-shadow: 0 0 20px rgba(0,230,118,0.2);">
                         <h3 class="font-header text-success mb-10" style="font-size: 1.5rem;">ДОСЬЕ ПОЛНОСТЬЮ РАСКРЫТО</h3>
-                        <p class="text-muted mb-15">У вас больше нет скрытой информации.</p>
+                        <p class="text-muted mb-15">Все ваши характеристики открыты.${closedCards.includes('action') ? '<br>Вы можете разыграть Спец. Протокол или передать ход.' : ''}</p>
                         <button class="btn-primary" onclick="skipRevealTurn()" style="margin: 0 auto; background: rgba(0,230,118,0.1); border-color: var(--success); color: var(--success);">ПЕРЕДАТЬ ХОД</button>
                     </div>
                 `;
