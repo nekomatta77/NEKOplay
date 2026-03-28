@@ -27,63 +27,61 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
   const [selectedSurvivor, setSelectedSurvivor] = useState<SurvivorData | null>(null);
   
   const [isTrayVisible, setIsTrayVisible] = useState(false); 
-  const [isAnimatingDice, setIsAnimatingDice] = useState(false); // Состояние 2D анимации
-  const lastTimestamp = useRef(gameState?.lastRollTimestamp || 0); 
+  const [isAnimatingDice, setIsAnimatingDice] = useState(false); 
+  const [rollingPlayerName, setRollingPlayerName] = useState(''); // <--- Храним имя того, кто бросает
+  
+  const lastTimestamp = useRef(gameState?.lastDiceRequest?.timestamp || 0); 
 
   const playerState = gameState?.players?.[user.id];
   const survivorsInHand = (playerState?.survivors || []).map(id => getSurvivorData(id)).filter(Boolean);
   const handSize = (playerState?.hand || []).length;
   const actionDice = playerState?.actionDice || [];
 
-  // === ЭФФЕКТ: СЛУШАЕМ FIREBASE И ЗАПУСКАЕМ АНИМАЦИЮ ВЫПРЫГИВАНИЯ ===
+  // === ЭФФЕКТ: СЛУШАЕМ КОМАНДЫ С СЕРВЕРА ===
+  // Запускается у ВСЕХ игроков одновременно, когда кто-то нажал кнопку броска
   useEffect(() => {
-    if (gameState?.lastRollTimestamp && gameState.lastRollTimestamp > lastTimestamp.current) {
-      lastTimestamp.current = gameState.lastRollTimestamp;
+    if (gameState?.lastDiceRequest && gameState.lastDiceRequest.timestamp > lastTimestamp.current) {
+      lastTimestamp.current = gameState.lastDiceRequest.timestamp;
       
-      // Запускаем красивую анимацию 2D кубиков у всех игроков
-      setIsAnimatingDice(true);
-      // Выключаем класс анимации через секунду, чтобы они просто лежали
-      setTimeout(() => setIsAnimatingDice(false), 1000);
+      const { notation, results, playerId } = gameState.lastDiceRequest;
+      
+      // Находим имя игрока, который бросает, и передаем его в стейт
+      const pName = room.players?.find(p => p.id === playerId)?.name || 'Неизвестный выживший';
+      setRollingPlayerName(pName);
+      
+      setIsAnimatingDice(false);
+      setIsTrayVisible(true); // Открываем поднос у всех
+      
+      // Ждем, пока поднос появится, и запускаем 3D анимацию с жестко заданными результатами (results)
+      setTimeout(() => {
+        if ((window as any).roll3DSync) {
+          (window as any).roll3DSync(notation, results);
+        }
+      }, 500);
     }
-  }, [gameState?.lastRollTimestamp]);
+  }, [gameState?.lastDiceRequest, room.players]);
 
-  // === КОГДА 3D КУБИКИ ОСТАНОВИЛИСЬ (ОТРАБАТЫВАЕТ ТОЛЬКО У ТОГО, КТО БРОСИЛ) ===
-  const handleRollComplete = (results: any) => {
-    // 1. Читаем точные значения, которые выпали в физике
-    let finalNumbers: number[] = [];
-    if (results.length > 0 && results[0].rolls) {
-       finalNumbers = results[0].rolls.map((r: any) => r.value);
-    } else {
-       finalNumbers = results.map((r: any) => r.value);
-    }
-    
-    // Сортируем от большего к меньшему для удобства игрока
-    finalNumbers.sort((a, b) => b - a);
-
-    // 2. Даем посмотреть на 3D результат 1.5 секунды, закрываем поднос и шлем в Firebase
+  // === ЭФФЕКТ ЗАВЕРШЕНИЯ БРОСКА ===
+  // Вызывается у всех, когда 3D кубики остановились
+  const handleRollComplete = () => {
     setTimeout(() => {
-      setIsTrayVisible(false);
-      GameActions.saveDiceRoll(room.id, user.id, finalNumbers);
-    }, 1500);
+      setIsTrayVisible(false); // Прячем поднос
+      setIsAnimatingDice(true); // Запускаем 2D выпрыгивание
+      
+      setTimeout(() => setIsAnimatingDice(false), 1000);
+    }, 1500); // Даем 1.5 секунды посмотреть на результат
   };
 
-  // === КЛИК ПО КНОПКЕ "БРОСИТЬ КУБИКИ" ===
-  const handleRollClick = () => {
-    // Открываем свой персональный поднос
-    setIsTrayVisible(true);
-    // Ждем 0.5с (чтобы поднос выехал из темноты) и кидаем 3D-кубики
-    setTimeout(() => {
-      if ((window as any).roll3D) {
-        (window as any).roll3D('3d6');
-      }
-    }, 500);
+  // КНОПКА: Отправляет команду на сервер (НИКАКОЙ ЛОКАЛЬНОЙ АНИМАЦИИ ЗДЕСЬ)
+  const handleRollRequest = async (notation: string) => {
+    await GameActions.requestDiceRoll(room.id, user.id, notation);
   };
 
   return (
     <div className="h-screen bg-slate-950 text-slate-300 font-sans flex flex-col relative overflow-hidden selection:bg-red-900/40">
       
-      {/* === ПОДНОС ДЛЯ КУБИКОВ ВСЕГДА В ДОМЕ === */}
-      <DiceTray isVisible={isTrayVisible} />
+      {/* === ПОДНОС ДЛЯ КУБИКОВ (Передаем имя игрока) === */}
+      <DiceTray isVisible={isTrayVisible} playerName={rollingPlayerName} />
       <DiceRoller onRollComplete={handleRollComplete} />
 
       <div className="absolute inset-0 bg-[url('https://placehold.co/1920x1080/020617/0f172a?text=DEAD+OF+WINTER')] bg-cover bg-center opacity-10 pointer-events-none"></div>
@@ -169,7 +167,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
           <div className="flex lg:flex-col items-center lg:items-start gap-2.5 lg:gap-3 w-full lg:w-auto">
             
             <button 
-              onClick={handleRollClick} // Вызываем новую функцию старта локального броска
+              onClick={() => handleRollRequest('3d6')} 
               className="w-full lg:w-auto text-xs sm:text-sm font-bold text-white bg-red-800 hover:bg-red-700 px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-md uppercase tracking-widest transition active:scale-95 cursor-pointer z-50 pointer-events-auto shadow-lg border border-red-600 mb-2 lg:mb-0"
             >
               Бросить кубики
@@ -177,16 +175,21 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
 
             <div className="flex gap-2 w-full lg:w-auto justify-end lg:justify-start">
               {actionDice.length > 0 ? (
-                actionDice.map((dice, i) => (
-                  <div 
-                    key={i} 
-                    className={`w-10 h-10 sm:w-12 sm:h-12 bg-slate-950 border-2 border-slate-700 rounded-xl flex items-center justify-center text-lg sm:text-2xl font-black text-white shadow-inner select-none ${isAnimatingDice ? 'animate-jump-in' : ''}`}
-                    // Если идет анимация, мы прячем их (opacity: 0), пока они не "выпрыгнут" один за другим с задержкой (i * 150)
-                    style={isAnimatingDice ? { animationDelay: `${i * 150}ms`, opacity: 0 } : {}}
-                  >
-                    {dice}
-                  </div>
-                ))
+                actionDice.map((dice, i) => {
+                  // Прячем 2D кубики, если поднос открыт и бросает именно этот игрок
+                  const isMyRoll = gameState?.lastDiceRequest?.playerId === user.id;
+                  const isHidden = isTrayVisible && isMyRoll;
+                  
+                  return (
+                    <div 
+                      key={i} 
+                      className={`w-10 h-10 sm:w-12 sm:h-12 bg-slate-950 border-2 border-slate-700 rounded-xl flex items-center justify-center text-lg sm:text-2xl font-black text-white shadow-inner select-none transition-all duration-300 ${isHidden ? 'opacity-0 scale-50' : 'opacity-100'} ${isAnimatingDice && !isHidden && isMyRoll ? 'animate-jump-in' : ''}`}
+                      style={isAnimatingDice ? { animationDelay: `${i * 150}ms` } : {}}
+                    >
+                      {dice}
+                    </div>
+                  );
+                })
               ) : (
                 <div className="text-xs sm:text-sm text-slate-600 italic py-1 sm:py-2">Не брошены</div>
               )}
@@ -286,7 +289,6 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
       )}
 
-      {/* === ДОБАВЛЕНА АНИМАЦИЯ jumpIn === */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -295,8 +297,6 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes zoomIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        
-        /* КРАСИВАЯ АНИМАЦИЯ: Кубики выпрыгивают в интерфейс */
         @keyframes jumpIn { 
           0% { opacity: 0; transform: scale(0.5) translateY(20px); } 
           50% { opacity: 1; transform: scale(1.2) translateY(-10px); } 
@@ -305,7 +305,6 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         
         .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
         .animate-zoom-in { animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        /* forwards означает, что после анимации кубик останется видимым (opacity: 1) */
         .animate-jump-in { animation: jumpIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
     </div>

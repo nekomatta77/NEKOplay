@@ -36,8 +36,13 @@ export interface DeadOfWinterState {
   mainObjective: string;
   currentCrisis: string | null;
   
-  // === ДОБАВЛЕНО ДЛЯ АНИМАЦИИ КУБИКОВ ===
-  lastRollTimestamp?: number; 
+  // === ЕДИНЫЙ ЦЕНТР СИНХРОНИЗАЦИИ БРОСКОВ ===
+  lastDiceRequest?: {
+    playerId: string;
+    notation: string;
+    results: number[];
+    timestamp: number;
+  };
 }
 
 export const getInitialGameState = (playerIds: string[]): DeadOfWinterState => {

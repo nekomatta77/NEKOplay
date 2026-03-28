@@ -14,6 +14,10 @@ const shuffleArray = <T>(array: T[]): T[] => {
   return newArray;
 };
 
+const getRandomInt = (min: number, max: number) => {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+};
+
 export const GameActions = {
   
   startGame: async (room: Room) => {
@@ -43,14 +47,30 @@ export const GameActions = {
     await update(ref(db, `rooms/${room.id}/gameState`), initialState);
   },
 
-  // === НОВАЯ ФУНКЦИЯ: Сохраняем физические результаты 3D броска в базу ===
-  saveDiceRoll: async (roomId: string, playerId: string, results: number[]) => {
+  // === МАГИЯ СИНХРОНИЗАЦИИ ===
+  requestDiceRoll: async (roomId: string, playerId: string, notation: string) => {
+    // 1. Придумываем цифры заранее
+    const results: number[] = [];
+    if (notation === '3d6') {
+      results.push(getRandomInt(1, 6), getRandomInt(1, 6), getRandomInt(1, 6));
+    } else {
+      results.push(1); 
+    }
+    // Сортируем для красоты
+    results.sort((a, b) => b - a);
+
     const updates: any = {};
     
-    // 1. Выдаем кубики игроку в инвентарь
+    // 2. Даем команду всем 3D-движкам в комнате: "БРОСАЙТЕ!"
+    updates[`rooms/${roomId}/gameState/lastDiceRequest`] = {
+      playerId,
+      notation,
+      results,
+      timestamp: Date.now()
+    };
+    
+    // 3. Выдаем кубики в 2D-руку игроку (они появятся, когда 3D-поднос закроется)
     updates[`rooms/${roomId}/gameState/players/${playerId}/actionDice`] = results;
-    // 2. Обновляем таймстамп, чтобы у всех сработала 2D-анимация выпрыгивания
-    updates[`rooms/${roomId}/gameState/lastRollTimestamp`] = Date.now();
 
     await update(ref(db), updates);
   }
