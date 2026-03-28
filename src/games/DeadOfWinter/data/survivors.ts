@@ -29,10 +29,10 @@ const getImageUrl = (id: string, placeholderText: string) => {
   return `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${GITHUB_REPO}/${GITHUB_BRANCH}/${id}${IMAGE_EXTENSION}`;
 };
 
-// База персонажей (временно оставлены только те 11, для которых есть картинки)
+// База персонажей (оставлены только 12 готовых)
 export const SURVIVORS: Record<string, SurvivorData> = {
-  'ArthurThurston': {
-    id: 'ArthurThurston',
+  'ArturThurston': { // Внимание: ID изменен под точное название твоего файла ArturThurston.png
+    id: 'ArturThurston',
     name: 'Артур Терстон',
     profession: 'Директор школы',
     influence: 73,
@@ -40,7 +40,7 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     search: 3,
     abilityTitle: 'Авторитет',
     abilityDesc: 'Один раз за раунд вы можете добавить 1 кубик действия в свой пул кубиков.',
-    image: getImageUrl('ArthurThurston', 'ARTHUR THURSTON')
+    image: getImageUrl('ArturThurston', 'ARTHUR THURSTON')
   },
   'Sparky': {
     id: 'Sparky',
@@ -52,17 +52,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityTitle: 'Хороший мальчик',
     abilityDesc: 'Спарки не может экипировать оружие. При броске кубика повреждений, если выпадает "Укус", считайте это "Раной". Спарки не передает укусы.',
     image: getImageUrl('Sparky', 'SPARKY')
-  },
-  'LorettaClay': {
-    id: 'LorettaClay',
-    name: 'Лоретта Клей',
-    profession: 'Повариха',
-    influence: 51,
-    attack: 4,
-    search: 3,
-    abilityTitle: 'Сытный обед',
-    abilityDesc: 'Один раз за раунд, если Лоретта в Колонии, вы можете добавить 1 жетон еды на склад Колонии.',
-    image: getImageUrl('LorettaClay', 'LORETTA CLAY')
   },
   'MikeCho': {
     id: 'MikeCho',
@@ -119,6 +108,17 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд Софи может посмотреть верхнюю карту колоды любой локации.',
     image: getImageUrl('SophieRobinson', 'SOPHIE ROBINSON')
   },
+  'MariaLopez': {
+    id: 'MariaLopez',
+    name: 'Мария Лопес',
+    profession: 'Учительница',
+    influence: 62,
+    attack: 4,
+    search: 2,
+    abilityTitle: 'Знание школы',
+    abilityDesc: 'Один раз за раунд, потратив кубик (1+), Мария может убить 1 зомби в Школе без кубика повреждений.',
+    image: getImageUrl('MariaLopez', 'MARIA LOPEZ')
+  },
   'ThomasHeart': {
     id: 'ThomasHeart',
     name: 'Томас Харт',
@@ -129,6 +129,17 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityTitle: 'Снайпер',
     abilityDesc: 'Один раз за раунд, потратив кубик (5+), Томас может убить 2 зомби в Колонии без кубика повреждений.',
     image: getImageUrl('ThomasHeart', 'THOMAS HEART')
+  },
+  'AndrewEvans': {
+    id: 'AndrewEvans',
+    name: 'Эндрю Эванс',
+    profession: 'Фермер',
+    influence: 66,
+    attack: 3,
+    search: 3,
+    abilityTitle: 'Запасливый',
+    abilityDesc: 'При поиске в Продуктовом магазине Эндрю может посмотреть и оставить себе на 1 карту больше.',
+    image: getImageUrl('AndrewEvans', 'ANDREW EVANS')
   },
   'ForestPlum': {
     id: 'ForestPlum',
@@ -141,6 +152,33 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за игру вы можете убить Фореста, чтобы поднять мораль на 1. Мораль не падает за его смерть.',
     image: getImageUrl('ForestPlum', 'FOREST PLUM')
   },
+  'JamesMeyers': {
+    id: 'JamesMeyers',
+    name: 'Джеймс Майерс',
+    profession: 'Психиатр',
+    influence: 71,
+    attack: 4,
+    search: 3,
+    abilityTitle: 'Психоанализ',
+    abilityDesc: 'Один раз за игру Джеймс может тайно посмотреть секретную цель одного из игроков.',
+    image: getImageUrl('JamesMeyers', 'JAMES MEYERS')
+  }
+
+  // === ПЕРСОНАЖИ В РАЗРАБОТКЕ (КАРТИНКИ НЕ ГОТОВЫ) ===
+  // Чтобы вернуть персонажа в игру, просто удали двойные слеши (//) и многострочные комментарии (/* */)
+
+  /*
+  'LorettaClay': {
+    id: 'LorettaClay',
+    name: 'Лоретта Клей',
+    profession: 'Повариха',
+    influence: 51,
+    attack: 4,
+    search: 3,
+    abilityTitle: 'Сытный обед',
+    abilityDesc: 'Один раз за раунд, если Лоретта в Колонии, вы можете добавить 1 жетон еды на склад Колонии.',
+    image: getImageUrl('LorettaClay', 'LORETTA CLAY')
+  },
   'BevRussell': {
     id: 'BevRussell',
     name: 'Бев Рассел',
@@ -152,37 +190,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд Бев может убить 1 зомби в своей локации без броска кубика повреждений.',
     image: getImageUrl('BevRussell', 'BEV RUSSELL')
   },
-
-  // === ПЕРСОНАЖИ В РАЗРАБОТКЕ (КАРТИНКИ НЕ ГОТОВЫ) ===
-  // Чтобы вернуть персонажа в игру, просто удали двойные слеши (//) перед его блоком кода
-
-  /*
-  'MariaLopez': {
-    id: 'MariaLopez',
-    name: 'Мария Лопес',
-    profession: 'Учительница',
-    influence: 62,
-    attack: 4,
-    search: 2,
-    abilityTitle: 'Знание школы',
-    abilityDesc: 'Один раз за раунд, потратив кубик (1+), Мария может убить 1 зомби в Школе без кубика повреждений.',
-    image: getImageUrl('MariaLopez', 'MARIA LOPEZ')
-  },
-  */
-  /*
-  'AndrewEvans': {
-    id: 'AndrewEvans',
-    name: 'Эндрю Эванс',
-    profession: 'Фермер',
-    influence: 66,
-    attack: 3,
-    search: 3,
-    abilityTitle: 'Запасливый',
-    abilityDesc: 'При поиске в Продуктовом магазине Эндрю может посмотреть и оставить себе на 1 карту больше.',
-    image: getImageUrl('AndrewEvans', 'ANDREW EVANS')
-  },
-  */
-  /*
   'AnnaleighChan': {
     id: 'AnnaleighChan',
     name: 'Аннали Чан',
@@ -194,8 +201,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд в Колонии вы можете посмотреть 1 случайную карту из руки другого игрока.',
     image: getImageUrl('AnnaleighChan', 'ANNALEIGH CHAN')
   },
-  */
-  /*
   'JohnPrice': {
     id: 'JohnPrice',
     name: 'Джон Прайс',
@@ -207,8 +212,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Джон обладает способностями всех остальных выживших, находящихся в одной с ним локации.',
     image: getImageUrl('JohnPrice', 'JOHN PRICE')
   },
-  */
-  /*
   'BrandonCameron': {
     id: 'BrandonCameron',
     name: 'Брэндон Кэмерон',
@@ -220,8 +223,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд в Колонии Брэндон может сбросить 3 карты из мусора, потратив кубик действия (любой).',
     image: getImageUrl('BrandonCameron', 'BRANDON CAMERON')
   },
-  */
-  /*
   'DavidGarcia': {
     id: 'DavidGarcia',
     name: 'Дэвид Гарсия',
@@ -233,8 +234,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд при поиске в любой локации Дэвид может посмотреть и оставить себе на 1 карту больше.',
     image: getImageUrl('DavidGarcia', 'DAVID GARCIA')
   },
-  */
-  /*
   'HarmanBrooks': {
     id: 'HarmanBrooks',
     name: 'Харман Брукс',
@@ -246,8 +245,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Если Харман должен получить обморожение, он получает обычную рану вместо этого.',
     image: getImageUrl('HarmanBrooks', 'HARMAN BROOKS')
   },
-  */
-  /*
   'AshleyRoss': {
     id: 'AshleyRoss',
     name: 'Эшли Росс',
@@ -259,8 +256,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд Эшли может поставить 1 баррикаду в своей локации без траты кубика действия.',
     image: getImageUrl('AshleyRoss', 'ASHLEY ROSS')
   },
-  */
-  /*
   'BrianBaker': {
     id: 'BrianBaker',
     name: 'Брайан Л.Б. Бейкер',
@@ -272,8 +267,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'При голосовании за изгнание голос Брайана считается за два.',
     image: getImageUrl('BrianBaker', 'BRIAN BAKER')
   },
-  */
-  /*
   'BuddyDavis': {
     id: 'BuddyDavis',
     name: 'Бадди Дэвис',
@@ -285,8 +278,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Бадди может перемещаться один дополнительный раз за раунд без броска кубика повреждений.',
     image: getImageUrl('BuddyDavis', 'BUDDY DAVIS')
   },
-  */
-  /*
   'DanielSmith': {
     id: 'DanielSmith',
     name: 'Дэниел Смит',
@@ -298,8 +289,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'При атаке Дэниел убивает 1 дополнительного зомби в той же локации.',
     image: getImageUrl('DanielSmith', 'DANIEL SMITH')
   },
-  */
-  /*
   'EdwardWhite': {
     id: 'EdwardWhite',
     name: 'Эдвард Уайт',
@@ -311,8 +300,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд Эдвард может сбросить 2 любые карты, чтобы вылечить 1 рану у выжившего в своей локации.',
     image: getImageUrl('EdwardWhite', 'EDWARD WHITE')
   },
-  */
-  /*
   'GabrielDiaz': {
     id: 'GabrielDiaz',
     name: 'Габриэль Диас',
@@ -324,8 +311,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'При броске кубика повреждений Габриэль перебрасывает пустую грань (вы можете выбрать новый результат).',
     image: getImageUrl('GabrielDiaz', 'GABRIEL DIAZ')
   },
-  */
-  /*
   'GwenMellon': {
     id: 'GwenMellon',
     name: 'Гвен Меллон',
@@ -337,8 +322,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'При поиске Гвен всегда находит как минимум 1 карту еды (даже если колода локации не содержит еды).',
     image: getImageUrl('GwenMellon', 'GWEN MELLON')
   },
-  */
-  /*
   'HopeHarper': {
     id: 'HopeHarper',
     name: 'Хоуп Харпер',
@@ -350,21 +333,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд Хоуп может переместить до 2 зомби из Колонии в свою текущую локацию (не Колонию).',
     image: getImageUrl('HopeHarper', 'HOPE HARPER')
   },
-  */
-  /*
-  'JamesMeyers': {
-    id: 'JamesMeyers',
-    name: 'Джеймс Майерс',
-    profession: 'Психиатр',
-    influence: 71,
-    attack: 4,
-    search: 3,
-    abilityTitle: 'Психоанализ',
-    abilityDesc: 'Один раз за игру Джеймс может тайно посмотреть секретную цель одного из игроков.',
-    image: getImageUrl('JamesMeyers', 'JAMES MEYERS')
-  },
-  */
-  /*
   'JanetTaylor': {
     id: 'JanetTaylor',
     name: 'Джанет Тейлор',
@@ -376,8 +344,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Если Джанет в Больнице, она может вылечить 1 рану любому выжившему в Колонии.',
     image: getImageUrl('JanetTaylor', 'JANET TAYLOR')
   },
-  */
-  /*
   'JennyClark': {
     id: 'JennyClark',
     name: 'Дженни Кларк',
@@ -389,8 +355,6 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     abilityDesc: 'Один раз за раунд при поиске Дженни может посмотреть на 2 карты больше, чем обычно.',
     image: getImageUrl('JennyClark', 'JENNY CLARK')
   },
-  */
-  /*
   'KodiakColby': {
     id: 'KodiakColby',
     name: 'Кодиак Колби',
