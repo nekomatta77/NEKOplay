@@ -46,7 +46,7 @@ export const GameActions = {
       // Сортируем полученных выживших так, чтобы персонаж с наибольшим влиянием был первым в массиве
       playerSurvivors.sort((a, b) => b.influence - a.influence);
       
-      // Нам в базу данных нужны только их ID (например, 'sparky', 'olivia_brown')
+      // Нам в базу данных нужны только их ID (например, 'Sparky', 'OliviaBrown')
       const survivorIds = playerSurvivors.map(s => s.id);
 
       // Записываем этих персонажей в листинг игрока
