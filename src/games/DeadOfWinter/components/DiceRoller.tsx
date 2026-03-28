@@ -17,7 +17,8 @@ export default function DiceRoller({ onRollComplete }: Props) {
 
     diceBoxRef.current = new DiceBox({
       container: "#dice-box-container", 
-      assetPath: "/dice-3d/", // Путь к папке, которую мы создали (или "/assets/")
+      // === ИСПРАВЛЕНИЕ: Возвращаем путь на /assets/, так как файлы у тебя лежат там ===
+      assetPath: "/assets/", 
       theme: "default",
       themeColor: "#991b1b",
       scale: 8,              
@@ -37,10 +38,32 @@ export default function DiceRoller({ onRollComplete }: Props) {
 
     (window as any).roll3D = (notation: string) => {
       if (diceBoxRef.current) {
-        diceBoxRef.current.clear(); // <--- ГАРАНТИРОВАННАЯ ОЧИСТКА СТАРЫХ КУБИКОВ ПЕРЕД БРОСКОМ
+        diceBoxRef.current.clear(); // Очищаем старые кубики
         diceBoxRef.current.roll(notation);
       }
     };
+
+    (window as any).roll3DSync = (notation: string, results: number[]) => {
+      if (!diceBoxRef.current || !isTrayVisible()) return;
+      
+      console.log(`🎲 Синхро-бросок ${notation}: показываем ${results.join(', ')}`);
+      
+      diceBoxRef.current.clear(); // Очищаем старые кубики перед новым броском
+      
+      const formattedRolls = results.map(value => ({ value }));
+      
+      diceBoxRef.current.roll(notation, {
+        forcedResults: [{
+          groupId: 0,
+          rolls: formattedRolls
+        }]
+      });
+    };
+
+    const isTrayVisible = () => {
+        const tray = document.getElementById('dice-box-container');
+        return tray && tray.offsetParent !== null; 
+    }
 
   }, [onRollComplete]);
 
