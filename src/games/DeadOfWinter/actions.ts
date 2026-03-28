@@ -14,11 +14,6 @@ const shuffleArray = <T>(array: T[]): T[] => {
   return newArray;
 };
 
-// Функция для случайного числа от min до max
-const getRandomInt = (min: number, max: number) => {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
-
 export const GameActions = {
   
   startGame: async (room: Room) => {
@@ -48,31 +43,15 @@ export const GameActions = {
     await update(ref(db, `rooms/${room.id}/gameState`), initialState);
   },
 
-  // === НОВАЯ МЕХАНИКА: ЗАПРОС СИНХРОНИЗИРОВАННОГО БРОСКА ===
-  requestDiceRoll: async (roomId: string, playerId: string, notation: string) => {
+  // === НОВАЯ ФУНКЦИЯ: Сохраняем физические результаты 3D броска в базу ===
+  saveDiceRoll: async (roomId: string, playerId: string, results: number[]) => {
+    const updates: any = {};
     
-    // 1. Тайком генерируем результаты здесь (на стороне клиента, который нажал кнопку)
-    const results: number[] = [];
-    
-    // Пока реализуем только стандартный 3d6 (три шестигранных кубика)
-    // Позже мы добавим парсер для notation (например d12 для укусов)
-    if (notation === '3d6') {
-      results.push(getRandomInt(1, 6));
-      results.push(getRandomInt(1, 6));
-      results.push(getRandomInt(1, 6));
-    } else {
-      console.warn(`🎲 Мы пока не реализовали математику для броска ${notation}`);
-      results.push(1); // Стаб
-    }
+    // 1. Выдаем кубики игроку в инвентарь
+    updates[`rooms/${roomId}/gameState/players/${playerId}/actionDice`] = results;
+    // 2. Обновляем таймстамп, чтобы у всех сработала 2D-анимация выпрыгивания
+    updates[`rooms/${roomId}/gameState/lastRollTimestamp`] = Date.now();
 
-    console.log(`🎲 Firebase Экшен: генерирую ${notation} -> [${results.join(', ')}] и отправляю в базу.`);
-
-    // 2. Пишем в Firebase в специальное поле lastDiceRequest
-    await update(ref(db, `rooms/${roomId}/gameState/lastDiceRequest`), {
-      playerId,
-      notation,
-      results,
-      timestamp: Date.now() // Уникальный ID броска
-    });
+    await update(ref(db), updates);
   }
 };

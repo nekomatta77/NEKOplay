@@ -1,18 +1,18 @@
 // src/games/DeadOfWinter/state.ts
 
 export interface PlayerState {
-  survivors: string[]; // ID выживших под контролем игрока
-  hand: string[];      // ID карт предметов в руке
-  actionDice: number[]; // Значения брошенных кубиков действий
+  survivors: string[]; 
+  hand: string[];      
+  actionDice: number[]; 
   secretObjective: string | null;
   isTraitor: boolean;
 }
 
 export interface LocationState {
-  survivors: string[]; // Кто находится здесь
-  zombies: number;     // Количество зомби
-  barricades: number;  // Количество баррикад
-  noise: number;       // Жетоны шума (кроме колонии)
+  survivors: string[]; 
+  zombies: number;     
+  barricades: number;  
+  noise: number;       
 }
 
 export interface DeadOfWinterState {
@@ -36,16 +36,10 @@ export interface DeadOfWinterState {
   mainObjective: string;
   currentCrisis: string | null;
   
-  // === ДОБАВЛЕНО ДЛЯ СИНХРОНИЗАЦИИ КУБИКОВ ===
-  lastDiceRequest?: {
-    playerId: string;
-    notation: string;
-    results: number[];
-    timestamp: number;
-  };
+  // === ДОБАВЛЕНО ДЛЯ АНИМАЦИИ КУБИКОВ ===
+  lastRollTimestamp?: number; 
 }
 
-// Функция для генерации начального состояния при старте игры
 export const getInitialGameState = (playerIds: string[]): DeadOfWinterState => {
   const initialPlayersState: Record<string, PlayerState> = {};
   
@@ -63,7 +57,7 @@ export const getInitialGameState = (playerIds: string[]): DeadOfWinterState => {
     status: 'playing',
     round: 1,
     phase: 'playerTurns',
-    activePlayerId: playerIds[0], // Первый игрок начинает
+    activePlayerId: playerIds[0], 
     morale: 5,
     food: 0,
     waste: 0,
