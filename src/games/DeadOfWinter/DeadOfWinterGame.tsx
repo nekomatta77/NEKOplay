@@ -1,3 +1,4 @@
+// src/games/DeadOfWinter/DeadOfWinterGame.tsx
 import React from 'react';
 import { Room, User } from '../../types';
 import { DeadOfWinterState } from './state';
@@ -13,25 +14,25 @@ interface Props {
 }
 
 export default function DeadOfWinterGame({ room, user, gameState, onLeave }: Props) {
-  const isHost = room.players?.find(p => p.id === user.id)?.isHost || false;
   const isPlaying = gameState?.status === 'playing';
 
   const handleStartGame = () => {
     GameActions.startGame(room);
   };
 
+  // Если игра еще не началась, показываем лобби
   if (!isPlaying || !gameState) {
     return (
       <LobbyScreen 
         room={room} 
         user={user} 
-        isHost={isHost} 
-        onStartGame={handleStartGame} 
+        onStart={handleStartGame} // <-- Исправили название на onStart!
         onLeave={onLeave} 
       />
     );
   }
 
+  // Если статус 'playing', показываем игровой стол
   return (
     <BoardScreen 
       gameState={gameState}

@@ -12,7 +12,7 @@ interface Props {
 
 export default function LobbyScreen({ user, room, onLeave, onStart }: Props) {
   const players = room.players || [];
-  // ИСПРАВЛЕНИЕ 1: Используем isHost из массива игроков, как это было изначально
+  // Проверяем, является ли текущий пользователь хостом
   const isHost = players.find(p => p.id === user.id)?.isHost || false;
 
   return (
@@ -55,16 +55,13 @@ export default function LobbyScreen({ user, room, onLeave, onStart }: Props) {
             ) : (
               players.map((player, index) => (
                 <div key={player.id} className="bg-slate-800 rounded-2xl p-4 border border-slate-700 flex items-center gap-4 group transition-all hover:border-slate-500">
-                  {/* ИСПРАВЛЕНИЕ 2: player.avatar вместо player.photoUrl */}
                   <img src={player.avatar} alt={player.name} className="w-12 h-12 rounded-full border-2 border-slate-600 group-hover:border-slate-400 transition" />
                   <div className="flex flex-col flex-1 truncate">
                     <span className="text-white font-bold text-sm sm:text-base group-hover:text-red-400 transition truncate">{player.name}</span>
                     <span className="text-xs text-slate-400 font-mono mt-0.5 truncate">
-                      {/* ИСПРАВЛЕНИЕ 3: Используем player.isHost */}
                       {player.isHost ? 'Организатор' : `Игрок #${index + 1}`}
                     </span>
                   </div>
-                  {/* ИСПРАВЛЕНИЕ 4: Используем player.isHost */}
                   {player.isHost && (
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" title="Хост"></div>
                   )}
@@ -122,10 +119,9 @@ export default function LobbyScreen({ user, room, onLeave, onStart }: Props) {
         {isHost && (
           <button 
             onClick={onStart} 
-            className="w-full sm:w-auto px-7 py-2.5 bg-red-800 hover:bg-red-700 disabled:bg-slate-800 disabled:opacity-50 disabled:border-slate-700 disabled:text-slate-600 rounded-xl text-sm font-bold border border-red-900 transition active:scale-95 shadow-[0_0_15px_rgba(185,28,28,0.3)] disabled:shadow-none"
-            disabled={players.length < 2} // Запрещаем старт, если игроков < 2
+            className="w-full sm:w-auto px-7 py-2.5 bg-red-800 hover:bg-red-700 rounded-xl text-sm font-bold border border-red-900 transition active:scale-95 shadow-[0_0_15px_rgba(185,28,28,0.3)]"
           >
-            {players.length < 2 ? 'Ожидание игроков...' : 'СТАРТ ПАРТИИ'}
+            СТАРТ ПАРТИИ
           </button>
         )}
       </footer>
