@@ -1,8 +1,8 @@
 // src/games/DeadOfWinter/components/BoardScreen.tsx
-import React, { useState } from 'react'; // ДОБАВЛЕН useState
+import React, { useState } from 'react';
 import { DeadOfWinterState, LocationState } from '../state';
 import { User, Room } from '../../../types';
-import { getSurvivorData, SurvivorData } from '../data/survivors'; // ДОБАВЛЕН SurvivorData
+import { getSurvivorData, SurvivorData } from '../data/survivors';
 import SurvivorCard from './SurvivorCard';
 import { MoraleIcon, FoodIcon, WasteIcon, ZombieIcon, SurvivorIcon, ObjectiveIcon, CrisisIcon, AttackIcon, SearchIcon, InfluenceIcon } from './Icons';
 
@@ -21,7 +21,6 @@ const LocationBadge = ({ icon, value }: { icon: React.ReactNode, value: number }
 );
 
 export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
-  // СОСТОЯНИЕ: хранит персонажа, которого мы открыли на весь экран
   const [selectedSurvivor, setSelectedSurvivor] = useState<SurvivorData | null>(null);
 
   const playerState = gameState?.players?.[user.id];
@@ -33,7 +32,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
     <div className="h-screen bg-slate-950 text-slate-300 font-sans flex flex-col relative overflow-hidden selection:bg-red-900/40">
       <div className="absolute inset-0 bg-[url('https://placehold.co/1920x1080/020617/0f172a?text=DEAD+OF+WINTER')] bg-cover bg-center opacity-10 pointer-events-none"></div>
 
-      {/* === ВЕРХНЯЯ ПАНЕЛЬ === */}
+      {/* ВЕРХНЯЯ ПАНЕЛЬ */}
       <header className="relative z-10 flex flex-wrap sm:flex-nowrap justify-between items-center p-2.5 sm:p-3 gap-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-xl shrink-0">
         <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-4 sm:gap-5">
           <div className="flex flex-col">
@@ -45,15 +44,18 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
             </span>
           </div>
           <div className="flex gap-1.5 sm:gap-2.5 items-center">
-            <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-red-900/50">
+            {/* ИСПРАВЛЕНИЕ ЗДЕСЬ: Перенесли title="Мораль" на родительский div */}
+            <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-red-900/50" title="Мораль">
               <MoraleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
               <span className="font-black text-white text-sm sm:text-lg leading-none">{gameState?.morale || 0}</span>
             </div>
-            <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-emerald-900/50">
+            {/* ИСПРАВЛЕНИЕ ЗДЕСЬ: Перенесли title="Еда на складе" на родительский div */}
+            <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-emerald-900/50" title="Еда на складе">
               <FoodIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
               <span className="font-black text-white text-sm sm:text-lg leading-none">{gameState?.food || 0}</span>
             </div>
-            <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-slate-700/50">
+            {/* ИСПРАВЛЕНИЕ ЗДЕСЬ: Перенесли title="Мусор" на родительский div */}
+            <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-slate-700/50" title="Мусор">
               <WasteIcon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
               <span className="font-black text-white text-sm sm:text-lg leading-none">{gameState?.waste || 0}</span>
             </div>
@@ -64,7 +66,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </button>
       </header>
 
-      {/* === ЦЕНТРАЛЬНАЯ ЧАСТЬ === */}
+      {/* ЦЕНТРАЛЬНАЯ ЧАСТЬ */}
       <main className="relative z-10 flex-1 p-2 sm:p-4 flex flex-col lg:flex-row gap-3 sm:gap-4 overflow-hidden">
         <div className="flex-1 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800 p-3 sm:p-5 overflow-y-auto custom-scrollbar shadow-inner">
           <h3 className="text-slate-500 font-bold text-[10px] sm:text-xs tracking-widest uppercase mb-3 pl-1">Локации города</h3>
@@ -108,7 +110,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
       </main>
 
-      {/* === НИЖНЯЯ ПАНЕЛЬ === */}
+      {/* НИЖНЯЯ ПАНЕЛЬ */}
       <footer className="relative z-20 p-2.5 sm:p-4 bg-slate-900 border-t border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.4)] shrink-0 flex flex-col lg:flex-row gap-4 lg:gap-6 h-auto">
         <div className="flex flex-row lg:flex-col justify-between items-center lg:items-stretch lg:justify-center lg:w-48 lg:border-r border-b lg:border-b-0 border-slate-800 pb-3 lg:pb-0 lg:pr-6 gap-3 shrink-0">
           <div className="flex lg:flex-col items-center lg:items-start gap-2.5 lg:gap-3">
@@ -133,7 +135,6 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
 
         <div className="flex-1 flex flex-col min-w-0">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 pl-1 hidden lg:block">Ваша группа выживших</h3>
-          {/* ИСПРАВЛЕНИЕ: Увеличен gap с gap-6 до gap-8 sm:gap-12 */}
           <div className="flex gap-8 sm:gap-12 overflow-x-auto overflow-y-hidden pt-4 pb-6 px-4 custom-scrollbar snap-x snap-mandatory h-[240px] sm:h-[280px] lg:h-[300px]">
             {survivorsInHand.length === 0 ? (
               <div className="border-2 border-dashed border-slate-800 rounded-2xl h-full w-full flex items-center justify-center text-slate-700 text-sm font-medium">
@@ -142,7 +143,6 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
             ) : (
               survivorsInHand.map(survivor => (
                 <div key={survivor.id} className="snap-center h-full shrink-0">
-                  {/* ПЕРЕДАЕМ onClick для открытия модалки */}
                   <SurvivorCard survivor={survivor} onClick={() => setSelectedSurvivor(survivor)} />
                 </div>
               ))
@@ -151,18 +151,16 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
       </footer>
 
-      {/* === ВСПЛЫВАЮЩЕЕ ОКНО (МОДАЛКА) ПЕРСОНАЖА === */}
+      {/* ВСПЛЫВАЮЩЕЕ ОКНО ПЕРСОНАЖА */}
       {selectedSurvivor && (
         <div 
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in"
-          onClick={() => setSelectedSurvivor(null)} // Закрытие по клику вне окна
+          onClick={() => setSelectedSurvivor(null)} 
         >
-          {/* Контейнер окна */}
           <div 
             className="relative max-w-3xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col sm:flex-row animate-zoom-in"
-            onClick={(e) => e.stopPropagation()} // Блокируем закрытие при клике внутри окна
+            onClick={(e) => e.stopPropagation()} 
           >
-            {/* Кнопка ЗАКРЫТЬ (Крестик) */}
             <button 
               onClick={() => setSelectedSurvivor(null)}
               className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 p-2 bg-black/60 hover:bg-red-600 border border-slate-600 hover:border-red-500 rounded-full text-white transition-all backdrop-blur-md"
@@ -172,21 +170,17 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
               </svg>
             </button>
 
-            {/* Левая часть: Огромный красивый Арт */}
             <div className="w-full sm:w-2/5 h-64 sm:h-auto relative bg-slate-800 shrink-0">
               <img 
                 src={selectedSurvivor.image} 
                 alt={selectedSurvivor.name} 
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover object-top" 
               />
               <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-slate-900 to-transparent sm:hidden"></div>
             </div>
 
-            {/* Правая часть: Подробная информация */}
             <div className="w-full sm:w-3/5 p-5 sm:p-8 flex flex-col gap-5 sm:gap-6 bg-slate-900">
-              
-              {/* Имя и Профессия */}
-              <div className="pr-10"> {/* pr-10 чтобы текст не залезал под крестик */}
+              <div className="pr-10">
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white uppercase tracking-tight leading-none mb-2 text-shadow-lg">
                   {selectedSurvivor.name}
                 </h2>
@@ -195,7 +189,6 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
                 </p>
               </div>
 
-              {/* Блок характеристик */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 sm:p-4 flex flex-col items-center justify-center gap-1 sm:gap-2 shadow-inner">
                   <InfluenceIcon className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 drop-shadow-md" />
@@ -214,7 +207,6 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
                 </div>
               </div>
 
-              {/* Способность */}
               <div className="flex-1 bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 sm:p-6 shadow-md mt-2">
                 <h3 className="text-sm sm:text-base font-black text-red-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
@@ -229,14 +221,12 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
       )}
 
-      {/* Стили для скроллбара и Анимации */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.4); }
         
-        /* Наши плавные анимации появления */
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes zoomIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
