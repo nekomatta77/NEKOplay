@@ -4,6 +4,7 @@ import { DeadOfWinterState, LocationState } from '../state';
 import { User, Room } from '../../../types';
 import { getSurvivorData, SurvivorData } from '../data/survivors';
 import SurvivorCard from './SurvivorCard';
+import DiceRoller from './DiceRoller'; // Подключаем 3D-кубики
 import { MoraleIcon, FoodIcon, WasteIcon, ZombieIcon, SurvivorIcon, ObjectiveIcon, CrisisIcon, AttackIcon, SearchIcon, InfluenceIcon } from './Icons';
 
 interface Props {
@@ -30,6 +31,10 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
 
   return (
     <div className="h-screen bg-slate-950 text-slate-300 font-sans flex flex-col relative overflow-hidden selection:bg-red-900/40">
+      
+      {/* 3D КУБИКИ (Невидимый слой поверх всей игры) */}
+      <DiceRoller />
+
       <div className="absolute inset-0 bg-[url('https://placehold.co/1920x1080/020617/0f172a?text=DEAD+OF+WINTER')] bg-cover bg-center opacity-10 pointer-events-none"></div>
 
       {/* ВЕРХНЯЯ ПАНЕЛЬ */}
@@ -44,17 +49,14 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
             </span>
           </div>
           <div className="flex gap-1.5 sm:gap-2.5 items-center">
-            {/* ИСПРАВЛЕНИЕ ЗДЕСЬ: Перенесли title="Мораль" на родительский div */}
             <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-red-900/50" title="Мораль">
               <MoraleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
               <span className="font-black text-white text-sm sm:text-lg leading-none">{gameState?.morale || 0}</span>
             </div>
-            {/* ИСПРАВЛЕНИЕ ЗДЕСЬ: Перенесли title="Еда на складе" на родительский div */}
             <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-emerald-900/50" title="Еда на складе">
               <FoodIcon className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
               <span className="font-black text-white text-sm sm:text-lg leading-none">{gameState?.food || 0}</span>
             </div>
-            {/* ИСПРАВЛЕНИЕ ЗДЕСЬ: Перенесли title="Мусор" на родительский div */}
             <div className="flex items-center gap-1.5 bg-slate-800/60 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl border border-slate-700/50" title="Мусор">
               <WasteIcon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500" />
               <span className="font-black text-white text-sm sm:text-lg leading-none">{gameState?.waste || 0}</span>
@@ -114,7 +116,15 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
       <footer className="relative z-20 p-2.5 sm:p-4 bg-slate-900 border-t border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.4)] shrink-0 flex flex-col lg:flex-row gap-4 lg:gap-6 h-auto">
         <div className="flex flex-row lg:flex-col justify-between items-center lg:items-stretch lg:justify-center lg:w-48 lg:border-r border-b lg:border-b-0 border-slate-800 pb-3 lg:pb-0 lg:pr-6 gap-3 shrink-0">
           <div className="flex lg:flex-col items-center lg:items-start gap-2.5 lg:gap-3">
-            <h3 className="hidden lg:block text-xs font-bold text-slate-500 uppercase tracking-widest">Кубики действий</h3>
+            
+            {/* Кнопка Броска Кубиков */}
+            <button 
+              onClick={() => (window as any).roll3D && (window as any).roll3D('3d6')} 
+              className="hidden lg:block text-xs font-bold text-white bg-red-800 hover:bg-red-700 px-3 py-1 rounded-md uppercase tracking-widest transition active:scale-95 cursor-pointer z-50 pointer-events-auto shadow-lg border border-red-600"
+            >
+              Бросить кубики
+            </button>
+
             <div className="flex gap-2">
               {actionDice.length > 0 ? (
                 actionDice.map((dice, i) => (

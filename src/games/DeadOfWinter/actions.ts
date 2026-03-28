@@ -3,10 +3,8 @@ import { ref, update } from 'firebase/database';
 import { db } from '../../lib/firebase';
 import { getInitialGameState } from './state';
 import { Room } from '../../types';
-import { getAllSurvivors } from './data/survivors'; // Подключаем нашу базу персонажей
+import { getAllSurvivors } from './data/survivors';
 
-// Вспомогательная функция для перемешивания массива (Алгоритм Фишера-Йетса)
-// Это как тщательно перетасовать колоду карт перед раздачей
 const shuffleArray = <T>(array: T[]): T[] => {
   const newArray = [...array];
   for (let i = newArray.length - 1; i > 0; i--) {
@@ -16,51 +14,78 @@ const shuffleArray = <T>(array: T[]): T[] => {
   return newArray;
 };
 
+// Функция для случайного числа от min до max
+const getRandomInt = (min: number, max: number) => {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+};
+
 export const GameActions = {
   
-  // Старт игры
   startGame: async (room: Room) => {
     if (!room.players) return;
     const playerIds = room.players.map(p => p.id);
-    
-    // 1. Получаем базовый пустой шаблон состояния игры из state.ts
     const initialState = getInitialGameState(playerIds);
 
-    // 2. Достаем всех выживших из нашей базы и хорошенько их перемешиваем
     const allSurvivors = getAllSurvivors();
     const shuffledSurvivors = shuffleArray(allSurvivors);
-
-    // Индекс, чтобы знать, какие карты мы уже раздали
     let survivorIndex = 0;
     
-    // 3. Проходимся по каждому игроку в комнате и раздаем персонажей
     playerIds.forEach(playerId => {
-      // Берем двух следующих выживших из "колоды"
       const playerSurvivors = [
         shuffledSurvivors[survivorIndex],
         shuffledSurvivors[survivorIndex + 1]
       ];
-      survivorIndex += 2; // Сдвигаем индекс для следующего игрока
+      survivorIndex += 2; 
 
-      // В игре лидером группы становится тот, у кого больше значение "Влияния".
-      // Сортируем полученных выживших так, чтобы персонаж с наибольшим влиянием был первым в массиве
       playerSurvivors.sort((a, b) => b.influence - a.influence);
-      
-      // Нам в базу данных нужны только их ID (например, 'Sparky', 'OliviaBrown')
       const survivorIds = playerSurvivors.map(s => s.id);
 
-      // Записываем этих персонажей в листинг игрока
       initialState.players[playerId].survivors = survivorIds;
-
-      // И сразу физически размещаем их в стартовой локации "Колония"
       initialState.locations.colony.survivors.push(...survivorIds);
+      
+      // В начале игры каждый игрок получает кубики действий.
+      // Формула оригинала: Количество выживших у игрока (2) + 1 = 3 кубика.
+      // Пока просто зададим пустой массив, они будут брошены в Фазу Игроков
+      initialState.players[playerId].actionDice = [];
     });
 
-    // 4. Отправляем обновленное и заполненное состояние игры в Firebase
     await update(ref(db, `rooms/${room.id}/gameState`), initialState);
   },
 
-  // В будущем здесь появятся:
-  // movePlayer: async (roomId, playerId, targetLocation) => { ... }
-  // attackZombie: async (roomId, playerId, location) => { ... }
+  // === НОВАЯ МЕХАНИКА: БРОСОК КУБИКОВ ДЕЙСТВИЙ ===
+  rollActionDice: async (roomId: string, playerId: string, diceCount: number) => {
+    const rolledDice = [];
+    for (let i = 0; i < diceCount; i++) {
+      rolledDice.push(getRandomInt(1, 6)); // Бросаем обычный d6
+    }
+    
+    // Сортируем от большего к меньшему для красоты и отправляем в базу
+    rolledDice.sort((a, b) => b - a);
+    
+    await update(ref(db, `rooms/${roomId}/gameState/players/${playerId}/actionDice`), rolledDice);
+  },
+
+  // === НОВАЯ МЕХАНИКА: БРОСОК КУБИКА ПОВРЕЖДЕНИЙ ===
+  rollExposureDie: async (roomId: string, playerId: string, survivorId: string) => {
+    // Математика 12-гранного кубика повреждений:
+    // 1-6 = Пусто (Blank)
+    // 7-9 = Рана (Wound)
+    // 10-11 = Обморожение (Frostbite)
+    // 12 = Укус (Bite)
+    
+    const roll = getRandomInt(1, 12);
+    let result = 'blank';
+    
+    if (roll >= 7 && roll <= 9) result = 'wound';
+    if (roll >= 10 && roll <= 11) result = 'frostbite';
+    if (roll === 12) result = 'bite';
+
+    // Записываем результат в специальное поле, чтобы UI поймал его и запустил 3D анимацию
+    await update(ref(db, `rooms/${roomId}/gameState/lastExposureRoll`), {
+      playerId,
+      survivorId,
+      result,
+      timestamp: Date.now() // Чтобы всегда срабатывало как новое событие
+    });
+  }
 };
