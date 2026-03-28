@@ -1,10 +1,10 @@
 // src/games/DeadOfWinter/components/BoardScreen.tsx
-import React from 'react';
+import React, { useState } from 'react'; // ДОБАВЛЕН useState
 import { DeadOfWinterState, LocationState } from '../state';
 import { User, Room } from '../../../types';
-import { getSurvivorData } from '../data/survivors';
+import { getSurvivorData, SurvivorData } from '../data/survivors'; // ДОБАВЛЕН SurvivorData
 import SurvivorCard from './SurvivorCard';
-import { MoraleIcon, FoodIcon, WasteIcon, ZombieIcon, SurvivorIcon, ObjectiveIcon, CrisisIcon } from './Icons';
+import { MoraleIcon, FoodIcon, WasteIcon, ZombieIcon, SurvivorIcon, ObjectiveIcon, CrisisIcon, AttackIcon, SearchIcon, InfluenceIcon } from './Icons';
 
 interface Props {
   gameState: DeadOfWinterState;
@@ -21,6 +21,9 @@ const LocationBadge = ({ icon, value }: { icon: React.ReactNode, value: number }
 );
 
 export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
+  // СОСТОЯНИЕ: хранит персонажа, которого мы открыли на весь экран
+  const [selectedSurvivor, setSelectedSurvivor] = useState<SurvivorData | null>(null);
+
   const playerState = gameState?.players?.[user.id];
   const survivorsInHand = (playerState?.survivors || []).map(id => getSurvivorData(id)).filter(Boolean);
   const handSize = (playerState?.hand || []).length;
@@ -30,6 +33,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
     <div className="h-screen bg-slate-950 text-slate-300 font-sans flex flex-col relative overflow-hidden selection:bg-red-900/40">
       <div className="absolute inset-0 bg-[url('https://placehold.co/1920x1080/020617/0f172a?text=DEAD+OF+WINTER')] bg-cover bg-center opacity-10 pointer-events-none"></div>
 
+      {/* === ВЕРХНЯЯ ПАНЕЛЬ === */}
       <header className="relative z-10 flex flex-wrap sm:flex-nowrap justify-between items-center p-2.5 sm:p-3 gap-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-xl shrink-0">
         <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-4 sm:gap-5">
           <div className="flex flex-col">
@@ -60,6 +64,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </button>
       </header>
 
+      {/* === ЦЕНТРАЛЬНАЯ ЧАСТЬ === */}
       <main className="relative z-10 flex-1 p-2 sm:p-4 flex flex-col lg:flex-row gap-3 sm:gap-4 overflow-hidden">
         <div className="flex-1 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800 p-3 sm:p-5 overflow-y-auto custom-scrollbar shadow-inner">
           <h3 className="text-slate-500 font-bold text-[10px] sm:text-xs tracking-widest uppercase mb-3 pl-1">Локации города</h3>
@@ -103,9 +108,8 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
       </main>
 
-      {/* НИЖНЯЯ ПАНЕЛЬ */}
+      {/* === НИЖНЯЯ ПАНЕЛЬ === */}
       <footer className="relative z-20 p-2.5 sm:p-4 bg-slate-900 border-t border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.4)] shrink-0 flex flex-col lg:flex-row gap-4 lg:gap-6 h-auto">
-        
         <div className="flex flex-row lg:flex-col justify-between items-center lg:items-stretch lg:justify-center lg:w-48 lg:border-r border-b lg:border-b-0 border-slate-800 pb-3 lg:pb-0 lg:pr-6 gap-3 shrink-0">
           <div className="flex lg:flex-col items-center lg:items-start gap-2.5 lg:gap-3">
             <h3 className="hidden lg:block text-xs font-bold text-slate-500 uppercase tracking-widest">Кубики действий</h3>
@@ -127,12 +131,10 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
           </div>
         </div>
 
-        {/* Скролл-лента выживших */}
         <div className="flex-1 flex flex-col min-w-0">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 pl-1 hidden lg:block">Ваша группа выживших</h3>
-          
-          {/* Мы убрали 'gap', так как padding внутри SurvivorCard (px-3) теперь создает идеальные отступы! */}
-          <div className="flex overflow-x-auto overflow-y-hidden custom-scrollbar snap-x snap-mandatory h-[240px] sm:h-[280px] lg:h-[300px]">
+          {/* ИСПРАВЛЕНИЕ: Увеличен gap с gap-6 до gap-8 sm:gap-12 */}
+          <div className="flex gap-8 sm:gap-12 overflow-x-auto overflow-y-hidden pt-4 pb-6 px-4 custom-scrollbar snap-x snap-mandatory h-[240px] sm:h-[280px] lg:h-[300px]">
             {survivorsInHand.length === 0 ? (
               <div className="border-2 border-dashed border-slate-800 rounded-2xl h-full w-full flex items-center justify-center text-slate-700 text-sm font-medium">
                 Группа пуста
@@ -140,7 +142,8 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
             ) : (
               survivorsInHand.map(survivor => (
                 <div key={survivor.id} className="snap-center h-full shrink-0">
-                  <SurvivorCard survivor={survivor} />
+                  {/* ПЕРЕДАЕМ onClick для открытия модалки */}
+                  <SurvivorCard survivor={survivor} onClick={() => setSelectedSurvivor(survivor)} />
                 </div>
               ))
             )}
@@ -148,11 +151,96 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
       </footer>
 
+      {/* === ВСПЛЫВАЮЩЕЕ ОКНО (МОДАЛКА) ПЕРСОНАЖА === */}
+      {selectedSurvivor && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in"
+          onClick={() => setSelectedSurvivor(null)} // Закрытие по клику вне окна
+        >
+          {/* Контейнер окна */}
+          <div 
+            className="relative max-w-3xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col sm:flex-row animate-zoom-in"
+            onClick={(e) => e.stopPropagation()} // Блокируем закрытие при клике внутри окна
+          >
+            {/* Кнопка ЗАКРЫТЬ (Крестик) */}
+            <button 
+              onClick={() => setSelectedSurvivor(null)}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20 p-2 bg-black/60 hover:bg-red-600 border border-slate-600 hover:border-red-500 rounded-full text-white transition-all backdrop-blur-md"
+            >
+              <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Левая часть: Огромный красивый Арт */}
+            <div className="w-full sm:w-2/5 h-64 sm:h-auto relative bg-slate-800 shrink-0">
+              <img 
+                src={selectedSurvivor.image} 
+                alt={selectedSurvivor.name} 
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-slate-900 to-transparent sm:hidden"></div>
+            </div>
+
+            {/* Правая часть: Подробная информация */}
+            <div className="w-full sm:w-3/5 p-5 sm:p-8 flex flex-col gap-5 sm:gap-6 bg-slate-900">
+              
+              {/* Имя и Профессия */}
+              <div className="pr-10"> {/* pr-10 чтобы текст не залезал под крестик */}
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white uppercase tracking-tight leading-none mb-2 text-shadow-lg">
+                  {selectedSurvivor.name}
+                </h2>
+                <p className="text-sm sm:text-base text-slate-400 font-mono inline-block bg-slate-950 px-3 py-1 rounded-md border border-slate-800">
+                  {selectedSurvivor.profession}
+                </p>
+              </div>
+
+              {/* Блок характеристик */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 sm:p-4 flex flex-col items-center justify-center gap-1 sm:gap-2 shadow-inner">
+                  <InfluenceIcon className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 drop-shadow-md" />
+                  <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Влияние</span>
+                  <span className="text-xl sm:text-3xl font-black text-white leading-none">{selectedSurvivor.influence}</span>
+                </div>
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 sm:p-4 flex flex-col items-center justify-center gap-1 sm:gap-2 shadow-inner">
+                  <AttackIcon className="w-6 h-6 sm:w-8 sm:h-8 text-red-500 drop-shadow-md" />
+                  <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Атака</span>
+                  <span className="text-xl sm:text-3xl font-black text-white leading-none">{selectedSurvivor.attack}+</span>
+                </div>
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 sm:p-4 flex flex-col items-center justify-center gap-1 sm:gap-2 shadow-inner">
+                  <SearchIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500 drop-shadow-md" />
+                  <span className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-wider">Поиск</span>
+                  <span className="text-xl sm:text-3xl font-black text-white leading-none">{selectedSurvivor.search}+</span>
+                </div>
+              </div>
+
+              {/* Способность */}
+              <div className="flex-1 bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 sm:p-6 shadow-md mt-2">
+                <h3 className="text-sm sm:text-base font-black text-red-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
+                  {selectedSurvivor.abilityTitle}
+                </h3>
+                <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">
+                  {selectedSurvivor.abilityDesc}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Стили для скроллбара и Анимации */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.4); }
+        
+        /* Наши плавные анимации появления */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+        .animate-zoom-in { animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
     </div>
   );

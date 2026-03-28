@@ -5,16 +5,17 @@ import { AttackIcon, SearchIcon, InfluenceIcon } from './Icons';
 
 interface Props {
   survivor: SurvivorData;
+  onClick?: () => void; // ДОБАВЛЕНО: поддержка клика по карточке
 }
 
-export default function SurvivorCard({ survivor }: Props) {
+export default function SurvivorCard({ survivor, onClick }: Props) {
   return (
-    // ВАЖНО: py-4 и px-3 создают "безопасную зону" вокруг карточки.
-    // Теперь таблички, вылетающие за пределы карточки, останутся внутри этого padding'а и не обрежутся браузером!
-    // Ширина теперь вычисляется автоматически благодаря h-full и aspect-[2/3]
-    <div className="h-full shrink-0 group cursor-pointer py-4 px-3 sm:px-4 flex items-center justify-center">
-      
-      <div className="relative h-full aspect-[2/3] transition-transform duration-300 group-hover:-translate-y-2">
+    // ДОБАВЛЕНО: onClick={onClick} передается в главный контейнер
+    <div 
+      className="h-full shrink-0 group cursor-pointer py-4 px-3 sm:px-4 flex items-center justify-center"
+      onClick={onClick}
+    >
+      <div className="relative h-full aspect-[2/3] transition-transform duration-300 group-hover:-translate-y-2 group-active:scale-95">
         
         {/* Желтая табличка Влияния */}
         <div className="absolute -top-4 -right-4 z-30 bg-slate-950/95 backdrop-blur-sm border-2 border-yellow-500 px-2 sm:px-2.5 py-1 rounded-full shadow-2xl flex items-center gap-1 sm:gap-1.5" title="Влияние">
@@ -25,7 +26,6 @@ export default function SurvivorCard({ survivor }: Props) {
         {/* Рамка карточки */}
         <div className="w-full h-full rounded-xl sm:rounded-2xl overflow-hidden border-2 border-slate-700 group-hover:border-slate-400 shadow-[0_10px_25px_rgba(0,0,0,0.6)] bg-slate-900 relative">
           
-          {/* Арт персонажа */}
           <img 
             src={survivor.image} 
             alt={survivor.name} 
@@ -37,9 +37,7 @@ export default function SurvivorCard({ survivor }: Props) {
             }}
           />
 
-          {/* Градиент и Текст (с авто-переносом) */}
           <div className="absolute inset-x-0 bottom-0 h-2/5 sm:h-1/3 bg-gradient-to-t from-black/95 via-black/80 to-transparent flex flex-col justify-end p-2 sm:p-3 pb-3 sm:pb-4 pointer-events-none z-10">
-            {/* break-words и line-clamp-2 аккуратно перенесут имя на вторую строку, если оно длинное */}
             <h4 className="text-white font-black text-xs sm:text-sm lg:text-base leading-tight drop-shadow-lg break-words whitespace-pre-wrap line-clamp-2 w-full group-hover:text-red-300 transition-colors">
               {survivor.name.toUpperCase()}
             </h4>
