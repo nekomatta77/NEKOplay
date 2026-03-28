@@ -35,6 +35,14 @@ export interface DeadOfWinterState {
   players: Record<string, PlayerState>;
   mainObjective: string;
   currentCrisis: string | null;
+  
+  // === ДОБАВЛЕНО ДЛЯ СИНХРОНИЗАЦИИ КУБИКОВ ===
+  lastDiceRequest?: {
+    playerId: string;
+    notation: string;
+    results: number[];
+    timestamp: number;
+  };
 }
 
 // Функция для генерации начального состояния при старте игры

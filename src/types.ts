@@ -1,3 +1,5 @@
+// src/types.ts
+
 export interface User {
   id: string;
   name: string;
@@ -17,7 +19,7 @@ export interface Room {
   maxPlayers: number;
   players: Player[];
   status: "waiting" | "playing";
-  lastActive?: number; // <- Добавили сюда поле для отслеживания АФК-комнат
+  lastActive?: number; // Поле для отслеживания АФК-комнат
 }
 
 export interface Game {

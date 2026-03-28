@@ -42,50 +42,37 @@ export const GameActions = {
 
       initialState.players[playerId].survivors = survivorIds;
       initialState.locations.colony.survivors.push(...survivorIds);
-      
-      // В начале игры каждый игрок получает кубики действий.
-      // Формула оригинала: Количество выживших у игрока (2) + 1 = 3 кубика.
-      // Пока просто зададим пустой массив, они будут брошены в Фазу Игроков
       initialState.players[playerId].actionDice = [];
     });
 
     await update(ref(db, `rooms/${room.id}/gameState`), initialState);
   },
 
-  // === НОВАЯ МЕХАНИКА: БРОСОК КУБИКОВ ДЕЙСТВИЙ ===
-  rollActionDice: async (roomId: string, playerId: string, diceCount: number) => {
-    const rolledDice = [];
-    for (let i = 0; i < diceCount; i++) {
-      rolledDice.push(getRandomInt(1, 6)); // Бросаем обычный d6
+  // === НОВАЯ МЕХАНИКА: ЗАПРОС СИНХРОНИЗИРОВАННОГО БРОСКА ===
+  requestDiceRoll: async (roomId: string, playerId: string, notation: string) => {
+    
+    // 1. Тайком генерируем результаты здесь (на стороне клиента, который нажал кнопку)
+    const results: number[] = [];
+    
+    // Пока реализуем только стандартный 3d6 (три шестигранных кубика)
+    // Позже мы добавим парсер для notation (например d12 для укусов)
+    if (notation === '3d6') {
+      results.push(getRandomInt(1, 6));
+      results.push(getRandomInt(1, 6));
+      results.push(getRandomInt(1, 6));
+    } else {
+      console.warn(`🎲 Мы пока не реализовали математику для броска ${notation}`);
+      results.push(1); // Стаб
     }
-    
-    // Сортируем от большего к меньшему для красоты и отправляем в базу
-    rolledDice.sort((a, b) => b - a);
-    
-    await update(ref(db, `rooms/${roomId}/gameState/players/${playerId}/actionDice`), rolledDice);
-  },
 
-  // === НОВАЯ МЕХАНИКА: БРОСОК КУБИКА ПОВРЕЖДЕНИЙ ===
-  rollExposureDie: async (roomId: string, playerId: string, survivorId: string) => {
-    // Математика 12-гранного кубика повреждений:
-    // 1-6 = Пусто (Blank)
-    // 7-9 = Рана (Wound)
-    // 10-11 = Обморожение (Frostbite)
-    // 12 = Укус (Bite)
-    
-    const roll = getRandomInt(1, 12);
-    let result = 'blank';
-    
-    if (roll >= 7 && roll <= 9) result = 'wound';
-    if (roll >= 10 && roll <= 11) result = 'frostbite';
-    if (roll === 12) result = 'bite';
+    console.log(`🎲 Firebase Экшен: генерирую ${notation} -> [${results.join(', ')}] и отправляю в базу.`);
 
-    // Записываем результат в специальное поле, чтобы UI поймал его и запустил 3D анимацию
-    await update(ref(db, `rooms/${roomId}/gameState/lastExposureRoll`), {
+    // 2. Пишем в Firebase в специальное поле lastDiceRequest
+    await update(ref(db, `rooms/${roomId}/gameState/lastDiceRequest`), {
       playerId,
-      survivorId,
-      result,
-      timestamp: Date.now() // Чтобы всегда срабатывало как новое событие
+      notation,
+      results,
+      timestamp: Date.now() // Уникальный ID броска
     });
   }
 };

@@ -1,10 +1,12 @@
 // src/games/DeadOfWinter/components/BoardScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DeadOfWinterState, LocationState } from '../state';
 import { User, Room } from '../../../types';
 import { getSurvivorData, SurvivorData } from '../data/survivors';
 import SurvivorCard from './SurvivorCard';
 import DiceRoller from './DiceRoller'; 
+import DiceTray from './DiceTray'; // === ПОДКЛЮЧАЕМ ПОДНОС ===
+import { GameActions } from '../actions'; // Нам понадобятся новые экшены
 import { MoraleIcon, FoodIcon, WasteIcon, ZombieIcon, SurvivorIcon, ObjectiveIcon, CrisisIcon, AttackIcon, SearchIcon, InfluenceIcon } from './Icons';
 
 interface Props {
@@ -23,17 +25,66 @@ const LocationBadge = ({ icon, value }: { icon: React.ReactNode, value: number }
 
 export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
   const [selectedSurvivor, setSelectedSurvivor] = useState<SurvivorData | null>(null);
+  
+  // === СОСТОЯНИЕ ДЛЯ КУБИКОВ ===
+  const [isTrayVisible, setIsTrayVisible] = useState(false); // Показываем ли поднос
+  const lastTimestamp = useRef(0); // Чтобы не запускать один и тот же бросок дважды
 
   const playerState = gameState?.players?.[user.id];
   const survivorsInHand = (playerState?.survivors || []).map(id => getSurvivorData(id)).filter(Boolean);
   const handSize = (playerState?.hand || []).length;
   const actionDice = playerState?.actionDice || [];
 
+  // === ЭФФЕКТ СИНХРОНИЗАЦИИ КУБИКОВ (Firebase -> 3D Движок) ===
+  useEffect(() => {
+    // Если в базе есть запрос на бросок, и мы его еще не показывали
+    if (gameState?.lastDiceRequest && gameState.lastDiceRequest.timestamp > lastTimestamp.current) {
+      lastTimestamp.current = gameState.lastDiceRequest.timestamp;
+      
+      const { notation, results, playerId } = gameState.lastDiceRequest;
+      const requesterName = room.players?.find(p => p.id === playerId)?.name || 'Игрок';
+
+      console.log(`🎲 Firebase запросил бросок от ${requesterName}. Бросаем ${notation} -> ${results.join(', ')}`);
+      
+      // 1. Показываем замерзший поднос
+      setIsTrayVisible(true);
+      
+      // 2. Даем подносу 500мс плавно появиться, и только потом бросаем 3D-кубики
+      setTimeout(() => {
+        if ((window as any).roll3DSync) {
+          (window as any).roll3DSync(notation, results);
+        }
+      }, 500);
+    }
+  }, [gameState?.lastDiceRequest, room.players]);
+
+
+  // === ФУНКЦИЯ ЗАВЕРШЕНИЯ БРОСКА ===
+  // Вызывается из DiceRoller, когда кубики остановились
+  const handleRollComplete = () => {
+    // Даем игроку 2 секунды посмотреть на результат, и только потом плавно убираем поднос
+    setTimeout(() => {
+      setIsTrayVisible(false);
+    }, 2000);
+  };
+
+  // === ФУНКЦИЯ ЗАПРОСА БРОСКА (Button Click) ===
+  const handleRollRequest = async (notation: string) => {
+    // В мультиплеере мы НЕ запускаем бросок локально.
+    // Мы пишем в Firebase: "Я хочу бросить d6".
+    console.log(`🎲 Я отправляю запрос на бросок ${notation} в Firebase...`);
+    await GameActions.requestDiceRoll(room.id, user.id, notation);
+  };
+
   return (
     <div className="h-screen bg-slate-950 text-slate-300 font-sans flex flex-col relative overflow-hidden selection:bg-red-900/40">
       
-      {/* 3D КУБИКИ (Невидимый слой поверх всей игры) */}
-      <DiceRoller />
+      {/* === ПОДНОС ДЛЯ КУБИКОВ (Атмосферный поднос посередине) === */}
+      <DiceTray isVisible={isTrayVisible} />
+      
+      {/* 3D КУБИКИ (Невидимый слой) */}
+      {/* Мы монтируем DiceRoller только когда поднос виден, чтобы 3D-движок нашел id="dice-box-container" */}
+      {isTrayVisible && <DiceRoller onRollComplete={handleRollComplete} />}
 
       <div className="absolute inset-0 bg-[url('https://placehold.co/1920x1080/020617/0f172a?text=DEAD+OF+WINTER')] bg-cover bg-center opacity-10 pointer-events-none"></div>
 
@@ -117,9 +168,9 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         <div className="flex flex-row lg:flex-col justify-between items-center lg:items-stretch lg:justify-center lg:w-48 lg:border-r border-b lg:border-b-0 border-slate-800 pb-3 lg:pb-0 lg:pr-6 gap-3 shrink-0">
           <div className="flex lg:flex-col items-center lg:items-start gap-2.5 lg:gap-3 w-full lg:w-auto">
             
-            {/* КНОПКА БРОСКА (Теперь адаптивная для мобилок) */}
+            {/* КНОПКА БРОСКА (Теперь шлёт запрос в Firebase) */}
             <button 
-              onClick={() => (window as any).roll3D && (window as any).roll3D('3d6')} 
+              onClick={() => handleRollRequest('3d6')} 
               className="w-full lg:w-auto text-xs sm:text-sm font-bold text-white bg-red-800 hover:bg-red-700 px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-md uppercase tracking-widest transition active:scale-95 cursor-pointer z-50 pointer-events-auto shadow-lg border border-red-600 mb-2 lg:mb-0"
             >
               Бросить кубики
@@ -231,6 +282,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
       )}
 
+      {/* === АНИМАЦИИ (Мы добавили animate-zoom-in) === */}
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
