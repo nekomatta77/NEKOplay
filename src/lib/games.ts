@@ -1,3 +1,4 @@
+// src/lib/games.ts
 import { Game } from '../types';
 
 export const GAMES: Game[] = [
@@ -25,6 +26,7 @@ export const GAMES: Game[] = [
     minPlayers: 3, 
     maxPlayers: 8,
   },
+  // Наша новая игра на React
   {
     id: 'deadofwinter', 
     name: 'Мертвые сезоны',
@@ -32,14 +34,5 @@ export const GAMES: Game[] = [
     image: 'https://picsum.photos/seed/deadofwinter/400/300?blur=2',
     minPlayers: 2, 
     maxPlayers: 5,
-  },
-  {
-    id: 'monopoly',
-    name: 'Монополия',
-    description: 'Киберпанк-монополия. Захватывай рынки брендов одежды, выбивай эпические скины из кейсов и обанкроть друзей.',
-    minPlayers: 2,
-    maxPlayers: 4,
-    image: '/assets/avatars/ava1.png', 
-    isNative: true, // <-- ДОБАВИЛИ ФЛАГ, чтобы GameView понимал, что это React-игра
   },
 ];
