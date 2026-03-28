@@ -17,7 +17,6 @@ interface Props {
 
 // Компонент бейджа для локации (кол-во зомби, выживших)
 const LocationBadge = ({ icon, value }: { icon: React.ReactNode, value: number }) => (
-  // Анализ строки: shrink-0 гарантирует, что бейдж не сожмется, если много текста
   <div className="flex items-center gap-1.5 bg-slate-950/80 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full border border-slate-700/50 text-xs sm:text-sm font-semibold shrink-0">
     {icon}
     <span className="text-white">{value}</span>
@@ -27,13 +26,13 @@ const LocationBadge = ({ icon, value }: { icon: React.ReactNode, value: number }
 export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
   const playerState = gameState?.players?.[user.id];
   
-  // Анализ строки: Получаем полные данные выживших, фильтруем пустые
+  // Получаем полные данные выживших, фильтруем пустые
   const survivorsInHand = (playerState?.survivors || []).map(id => getSurvivorData(id)).filter(Boolean);
   const handSize = (playerState?.hand || []).length;
   const actionDice = playerState?.actionDice || [];
 
   return (
-    // Анализ строки: selection:bg-red-900/40 делает выделение текста красным для атмосферы
+    // selection:bg-red-900/40 делает выделение текста красным для атмосферы
     <div className="h-screen bg-slate-950 text-slate-300 font-sans flex flex-col relative overflow-hidden selection:bg-red-900/40">
       
       {/* Фон с логотипом */}
@@ -151,13 +150,11 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
 
         {/* === БЛОК С ВЫЖИВШИМИ (ИСПРАВЛЕНЫ ОТСТУПЫ И СПЕЙСИНГ) === */}
-        {/* Анализ строки: overflow-y-hidden pt-4 pb-6 px-4 гарантирует, что таблички персонажей не обрежутся */}
         <div className="flex-1 flex flex-col min-w-0">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 pl-1 hidden lg:block">Ваша группа выживших</h3>
           
-          {/* Контейнер: snap-x (примагничивание), gap-6 (расстояние), pt-4/pb-6 (высота для значков) */}
-          {/* ИСПРАВЛЕНИЕ 1: Изменили gap-4 sm:gap-6 на gap-6 sm:gap-8 для большего расстояния между карточками */}
-          {/* ИСПРАВЛЕНИЕ 2: Изменили pt-2 pb-4 px-3 на pt-4 pb-6 px-4, чтобы предотвратить обрезку табличек персонажей */}
+          {/* Контейнер: snap-x (примагничивание), gap-4 (расстояние), pt-2/pb-4 (высота для значков) */}
+          {/* ИСПРАВЛЕНИЕ: Добавили gap-6 sm:gap-8 (для расстояния) и overflow-y-hidden pt-4 pb-6 px-4 (чтобы таблички не обрезались) */}
           <div className="flex gap-6 sm:gap-8 overflow-x-auto overflow-y-hidden pt-4 pb-6 px-4 custom-scrollbar snap-x snap-mandatory h-[200px] sm:h-[240px] lg:h-full">
             {survivorsInHand.length === 0 ? (
               <div className="border-2 border-dashed border-slate-800 rounded-2xl h-full w-full flex items-center justify-center text-slate-700 text-sm font-medium">

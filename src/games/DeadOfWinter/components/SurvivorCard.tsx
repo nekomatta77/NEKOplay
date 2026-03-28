@@ -46,11 +46,16 @@ export default function SurvivorCard({ survivor }: Props) {
           {/* Анализ строки: h-1/3 bg-gradient-to-t делает темную градиентную подложку внизу карточки */}
           {/* pointer-events-none гарантирует, что клики проходят сквозь текст на карточку */}
           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/95 via-black/80 to-transparent flex flex-col justify-end p-3 pb-4 pointer-events-none z-10">
-            {/* Имя — Крупное, Четкое */}
-            <h4 className="text-white font-black text-xs sm:text-sm lg:text-base leading-tight drop-shadow-lg truncate w-full group-hover:text-red-300 transition-colors">
+            
+            {/* === ИСПРАВЛЕНИЕ: Решение для имени (Авто-размер текста / Перенос) === */}
+            {/* Анализ строки: Убрали 'truncate', добавили 'whitespace-pre-wrap break-words line-clamp-2' */}
+            {/* whitespace-pre-wrap разрешает перенос по словам. break-words разбивает длинные слова. line-clamp-2 ограничивает 2 строками */}
+            <h4 className="text-white font-black text-xs sm:text-sm lg:text-base leading-tight drop-shadow-lg break-words whitespace-pre-wrap line-clamp-2 w-full group-hover:text-red-300 transition-colors">
               {survivor.name.toUpperCase()}
             </h4>
+
             {/* Профессия — Чуть меньше, моноширинный шрифт */}
+            {/* Оставляем truncate для профессии, так как она менее важна и текст там короче */}
             <p className="text-[9px] sm:text-[10px] lg:text-xs text-slate-400 font-mono mt-0.5 truncate w-full">
               {survivor.profession}
             </p>
