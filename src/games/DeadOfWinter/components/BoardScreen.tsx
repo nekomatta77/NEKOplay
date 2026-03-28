@@ -29,13 +29,10 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
 
   return (
     <div className="h-screen bg-slate-950 text-slate-300 font-sans flex flex-col relative overflow-hidden selection:bg-red-900/40">
-      
       <div className="absolute inset-0 bg-[url('https://placehold.co/1920x1080/020617/0f172a?text=DEAD+OF+WINTER')] bg-cover bg-center opacity-10 pointer-events-none"></div>
 
-      {/* --- ВЕРХНЯЯ ПАНЕЛЬ (АДАПТИВНАЯ) --- */}
+      {/* ВЕРХНЯЯ ПАНЕЛЬ */}
       <header className="relative z-10 flex flex-wrap sm:flex-nowrap justify-between items-center p-2 sm:p-3 gap-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 shadow-xl shrink-0">
-        
-        {/* Лого и статы */}
         <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-4 sm:gap-5">
           <div className="flex flex-col">
             <h1 className="text-base sm:text-xl font-black text-white tracking-tighter shadow-red-500/20 drop-shadow-sm leading-tight">
@@ -62,15 +59,13 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
           </div>
         </div>
 
-        {/* Кнопка выхода */}
         <button onClick={onLeave} className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold border border-slate-700 transition active:scale-95">
           Покинуть игру
         </button>
       </header>
 
-      {/* --- ЦЕНТРАЛЬНАЯ ЧАСТЬ --- */}
+      {/* ЦЕНТРАЛЬНАЯ ЧАСТЬ */}
       <main className="relative z-10 flex-1 p-2 sm:p-4 flex flex-col lg:flex-row gap-3 sm:gap-4 overflow-hidden">
-        
         {/* Локации города */}
         <div className="flex-1 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800 p-3 sm:p-5 overflow-y-auto custom-scrollbar shadow-inner">
           <h3 className="text-slate-500 font-bold text-[10px] sm:text-xs tracking-widest uppercase mb-3 pl-1">Локации города</h3>
@@ -93,7 +88,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
           </div>
         </div>
 
-        {/* Правая зона (Цели и Кризис) */}
+        {/* Правая зона */}
         <div className="w-full lg:w-72 xl:w-80 flex flex-col gap-3 shrink-0">
           <div className="bg-slate-900 border border-blue-900/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex gap-3 shadow-lg">
             <ObjectiveIcon />
@@ -115,43 +110,45 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
         </div>
       </main>
 
-      {/* --- НИЖНЯЯ ПАНЕЛЬ (АДАПТИВНАЯ ЗОНА ИГРОКА) --- */}
-      <footer className="relative z-20 p-2 sm:p-4 bg-slate-900 border-t border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.3)] shrink-0 flex flex-col lg:flex-row gap-3 sm:gap-5 h-auto lg:h-[220px]">
+      {/* НИЖНЯЯ ПАНЕЛЬ (Теперь значительно выше и вместительнее) */}
+      <footer className="relative z-20 p-2 sm:p-4 bg-slate-900 border-t border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.3)] shrink-0 flex flex-col lg:flex-row gap-4 lg:gap-6 h-auto lg:h-[320px]">
         
-        {/* Блок с кубиками и картами (на мобилке в строчку, на ПК колонкой) */}
-        <div className="flex flex-row lg:flex-col justify-between items-center lg:items-stretch lg:justify-center lg:w-48 lg:border-r border-b lg:border-b-0 border-slate-800 pb-2 lg:pb-0 lg:pr-5 gap-2 sm:gap-3 shrink-0">
+        {/* Блок с кубиками и картами */}
+        <div className="flex flex-row lg:flex-col justify-between items-center lg:items-stretch lg:justify-center lg:w-48 lg:border-r border-b lg:border-b-0 border-slate-800 pb-3 lg:pb-0 lg:pr-6 gap-3 sm:gap-4 shrink-0">
           
-          <div className="hidden sm:flex justify-between items-center">
-            <span className="bg-slate-700 px-3 py-1 rounded-full text-[10px] font-mono font-bold truncate text-white">{user.name}</span>
+          <div className="hidden lg:flex justify-between items-center">
+            <span className="bg-slate-700 px-3 py-1 rounded-full text-xs font-mono font-bold truncate text-white">{user.name}</span>
           </div>
           
-          <div className="flex lg:flex-col items-center lg:items-start gap-2">
-            <h3 className="hidden lg:block text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Кубики действий</h3>
-            <div className="flex gap-1.5">
+          <div className="flex lg:flex-col items-center lg:items-start gap-2 lg:gap-3">
+            <h3 className="hidden lg:block text-xs font-bold text-slate-500 uppercase tracking-widest">Кубики действий</h3>
+            <div className="flex gap-2">
               {actionDice.length > 0 ? (
                 actionDice.map((dice, i) => (
-                  <div key={i} className="w-8 h-8 sm:w-10 sm:h-10 bg-slate-950 border border-slate-700 rounded-lg flex items-center justify-center text-base sm:text-xl font-black text-white shadow-inner select-none">
+                  <div key={i} className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-950 border-2 border-slate-700 rounded-xl flex items-center justify-center text-lg sm:text-2xl font-black text-white shadow-inner select-none">
                     {dice}
                   </div>
                 ))
               ) : (
-                <div className="text-[10px] sm:text-xs text-slate-600 italic py-1 sm:py-2">Не брошены</div>
+                <div className="text-xs sm:text-sm text-slate-600 italic py-1 sm:py-2">Не брошены</div>
               )}
             </div>
           </div>
 
-          <div className="bg-slate-950 border border-slate-700 px-2 py-1.5 sm:p-2.5 rounded-lg flex gap-2 justify-between items-center text-xs sm:text-sm">
-            <span className="font-medium text-slate-400 truncate">Карты</span>
-            <span className="font-bold text-white text-sm sm:text-base bg-slate-800 px-2 sm:px-2.5 py-0.5 rounded-md">{handSize}</span>
+          <div className="bg-slate-950 border border-slate-700 px-3 py-2 sm:p-3 rounded-xl flex gap-3 justify-between items-center text-sm sm:text-base mt-auto lg:mt-0">
+            <span className="font-medium text-slate-400 truncate">Карты в руке</span>
+            <span className="font-bold text-white text-base sm:text-lg bg-slate-800 px-3 py-1 rounded-md">{handSize}</span>
           </div>
         </div>
 
-        {/* Блок с выжившими */}
+        {/* Блок с выжившими (Увеличенная высота и отступы) */}
         <div className="flex-1 flex flex-col min-w-0">
-          <h3 className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 pl-1 hidden lg:block">Ваша группа выживших</h3>
-          <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-2 custom-scrollbar snap-x h-[120px] sm:h-[140px] lg:h-[160px]">
+          <h3 className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 pl-1 hidden lg:block">Ваша группа выживших</h3>
+          
+          {/* Контейнер с отступами (pt-2 pb-4 px-3), чтобы абсолютно позиционированные значки не обрезались скроллом */}
+          <div className="flex gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden pt-2 pb-4 px-3 custom-scrollbar snap-x h-[200px] sm:h-[240px] lg:h-full">
             {survivorsInHand.length === 0 ? (
-              <div className="border-2 border-dashed border-slate-800 rounded-xl h-full w-full flex items-center justify-center text-slate-700 text-xs sm:text-sm font-medium">
+              <div className="border-2 border-dashed border-slate-800 rounded-2xl h-full w-full flex items-center justify-center text-slate-700 text-xs sm:text-sm font-medium">
                 Группа пуста
               </div>
             ) : (
@@ -166,10 +163,10 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
       </footer>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.3); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.4); }
       `}</style>
     </div>
   );
