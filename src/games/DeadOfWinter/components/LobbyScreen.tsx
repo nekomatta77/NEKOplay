@@ -1,110 +1,140 @@
-import React, { useState, useEffect } from 'react';
-import { Room, User } from '../../../types';
+// src/games/DeadOfWinter/components/LobbyScreen.tsx
+import React from 'react';
+import { User, Room } from '../../../types';
+import { ObjectiveIcon } from './Icons';
 
 interface Props {
-  room: Room;
   user: User;
-  isHost: boolean;
-  onStartGame: () => void;
+  room: Room;
   onLeave: () => void;
+  onStart: () => void;
 }
 
-const CrownIcon = ({ className = "w-6 h-6" }) => (
-  <svg viewBox="0 0 24 24" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="crown-grad" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse"><stop stopColor="#fbbf24"/><stop offset="1" stopColor="#d97706"/></linearGradient></defs>
-    <path d="M12 2L15.09 5.26L19 4L17.77 8.02L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L6.23 8.02L5 4L8.91 5.26L12 2Z" fill="url(#crown-grad)" stroke="#b45309" strokeWidth="1.5" strokeLinejoin="round"/>
-  </svg>
-);
-
-const ModernSpinner = ({ className = "w-5 h-5" }) => (
-  <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"></circle>
-    <path className="opacity-90" d="M12 2C6.47715 2 2 6.47715 2 12C2 13.88 2.51 15.63 3.39 17.13" stroke="currentColor" strokeWidth="3" strokeLinecap="round"></path>
-  </svg>
-);
-
-export default function LobbyScreen({ room, user, isHost, onStartGame, onLeave }: Props) {
-  const [snow, setSnow] = useState<any[]>([]);
-
-  useEffect(() => {
-    const s = Array.from({ length: 40 }).map((_, i) => ({
-      id: i, left: Math.random() * 100 + '%', animationDelay: Math.random() * 5 + 's',
-      animationDuration: (Math.random() * 3 + 3) + 's', opacity: Math.random() * 0.5 + 0.2, size: Math.random() * 3 + 2 + 'px'
-    }));
-    setSnow(s);
-  }, []);
+export default function LobbyScreen({ user, room, onLeave, onStart }: Props) {
+  const players = room.players || [];
+  // ИСПРАВЛЕНИЕ 1: Используем isHost из массива игроков, как это было изначально
+  const isHost = players.find(p => p.id === user.id)?.isHost || false;
 
   return (
-    <div className="min-h-screen text-white flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans">
-      <div className="absolute inset-0 bg-[url('https://picsum.photos/seed/dowbg4/1920/1080')] bg-cover bg-center scale-105 blur-[3px]"></div>
-      <div className="absolute inset-0 bg-slate-950/80 [mask-image:radial-gradient(ellipse_at_center,transparent_10%,black_100%)]"></div>
-      <div className="absolute inset-0 pointer-events-none">
-        {snow.map(s => <div key={s.id} className="absolute bg-white rounded-full animate-fall shadow-[0_0_5px_rgba(255,255,255,0.8)]" style={{ left: s.left, width: s.size, height: s.size, animationDelay: s.animationDelay, animationDuration: s.animationDuration, opacity: s.opacity }} />)}
-      </div>
-      <style>{`@keyframes fall { 0% { transform: translateY(-10vh) translateX(0); } 100% { transform: translateY(105vh) translateX(20px); } } .animate-fall { animation-iteration-count: infinite; animation-timing-function: linear; }`}</style>
+    <div className="min-h-screen bg-slate-950 text-slate-300 font-sans p-3 sm:p-5 flex flex-col relative selection:bg-red-900/40 overflow-hidden">
       
-      <div className="relative z-10 w-full max-w-lg backdrop-blur-2xl bg-slate-900/70 p-6 sm:p-10 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.9)] border border-slate-700/50 flex flex-col">
-        
-        <header className="mb-8 relative text-center flex flex-col items-center">
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-32 sm:w-48 h-1 bg-red-500 blur-md rounded-full opacity-40"></div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 tracking-tighter bg-clip-text text-transparent bg-gradient-to-b from-slate-100 to-slate-400 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-            МЕРТВЫЕ СЕЗОНЫ
+      {/* Атмосферный фон с текстурой */}
+      <div className="absolute inset-0 bg-[url('https://placehold.co/1920x1080/0f172a/020617?text=NEKOPLAY_LOBBY_BG')] bg-cover bg-center opacity-20 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48ZyBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiM5NDkzYjgiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTAgMGg0MHY0MEgwVjB6bTIwIDIwaDIwdjIwSDIWMjB6TTAgMjBoMjB2MjBIMFYyMHoyMCAwaDIwdjIwSDIwVjB6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30 pointer-events-none"></div>
+
+      {/* ХЕДЕР (ЛОГО И ИНФО О КОМНАТЕ) */}
+      <header className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-4 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 shadow-2xl mb-4 sm:mb-5">
+        <div className="flex flex-col">
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tighter leading-tight shadow-red-500/10 drop-shadow-sm">
+            <span className="text-red-600">DEAD</span> OF WINTER
           </h1>
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-slate-950/80 rounded-full border border-slate-800 shadow-inner">
-            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse shrink-0 shadow-[0_0_8px_rgba(6,182,212,0.8)]"></span>
-            <p className="text-[10px] sm:text-xs font-mono text-cyan-400 tracking-widest uppercase">Ожидание выживших</p>
-          </div>
-        </header>
+          <p className="text-[10px] sm:text-xs font-mono text-slate-500 uppercase tracking-widest mt-0.5">
+            Подготовка партии | БАЗОВАЯ ИГРА
+          </p>
+        </div>
         
-        <div className="space-y-3 mb-8 max-h-[45vh] overflow-y-auto pr-2 custom-scrollbar">
-          {room.players?.map(p => {
-            const isSelf = p.id === user.id;
-            return (
-              <div key={p.id} className={`flex items-center gap-3 sm:gap-4 bg-slate-950/60 p-3 sm:p-4 rounded-2xl transition-all duration-300 border ${isSelf ? 'border-red-800/60 shadow-[0_0_20px_rgba(153,27,27,0.2)]' : 'border-slate-800'}`}>
-                
-                <div className={`shrink-0 relative p-0.5 rounded-full border-2 ${isSelf ? 'border-red-500' : 'border-slate-600'}`}>
-                  <img src={p.avatar} alt="avatar" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover" />
-                </div>
-                
-                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                  <div className={`font-semibold text-base sm:text-lg truncate leading-tight ${isSelf ? 'text-white' : 'text-slate-300'}`}>
-                    {p.name} {isSelf && <span className="text-xs text-red-500 font-medium ml-1 bg-red-500/10 px-2 py-0.5 rounded-md">Вы</span>}
-                  </div>
-                  <p className="text-[10px] sm:text-xs text-slate-500 font-mono truncate mt-0.5">ID: {p.id.substring(0, 8)}</p>
-                </div>
-                
-                {p.isHost && (
-                  <div className="shrink-0 flex items-center justify-center w-10 h-10 bg-yellow-500/10 rounded-xl border border-yellow-500/20" title="Хост">
-                    <CrownIcon className="w-6 h-6" />
-                  </div>
-                )}
+        <div className="flex items-center gap-3 bg-slate-800 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl border border-slate-700 shadow-inner">
+          <span className="text-slate-500 font-medium text-xs sm:text-sm">Комната:</span>
+          <span className="text-white font-bold text-sm sm:text-lg">{room.name}</span>
+          <span className="font-bold text-slate-400 text-sm sm:text-lg bg-slate-900 px-2.5 py-0.5 rounded-md">{players.length}/5</span>
+        </div>
+      </header>
+
+      {/* ГЛАВНАЯ ЧАСТЬ */}
+      <main className="relative z-10 flex-1 grid grid-cols-1 xl:grid-cols-[1fr,360px] gap-4 sm:gap-5">
+        
+        {/* КОЛОНКА СЛЕВА: СПИСОК ИГРОКОВ (КАРТОЧКИ) */}
+        <div className="bg-slate-900/60 backdrop-blur-sm rounded-3xl border border-slate-800 p-4 sm:p-5 shadow-2xl flex flex-col gap-4">
+          <h2 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-widest mb-1 pl-1">Игроки в лобби</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 2xl:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pr-1 pb-2">
+            {players.length === 0 ? (
+              <div className="col-span-full border-2 border-dashed border-slate-800 rounded-3xl h-40 flex items-center justify-center text-slate-700 text-sm font-medium">
+                Ожидание подключения игроков...
               </div>
-            );
-          })}
+            ) : (
+              players.map((player, index) => (
+                <div key={player.id} className="bg-slate-800 rounded-2xl p-4 border border-slate-700 flex items-center gap-4 group transition-all hover:border-slate-500">
+                  {/* ИСПРАВЛЕНИЕ 2: player.avatar вместо player.photoUrl */}
+                  <img src={player.avatar} alt={player.name} className="w-12 h-12 rounded-full border-2 border-slate-600 group-hover:border-slate-400 transition" />
+                  <div className="flex flex-col flex-1 truncate">
+                    <span className="text-white font-bold text-sm sm:text-base group-hover:text-red-400 transition truncate">{player.name}</span>
+                    <span className="text-xs text-slate-400 font-mono mt-0.5 truncate">
+                      {/* ИСПРАВЛЕНИЕ 3: Используем player.isHost */}
+                      {player.isHost ? 'Организатор' : `Игрок #${index + 1}`}
+                    </span>
+                  </div>
+                  {/* ИСПРАВЛЕНИЕ 4: Используем player.isHost */}
+                  {player.isHost && (
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]" title="Хост"></div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        <div className="flex gap-3 sm:gap-4 flex-col sm:flex-row mt-auto">
-          <button onClick={onLeave} className="flex-1 py-3.5 sm:py-4 px-6 bg-slate-800 hover:bg-slate-700 rounded-xl transition-all duration-200 text-slate-300 font-bold tracking-tight border border-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500 active:scale-[0.98]">
-            Покинуть базу
-          </button>
-          {isHost ? (
-            <button onClick={onStartGame} className="flex-1 py-3.5 sm:py-4 px-6 bg-red-700 hover:bg-red-600 text-white rounded-xl transition-all duration-200 font-bold tracking-tight shadow-[0_0_20px_rgba(185,28,28,0.4)] border border-red-500/50 focus:outline-none focus:ring-2 focus:ring-red-500 active:scale-[0.98]">
-              Начать выживание
-            </button>
-          ) : (
-            <div className="flex-1 py-3.5 sm:py-4 px-6 bg-slate-900 text-cyan-500 rounded-xl font-bold border border-cyan-900/40 flex justify-center items-center gap-3">
-              <ModernSpinner className="w-5 h-5 shrink-0" />
-              <span className="font-mono text-[10px] sm:text-xs tracking-wider uppercase truncate">Ждем хоста</span>
+        {/* КОЛОНКА СПРАВА: ПАРАМЕТРЫ ИГРЫ (ТАБЛИЦА) */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-inner flex flex-col">
+          <h2 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 pl-1">Параметры игры</h2>
+          
+          <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1 pb-2">
+            <div className="bg-slate-800/80 p-4 rounded-xl border border-blue-900/50 flex gap-4 shadow-md items-center">
+              <ObjectiveIcon className="w-7 h-7 text-blue-500" />
+              <div>
+                <h3 className="text-blue-400 font-bold text-[10px] uppercase tracking-wider mb-0.5">Главная цель</h3>
+                <p className="text-white text-xs sm:text-sm font-semibold">"Пережить зиму" (Тестовая)</p>
+              </div>
             </div>
-          )}
+
+            <table className="w-full text-xs sm:text-sm font-mono text-slate-400 border-collapse">
+              <tbody className="divide-y divide-slate-800 border-t border-b border-slate-800">
+                <tr>
+                  <td className="py-2.5 text-left font-medium">Длительность</td>
+                  <td className="py-2.5 text-right font-bold text-white bg-slate-950 px-2.5 rounded-md">СРЕДНЯЯ</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 text-left font-medium">Сложность</td>
+                  <td className="py-2.5 text-right font-bold text-white bg-slate-950 px-2.5 rounded-md underline decoration-slate-600">НОРМАЛЬНАЯ</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 text-left font-medium">Дополнение</td>
+                  <td className="py-2.5 text-right font-bold text-white bg-slate-950 px-2.5 rounded-md text-slate-600">ОТСУТСТВУЕТ</td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <div className="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 text-center italic text-xs text-slate-600">
+              Голосование за цель в этой версии отключено хостом.
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
+
+      {/* ФУТЕР (КНОПКИ ДЕЙСТВИЯ) */}
+      <footer className="relative z-10 flex flex-col sm:flex-row justify-end items-center p-3 gap-3 bg-slate-900 border-t border-slate-800 rounded-2xl shadow-inner mt-4 sm:mt-5">
+        <button 
+          onClick={onLeave} 
+          className="w-full sm:w-auto px-5 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm font-semibold border border-slate-700 transition active:scale-95"
+        >
+          Покинуть лобби
+        </button>
+        {isHost && (
+          <button 
+            onClick={onStart} 
+            className="w-full sm:w-auto px-7 py-2.5 bg-red-800 hover:bg-red-700 disabled:bg-slate-800 disabled:opacity-50 disabled:border-slate-700 disabled:text-slate-600 rounded-xl text-sm font-bold border border-red-900 transition active:scale-95 shadow-[0_0_15px_rgba(185,28,28,0.3)] disabled:shadow-none"
+            disabled={players.length < 2} // Запрещаем старт, если игроков < 2
+          >
+            {players.length < 2 ? 'Ожидание игроков...' : 'СТАРТ ПАРТИИ'}
+          </button>
+        )}
+      </footer>
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.5); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(239, 68, 68, 0.3); }
       `}</style>
     </div>
   );
