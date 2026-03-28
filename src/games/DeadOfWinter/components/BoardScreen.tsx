@@ -4,7 +4,7 @@ import { DeadOfWinterState, LocationState } from '../state';
 import { User, Room } from '../../../types';
 import { getSurvivorData, SurvivorData } from '../data/survivors';
 import SurvivorCard from './SurvivorCard';
-import DiceRoller from './DiceRoller'; // Подключаем 3D-кубики
+import DiceRoller from './DiceRoller'; 
 import { MoraleIcon, FoodIcon, WasteIcon, ZombieIcon, SurvivorIcon, ObjectiveIcon, CrisisIcon, AttackIcon, SearchIcon, InfluenceIcon } from './Icons';
 
 interface Props {
@@ -115,17 +115,17 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
       {/* НИЖНЯЯ ПАНЕЛЬ */}
       <footer className="relative z-20 p-2.5 sm:p-4 bg-slate-900 border-t border-slate-800 shadow-[0_-10px_30px_rgba(0,0,0,0.4)] shrink-0 flex flex-col lg:flex-row gap-4 lg:gap-6 h-auto">
         <div className="flex flex-row lg:flex-col justify-between items-center lg:items-stretch lg:justify-center lg:w-48 lg:border-r border-b lg:border-b-0 border-slate-800 pb-3 lg:pb-0 lg:pr-6 gap-3 shrink-0">
-          <div className="flex lg:flex-col items-center lg:items-start gap-2.5 lg:gap-3">
+          <div className="flex lg:flex-col items-center lg:items-start gap-2.5 lg:gap-3 w-full lg:w-auto">
             
-            {/* Кнопка Броска Кубиков */}
+            {/* КНОПКА БРОСКА (Теперь адаптивная для мобилок) */}
             <button 
               onClick={() => (window as any).roll3D && (window as any).roll3D('3d6')} 
-              className="hidden lg:block text-xs font-bold text-white bg-red-800 hover:bg-red-700 px-3 py-1 rounded-md uppercase tracking-widest transition active:scale-95 cursor-pointer z-50 pointer-events-auto shadow-lg border border-red-600"
+              className="w-full lg:w-auto text-xs sm:text-sm font-bold text-white bg-red-800 hover:bg-red-700 px-4 py-2.5 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-md uppercase tracking-widest transition active:scale-95 cursor-pointer z-50 pointer-events-auto shadow-lg border border-red-600 mb-2 lg:mb-0"
             >
               Бросить кубики
             </button>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 w-full lg:w-auto justify-end lg:justify-start">
               {actionDice.length > 0 ? (
                 actionDice.map((dice, i) => (
                   <div key={i} className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-950 border-2 border-slate-700 rounded-xl flex items-center justify-center text-lg sm:text-2xl font-black text-white shadow-inner select-none">
@@ -137,7 +137,7 @@ export default function BoardScreen({ gameState, user, room, onLeave }: Props) {
               )}
             </div>
           </div>
-          <div className="bg-slate-950 border border-slate-700 px-3 py-2 rounded-xl flex gap-3 justify-between items-center text-sm sm:text-base mt-auto lg:mt-0">
+          <div className="bg-slate-950 border border-slate-700 px-3 py-2 rounded-xl flex gap-3 justify-between items-center text-sm sm:text-base mt-auto lg:mt-0 w-full lg:w-auto">
             <span className="font-medium text-slate-400 truncate">Карты в руке</span>
             <span className="font-bold text-white text-base sm:text-lg bg-slate-800 px-3 py-1 rounded-lg">{handSize}</span>
           </div>
