@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Room, User } from '../../types';
 import { ref, update } from 'firebase/database';
 import { db } from '../../lib/firebase';
@@ -10,9 +10,60 @@ interface FlappyNekoGameProps {
   onLeave: () => void;
 }
 
+interface SkinConfig {
+  id: string;
+  name: string;
+  path: string;
+  radiusX: number; // Индивидуальный горизонтальный хитбокс
+  radiusY: number; // Индивидуальный вертикальный хитбокс
+}
+
+// Глобальный масштабирующий коэффициент для графики скинов
+const SKIN_SCALE = 1.15;
+
+// Базовый путь к репозиторию ассетов
+const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/nekomatta77/nekoplayassets/main/FlappyNEKO';
+
+// 12 утвержденных скинов с персональными физическими размерами хитбоксов
+const SKIN_SPECS = [
+  { name: "Классика", rx: 22, ry: 22 },
+  { name: "Ворон", rx: 25, ry: 19 },
+  { name: "Свинка", rx: 23, ry: 23 },
+  { name: "Самолет", rx: 28, ry: 18 },
+  { name: "Квадракоптер", rx: 27, ry: 17 },
+  { name: "Баба Яга", rx: 19, ry: 27 },
+  { name: "Ночная Фурия", rx: 26, ry: 20 },
+  { name: "Аппа", rx: 26, ry: 22 },
+  { name: "Демон", rx: 22, ry: 22 },
+  { name: "Огненный дух", rx: 20, ry: 25 },
+  { name: "Ифрит", rx: 23, ry: 23 },
+  { name: "Алладин", rx: 29, ry: 15 }
+];
+
+const AVAILABLE_SKINS: SkinConfig[] = SKIN_SPECS.map((spec, index) => {
+  const skinNumber = index + 1;
+  return {
+    id: `skin${skinNumber}`,
+    name: `${skinNumber}. ${spec.name.toUpperCase()}`,
+    path: `${GITHUB_BASE_URL}/skin${skinNumber}.webp`,
+    radiusX: spec.rx * SKIN_SCALE,
+    radiusY: spec.ry * SKIN_SCALE
+  };
+});
+
 export default function FlappyNekoGame({ room, user, gameState, onLeave }: FlappyNekoGameProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const isHost = room.players?.find((p: any) => p.id === user.id)?.isHost || false;
+
+  const [currentSkin, setCurrentSkin] = useState<string>('skin1');
+  const [assetsLoaded, setAssetsLoaded] = useState<boolean>(false);
+  const [countdownText, setCountdownText] = useState<string>('');
+
+  // Кэш текстур
+  const bgRef = useRef<HTMLImageElement | null>(null);
+  const skinsImgRef = useRef<Record<string, HTMLImageElement>>({});
+  const bgOffsetRef = useRef<number>(0);
 
   const myCatRef = useRef({
     y: 300,
@@ -22,37 +73,117 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
     rotation: 0
   });
 
-  // Хранилище сглаженных координат других игроков для интерполяции
   const interpolatedPlayersRef = useRef<Record<string, number>>({});
+  const lastNetworkUpdateRef = useRef<number>(0);
 
-  // Физические коэффициенты оригинальной Flappy Bird
-  const GRAVITY = 0.35;
-  const JUMP_FORCE = -7.0;
-  const CAT_RADIUS = 16;
-  const PIPE_WIDTH = 68;
-  const PIPE_GAP = 150;
-  const CANVAS_WIDTH = 480;
-  const CANVAS_HEIGHT = 640;
-  const X_POSITION = 160; // Фиксированная позиция игроков по оси X
+  // Физические константы
+  const GRAVITY = 0.4;
+  const JUMP_FORCE = -7.5;
+  const PIPE_WIDTH = 76;
+  const PIPE_GAP = 175; // Увеличенный зазор под индивидуальные прыжки
+  const BASE_WIDTH = 480;
+  const BASE_HEIGHT = 640;
+  const X_POSITION = 140;
 
   const gameStatus = gameState?.status || 'waiting';
   const pipes = gameState?.pipes || [];
   const networkPlayers = gameState?.players || {};
 
+  // Динамический ресайз под экраны мобильных устройств
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
+
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, [assetsLoaded]);
+
+  // Предзагрузка ресурсов
+  useEffect(() => {
+    let loadedCount = 0;
+    const totalAssets = AVAILABLE_SKINS.length + 1;
+
+    const incrementLoad = () => {
+      loadedCount++;
+      if (loadedCount === totalAssets) {
+        setAssetsLoaded(true);
+      }
+    };
+
+    AVAILABLE_SKINS.forEach(skin => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = skin.path;
+      img.onload = incrementLoad;
+      img.onerror = incrementLoad;
+      skinsImgRef.current[skin.id] = img;
+    });
+
+    const b = new Image();
+    b.crossOrigin = 'anonymous';
+    b.src = `${GITHUB_BASE_URL}/bg.webp`;
+    b.onload = () => { bgRef.current = b; incrementLoad(); };
+    b.onerror = incrementLoad;
+  }, []);
+
+  // Синхронизация скина
   useEffect(() => {
     const playerGameRef = ref(db, `rooms/${room.id}/gameState/players/${user.id}`);
     update(playerGameRef, {
       name: user.name,
       y: 300,
       isGhost: false,
-      score: 0
+      score: 0,
+      skinId: currentSkin
     });
-  }, [room.id, user.id, user.name]);
+  }, [room.id, user.id, user.name, currentSkin]);
+
+  // Красивый отсчет перед полетом
+  useEffect(() => {
+    if (gameStatus !== 'countdown') {
+      setCountdownText('');
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - (gameState?.startTime || 0);
+      const remaining = Math.ceil((3000 - elapsed) / 1000);
+      if (remaining > 0) {
+        setCountdownText(remaining.toString());
+      } else {
+        setCountdownText('GO!');
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [gameStatus, gameState?.startTime]);
+
+  useEffect(() => {
+    if (!isHost || gameStatus !== 'countdown') return;
+
+    const timer = setTimeout(async () => {
+      const startRef = ref(db, `rooms/${room.id}/gameState`);
+      await update(startRef, {
+        status: 'playing',
+        startTime: Date.now() 
+      });
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [isHost, gameStatus, room.id]);
 
   const handleJump = () => {
-    if (gameStatus !== 'playing' || myCatRef.current.isGhost) return;
+    if (gameStatus !== 'playing') return;
     myCatRef.current.velocity = JUMP_FORCE;
-    myCatRef.current.rotation = -0.4; // Наклоняем кота вверх при прыжке
+    myCatRef.current.rotation = -0.35;
     
     const myRef = ref(db, `rooms/${room.id}/gameState/players/${user.id}`);
     update(myRef, { y: Math.floor(myCatRef.current.y) });
@@ -71,40 +202,50 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
 
   const handleStartGame = async () => {
     const startRef = ref(db, `rooms/${room.id}/gameState`);
+    
+    const updatedPlayers = { ...networkPlayers };
+    Object.keys(updatedPlayers).forEach(pId => {
+      updatedPlayers[pId] = {
+        ...updatedPlayers[pId],
+        isGhost: false,
+        score: 0,
+        y: 300
+      };
+    });
+
     await update(startRef, {
-      status: 'playing',
+      status: 'countdown',
       pipes: [],
-      startTime: Date.now()
+      startTime: Date.now(),
+      players: updatedPlayers
     });
   };
 
-  // ДВИЖОК ХОСТА: Работает на независимом таймере Delta Time
   useEffect(() => {
     if (!isHost || gameStatus !== 'playing') return;
 
     let lastTime = performance.now();
-    let pipeSpeed = 3.2;
+    let pipeSpeed = 3.4;
 
     const hostTicker = setInterval(() => {
       const now = performance.now();
-      const dt = (now - lastTime) / (1000 / 60); // Нормализация под 60 FPS
+      const dt = (now - lastTime) / (1000 / 60);
       lastTime = now;
 
-      if (dt > 3) return; // Игнорируем сильные скачки лагов
+      if (dt > 3) return;
 
       const stateRef = ref(db, `rooms/${room.id}/gameState`);
       let currentPipes = [...pipes];
 
-      if (currentPipes.length === 0 || currentPipes[currentPipes.length - 1].x < CANVAS_WIDTH - 240) {
-        const topHeight = Math.floor(Math.random() * (CANVAS_HEIGHT - PIPE_GAP - 160)) + 80;
-        currentPipes.push({ x: CANVAS_WIDTH, top: topHeight });
+      if (currentPipes.length === 0 || currentPipes[currentPipes.length - 1].x < BASE_WIDTH - 240) {
+        const topHeight = Math.floor(Math.random() * (BASE_HEIGHT - PIPE_GAP - 200)) + 100;
+        currentPipes.push({ x: BASE_WIDTH, top: topHeight });
       }
 
       let nextPipes = currentPipes
         .map(p => ({ ...p, x: p.x - pipeSpeed * dt }))
         .filter(p => p.x > -PIPE_WIDTH);
 
-      // Проверка набора очков при пролете центра трубы
       currentPipes.forEach(p => {
         if (p.x >= X_POSITION && p.x - pipeSpeed * dt < X_POSITION) {
           Object.keys(networkPlayers).forEach(pId => {
@@ -122,7 +263,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
     return () => clearInterval(hostTicker);
   }, [isHost, gameStatus, pipes, networkPlayers, room.id]);
 
-  // КЛИЕНТСКИЙ ЦИКЛ РЕНДЕРА И ИНТЕРПОЛЯЦИИ
+  // Главный визуальный поток Canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -137,55 +278,76 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
       const dt = (now - lastTime) / (1000 / 60);
       lastTime = now;
 
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      const scaleX = canvas.width / BASE_WIDTH;
+      const scaleY = canvas.height / BASE_HEIGHT;
 
-      // Отрисовка бэкграунда (Неоновое ночное небо)
-      ctx.fillStyle = '#111216';
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      
-      // Сетка на фоне для ощущения скорости
-      ctx.strokeStyle = '#1d2026';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < CANVAS_WIDTH; i += 40) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, CANVAS_HEIGHT); ctx.stroke();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.scale(scaleX, scaleY);
+
+      if (gameStatus === 'playing') {
+        bgOffsetRef.current -= 0.6 * dt;
+        if (bgOffsetRef.current <= -BASE_WIDTH) bgOffsetRef.current = 0;
+      }
+
+      if (bgRef.current) {
+        ctx.drawImage(bgRef.current, bgOffsetRef.current, 0, BASE_WIDTH, BASE_HEIGHT);
+        ctx.drawImage(bgRef.current, bgOffsetRef.current + BASE_WIDTH, 0, BASE_WIDTH, BASE_HEIGHT);
+      } else {
+        ctx.fillStyle = '#bae6fd'; 
+        ctx.fillRect(0, 0, BASE_WIDTH, BASE_HEIGHT);
+      }
+
+      const serverMe = networkPlayers[user.id];
+      // Определение спецификации хитбокса текущего скина
+      const currentSpec = AVAILABLE_SKINS.find(s => s.id === (serverMe?.skinId || 'skin1')) || AVAILABLE_SKINS[0];
+
+      if (gameStatus === 'countdown') {
+        myCatRef.current.y = 300 + Math.sin(now / 120) * 3;
+        myCatRef.current.velocity = 0;
+        myCatRef.current.rotation = 0;
+
+        if (now - lastNetworkUpdateRef.current > 60) {
+          const myRef = ref(db, `rooms/${room.id}/gameState/players/${user.id}`);
+          update(myRef, { y: Math.floor(myCatRef.current.y) });
+          lastNetworkUpdateRef.current = now;
+        }
       }
 
       if (gameStatus === 'playing') {
-        // Расчет физики локального кота
         myCatRef.current.velocity += GRAVITY * dt;
         myCatRef.current.y += myCatRef.current.velocity * dt;
 
-        // Плавное вращение носом вниз при падении
-        if (myCatRef.current.velocity > 3) {
-          myCatRef.current.rotation = Math.min(Math.PI / 2, myCatRef.current.rotation + 0.08 * dt);
+        if (myCatRef.current.velocity > 2.5) {
+          myCatRef.current.rotation = Math.min(Math.PI / 3.5, myCatRef.current.rotation + 0.07 * dt);
         } else {
-          myCatRef.current.rotation = Math.max(-0.4, myCatRef.current.rotation + 0.02 * dt);
+          myCatRef.current.rotation = Math.max(-0.3, myCatRef.current.rotation + 0.02 * dt);
         }
 
-        if (myCatRef.current.y > CANVAS_HEIGHT - CAT_RADIUS) {
-          myCatRef.current.y = CANVAS_HEIGHT - CAT_RADIUS;
+        // Ограничения краев экрана используют вертикальный радиус текущего скина
+        if (myCatRef.current.y > BASE_HEIGHT - currentSpec.radiusY) {
+          myCatRef.current.y = BASE_HEIGHT - currentSpec.radiusY;
           myCatRef.current.velocity = 0;
         }
-        if (myCatRef.current.y < CAT_RADIUS) {
-          myCatRef.current.y = CAT_RADIUS;
+        if (myCatRef.current.y < currentSpec.radiusY) {
+          myCatRef.current.y = currentSpec.radiusY;
           myCatRef.current.velocity = 0;
         }
 
-        // Сетевой троттлинг позиции Y
-        if (Math.random() < 0.2) {
+        if (now - lastNetworkUpdateRef.current > 60) {
           const myRef = ref(db, `rooms/${room.id}/gameState/players/${user.id}`);
           update(myRef, { y: Math.floor(myCatRef.current.y) });
+          lastNetworkUpdateRef.current = now;
         }
 
-        // Проверка точных коллизий
-        const serverMe = networkPlayers[user.id];
         if (serverMe && !serverMe.isGhost) {
           myCatRef.current.isGhost = false;
           
           for (let p of pipes) {
-            const insideX = (X_POSITION + CAT_RADIUS - 3 > p.x) && (X_POSITION - CAT_RADIUS + 3 < p.x + PIPE_WIDTH);
-            const hitTop = myCatRef.current.y - CAT_RADIUS + 3 < p.top;
-            const hitBottom = myCatRef.current.y + CAT_RADIUS - 3 > p.top + PIPE_GAP;
+            // ИНДИВИДУАЛЬНЫЙ РАСЧЕТ КОЛЛИЗИИ: подстановка уникальных radiusX и radiusY активной модели
+            const insideX = (X_POSITION + currentSpec.radiusX - 4 > p.x) && (X_POSITION - currentSpec.radiusX + 4 < p.x + PIPE_WIDTH);
+            const hitTop = myCatRef.current.y - currentSpec.radiusY + 4 < p.top;
+            const hitBottom = myCatRef.current.y + currentSpec.radiusY - 4 > p.top + PIPE_GAP;
 
             if (insideX && (hitTop || hitBottom)) {
               myCatRef.current.isGhost = true;
@@ -199,148 +361,233 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
         }
       }
 
-      // ОТРИСОВКА ТРУБ (Скругленный неоновый стиль)
+      // Собственные мультяшные процедурные трубы
       pipes.forEach((p: any) => {
-        ctx.fillStyle = '#059669';
-        ctx.strokeStyle = '#10b981';
+        ctx.save();
+        const CAP_HEIGHT = 30;
+        const CAP_OUTSET = 4;
+
+        ctx.fillStyle = '#22c55e';
+        ctx.strokeStyle = '#166534';
         ctx.lineWidth = 3;
 
         // Верхняя труба
-        ctx.fillRect(p.x, 0, PIPE_WIDTH, p.top);
-        ctx.strokeRect(p.x, 0, PIPE_WIDTH, p.top);
+        ctx.fillRect(p.x, 0, PIPE_WIDTH, p.top - CAP_HEIGHT);
+        ctx.strokeRect(p.x, -5, PIPE_WIDTH, p.top - CAP_HEIGHT + 5);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(p.x + 8, 0, 8, p.top - CAP_HEIGHT);
+        
+        ctx.fillStyle = '#15803d';
+        ctx.fillRect(p.x - CAP_OUTSET, p.top - CAP_HEIGHT, PIPE_WIDTH + (CAP_OUTSET * 2), CAP_HEIGHT);
+        ctx.strokeRect(p.x - CAP_OUTSET, p.top - CAP_HEIGHT, PIPE_WIDTH + (CAP_OUTSET * 2), CAP_HEIGHT);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(p.x - CAP_OUTSET + 8, p.top - CAP_HEIGHT, 8, CAP_HEIGHT);
 
-        // Нижная труба
-        ctx.fillRect(p.x, p.top + PIPE_GAP, PIPE_WIDTH, CANVAS_HEIGHT - p.top - PIPE_GAP);
-        ctx.strokeRect(p.x, p.top + PIPE_GAP, PIPE_WIDTH, CANVAS_HEIGHT - p.top - PIPE_GAP);
+        // Нижняя труба
+        ctx.fillStyle = '#15803d';
+        ctx.fillRect(p.x - CAP_OUTSET, p.top + PIPE_GAP, PIPE_WIDTH + (CAP_OUTSET * 2), CAP_HEIGHT);
+        ctx.strokeRect(p.x - CAP_OUTSET, p.top + PIPE_GAP, PIPE_WIDTH + (CAP_OUTSET * 2), CAP_HEIGHT);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(p.x - CAP_OUTSET + 8, p.top + PIPE_GAP, 8, CAP_HEIGHT);
+        
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(p.x, p.top + PIPE_GAP + CAP_HEIGHT, PIPE_WIDTH, BASE_HEIGHT - (p.top + PIPE_GAP + CAP_HEIGHT));
+        ctx.strokeRect(p.x, p.top + PIPE_GAP + CAP_HEIGHT, PIPE_WIDTH, BASE_HEIGHT - (p.top + PIPE_GAP + CAP_HEIGHT) + 5);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(p.x + 8, p.top + PIPE_GAP + CAP_HEIGHT, 8, BASE_HEIGHT - (p.top + PIPE_GAP + CAP_HEIGHT));
+
+        ctx.restore();
       });
 
-      // ОТРИСОВКА И ИНТЕРПОЛЯЦИЯ ИГРОКОВ
+      // Рендеринг текстур игроков
       Object.keys(networkPlayers).forEach(pId => {
         const p = networkPlayers[pId];
         const isMe = pId === user.id;
 
-        // Алгоритм LERP (Линейная интерполяция) для сглаживания лагов сети
         if (!isMe) {
           if (interpolatedPlayersRef.current[pId] === undefined) {
             interpolatedPlayersRef.current[pId] = p.y || 300;
           }
-          // Плавно подтягиваем координату на 15% ближе к серверной каждую итерацию
-          interpolatedPlayersRef.current[pId] += ((p.y || 300) - interpolatedPlayersRef.current[pId]) * 0.15 * dt;
+          interpolatedPlayersRef.current[pId] += ((p.y || 300) - interpolatedPlayersRef.current[pId]) * 0.16 * dt;
         }
 
         const drawY = isMe ? myCatRef.current.y : interpolatedPlayersRef.current[pId];
-        const currentRotation = isMe ? myCatRef.current.rotation : (p.y > drawY ? 0.4 : -0.2);
+        const currentRotation = isMe ? myCatRef.current.rotation : (p.y > drawY ? 0.25 : -0.1);
+
+        // Получение спецификаций хитбокса для отрисовки конкретного игрока
+        const playerSpec = AVAILABLE_SKINS.find(s => s.id === (p.skinId || 'skin1')) || AVAILABLE_SKINS[0];
 
         ctx.save();
         ctx.translate(X_POSITION, drawY);
         ctx.rotate(currentRotation);
 
         if (p.isGhost) {
-          ctx.globalAlpha = 0.3;
-          ctx.fillStyle = '#9ca3af';
+          ctx.globalAlpha = 0.25;
         } else {
-          ctx.fillStyle = isMe ? '#2563eb' : '#d97706';
-          ctx.strokeStyle = isMe ? '#3b82f6' : '#f59e0b';
-          ctx.lineWidth = 2;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = 'rgba(0,0,0,0.2)';
         }
 
-        // Рисуем птицу-кота
-        ctx.beginPath();
-        ctx.arc(0, 0, CAT_RADIUS, 0, Math.PI * 2);
-        ctx.fill();
-        if (!p.isGhost) ctx.stroke();
+        const sprite = skinsImgRef.current[playerSpec.id];
 
-        // Глаз направления полета
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(6, -4, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#000000';
-        ctx.beginPath(); ctx.arc(7, -4, 1.5, 0, Math.PI * 2); ctx.fill();
+        // Отрисовка текстуры по индивидуальным осям x и y
+        if (assetsLoaded && sprite && sprite.complete && sprite.naturalWidth !== 0) {
+          ctx.drawImage(sprite, -playerSpec.radiusX, -playerSpec.radiusY, playerSpec.radiusX * 2, playerSpec.radiusY * 2);
+        } else {
+          ctx.fillStyle = isMe ? '#38bdf8' : '#fbbf24';
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, 0, playerSpec.radiusX - 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
 
         ctx.restore();
 
-        // Никнейм пишем без учета вращения матрицы
         ctx.save();
-        ctx.fillStyle = isMe ? '#60a5fa' : '#fbbf24';
-        ctx.font = 'bold 12px font-sans, sans-serif';
+        ctx.fillStyle = isMe ? '#0369a1' : '#b45309';
+        ctx.font = 'bold 11px system-ui, sans-serif'; 
         ctx.textAlign = 'center';
-        ctx.fillText(`${p.name || 'Кот'} (${p.score || 0})`, X_POSITION, drawY - 24);
+        ctx.fillText(`${p.name.toUpperCase()} [${p.score || 0}]`, X_POSITION, drawY - (playerSpec.radiusY + 12));
         ctx.restore();
       });
 
+      ctx.restore();
       animationFrameId = requestAnimationFrame(renderLoop);
     };
 
     renderLoop();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [gameStatus, pipes, networkPlayers, room.id, user.id]);
+  }, [gameStatus, pipes, networkPlayers, room.id, user.id, assetsLoaded]);
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    handleJump();
-  };
-
-  const handleStartClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    handleStartGame();
-  };
+  const allPlayersDead = (gameStatus === 'playing' || gameStatus === 'countdown') && 
+    Object.keys(networkPlayers).length > 0 && 
+    Object.keys(networkPlayers).every(pId => networkPlayers[pId].isGhost);
 
   return (
-    <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center select-none text-white font-sans z-50">
-      <div className="absolute top-4 left-4 right-4 flex justify-between items-center bg-slate-900/90 backdrop-blur px-5 py-3 rounded-2xl max-w-md mx-auto border border-slate-800 shadow-xl">
+    <div className="fixed inset-0 bg-[#0c0d14] flex flex-col items-center justify-center select-none text-slate-200 font-sans p-0 sm:p-4 z-50">
+      
+      {/* Счетчик очков */}
+      <div className="absolute top-4 left-4 right-4 flex justify-between items-center bg-slate-900 border-2 border-slate-800 px-5 py-2.5 rounded-2xl max-w-md mx-auto shadow-xl z-20">
         <div className="flex flex-col">
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Режим</span>
-          <span className={`text-sm font-black ${networkPlayers[user.id]?.isGhost ? 'text-slate-400' : 'text-emerald-400'}`}>
-            {networkPlayers[user.id]?.isGhost ? '👻 ПРИЗРАК ПОЛЕТА' : '🐱 ЖИВОЙ КОТ'}
+          <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">СТАТУС</span>
+          <span className={`text-xs font-black ${networkPlayers[user.id]?.isGhost ? 'text-rose-400' : 'text-sky-400'}`}>
+            {networkPlayers[user.id]?.isGhost ? 'РЕЖИМ ДУХА' : 'В ПОЛЕТЕ'}
           </span>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Счет комнат</span>
-          <span className="text-xl font-black text-amber-400 animate-pulse">{networkPlayers[user.id]?.score || 0}</span>
+          <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">ОЧКИ</span>
+          <span className="text-xl font-black text-amber-400">{networkPlayers[user.id]?.score || 0}</span>
         </div>
       </div>
 
+      {/* Адаптивный холст */}
       <div 
+        ref={containerRef}
         onClick={handleJump}
-        onTouchStart={handleTouchStart}
-        className="relative border-4 border-slate-800 rounded-3xl overflow-hidden shadow-2xl bg-slate-950"
-        style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+        className="relative w-full h-full sm:w-[480px] sm:h-[640px] sm:aspect-[3/4] sm:border-4 sm:border-slate-800 sm:rounded-3xl overflow-hidden shadow-2xl bg-sky-200"
       >
-        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="block" />
+        <canvas ref={canvasRef} className="block w-full h-full" />
 
+        {/* Стилизованный черный отсчет */}
+        {gameStatus === 'countdown' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[0.5px]">
+            <span className="text-8xl font-black text-black select-none tracking-tighter animate-ping">
+              {countdownText}
+            </span>
+          </div>
+        )}
+
+        {/* Темное лобби */}
         {gameStatus === 'waiting' && (
-          <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center backdrop-blur-md">
-            <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center border border-blue-500/30 mb-4 animate-bounce">
-              <span className="text-2xl">🐱</span>
-            </div>
-            <h2 className="text-3xl font-black mb-2 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-emerald-400">
-              Flappy NEKO Engine
-            </h2>
-            <p className="text-xs text-slate-400 mb-8 max-w-xs leading-relaxed">
-              Мультиплеерная физическая синхронизация. Управляйте высотой кликом, тапом или Пробелом. Выжившие получают очки за каждую трубу.
-            </p>
-
-            {isHost ? (
-              <button
-                onClick={handleStartClick}
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 active:scale-95 transition-all text-white px-10 py-3.5 rounded-2xl font-extrabold text-base shadow-lg shadow-blue-900/30 border border-blue-400/20"
-              >
-                ЗАПУСТИТЬ СИНХРОНИЗАЦИЮ
-              </button>
-            ) : (
-              <div className="flex items-center space-x-3 bg-slate-900/80 px-5 py-2.5 rounded-xl border border-slate-800">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-ping" />
-                <span className="text-xs text-slate-400 font-bold tracking-wide">Хост подготавливает шлюз...</span>
+          <div className="absolute inset-0 bg-[#0c0d14]/98 flex flex-col items-center justify-between p-6 sm:p-8 text-center">
+            
+            {!assetsLoaded ? (
+              <div className="absolute inset-0 bg-[#0c0d14] flex flex-col items-center justify-center p-6">
+                <div className="w-9 h-9 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-4" />
+                <span className="text-xs font-black tracking-widest text-sky-400 uppercase animate-pulse">ЗАГРУЗКА ТЕКСТУР...</span>
               </div>
+            ) : (
+              <>
+                <div className="mt-12 flex flex-col items-center">
+                  <div className="w-12 h-12 bg-slate-900 border-2 border-slate-800 rounded-2xl flex items-center justify-center mb-3 text-sky-400 shadow-lg">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                  <h1 className="text-3xl font-black tracking-tight text-white uppercase">
+                    FlappyNEKO
+                  </h1>
+                </div>
+
+                {/* Выбор персонажей */}
+                <div className="w-full max-w-sm bg-slate-900/60 border-2 border-slate-800 rounded-2xl p-4">
+                  <span className="text-[11px] text-slate-400 font-black tracking-widest block mb-3 uppercase text-left border-b border-slate-800 pb-1.5">
+                    ВЫБЕРИТЕ СВОЕГО ПЕРСОНАЖА
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-800">
+                    {AVAILABLE_SKINS.map((skin) => (
+                      <button
+                        key={skin.id}
+                        onClick={(e) => { e.stopPropagation(); setCurrentSkin(skin.id); }}
+                        className={`px-3 py-3 rounded-xl border-2 text-left transition-all font-bold ${
+                          currentSkin === skin.id 
+                            ? 'bg-sky-500/10 border-sky-500 text-sky-400 shadow-md shadow-sky-500/5' 
+                            : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="text-[11px] tracking-wide truncate">{skin.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-6 w-full flex justify-center">
+                  {isHost ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleStartGame(); }}
+                      className="w-full max-w-xs bg-sky-500 hover:bg-sky-600 active:scale-95 transition-all text-white py-3.5 rounded-xl font-black text-sm tracking-wide uppercase border-b-4 border-sky-700 active:border-b-0"
+                    >
+                      Начать
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-center space-x-3 bg-slate-900/80 px-6 py-3.5 rounded-xl border border-slate-800 max-w-xs mx-auto">
+                      <div className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-ping" />
+                      <span className="text-[11px] text-slate-400 font-bold tracking-wider uppercase">Ожидание лидера...</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Меню проигрыша */}
+        {allPlayersDead && (
+          <div className="absolute inset-0 bg-[#0c0d14]/90 flex flex-col items-center justify-center p-6 text-center backdrop-blur-sm">
+            <h2 className="text-3xl font-black text-rose-500 uppercase tracking-tight mb-2">
+              Вы врезались
+            </h2>
+            <p className="text-xs text-slate-500 mb-8 uppercase tracking-widest">Все операторы завершили полет</p>
+            {isHost && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleStartGame(); }}
+                className="bg-sky-500 hover:bg-sky-600 active:scale-95 transition-all text-white px-10 py-3.5 rounded-xl font-black text-xs tracking-wider uppercase border-b-4 border-sky-700 active:border-b-0 shadow-lg shadow-sky-500/10"
+              >
+                Следующий полет
+              </button>
             )}
           </div>
         )}
       </div>
 
+      {/* Выйти */}
       <button
         onClick={onLeave}
-        className="mt-5 px-6 py-2.5 bg-slate-900 hover:bg-rose-950/50 hover:text-rose-400 text-slate-500 border border-slate-800 hover:border-rose-900/30 rounded-xl text-xs font-bold tracking-wider transition-all active:scale-95"
+        className="mt-4 sm:mt-6 px-6 py-2 bg-slate-900 hover:bg-rose-950/30 hover:text-rose-400 text-slate-500 border-2 border-slate-800 hover:border-rose-900/30 rounded-xl text-xs font-black tracking-widest uppercase transition-all active:scale-95 shadow-md"
       >
-        ВЫЙТИ ИЗ ИГРЫ
+        Выйти
       </button>
     </div>
   );
