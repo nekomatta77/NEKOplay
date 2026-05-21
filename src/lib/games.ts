@@ -3,6 +3,14 @@ import { Game } from '../types';
 
 export const GAMES: Game[] = [
   {
+    id: 'flappyneko',
+    name: 'Flappy NEKO (React)',
+    description: 'Кроссплатформенный мультиплеерный заезд! Летите одновременно с 20 игроками, уворачивайтесь от труб. После падения вы становитесь призраком и продолжаете полет!',
+    image: 'https://picsum.photos/seed/flappyneko/400/300?blur=1',
+    minPlayers: 1, 
+    maxPlayers: 20,
+  },
+  {
     id: 'drawphone',
     name: 'Испорченный телефон',
     description: 'Рисуй и угадывай! Безумная цепочка слов и рисунков.',
@@ -26,7 +34,6 @@ export const GAMES: Game[] = [
     minPlayers: 3, 
     maxPlayers: 8,
   },
-  // Наша новая игра на React
   {
     id: 'deadofwinter', 
     name: 'Мертвые сезоны',

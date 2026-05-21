@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Room, User } from '../types';
 import { ref, update, onValue, set, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
-// Импортируем нашу новую игру
 import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
+
+// ИСПРАВЛЕНО: Используем абсолютный настроенный алиас @/src для импорта, 
+// чтобы TypeScript гарантированно нашел компонент FlappyNekoGame в структуре папок
+import FlappyNekoGame from '@/src/games/FlappyNeko/FlappyNekoGame';
 
 interface GameViewProps {
   room: Room;
@@ -17,7 +20,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   const [isIframeLoaded, setIsIframeLoaded] = useState(false);
   const pendingState = useRef<any>(null);
   
-  // ДОБАВЛЕНО: Стейт для игр на React
   const [reactGameState, setReactGameState] = useState<any>(null);
 
   const handleLeaveGame = async () => {
@@ -46,10 +48,10 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id]);
 
   useEffect(() => {
-    const handleMessage = async (event: MessageEvent) => {
-      // Игнорируем сообщения от React-игр, так как они работают напрямую с Firebase
-      if (room.gameType === 'deadofwinter') return; 
+    // Игнорируем сообщения от нативных React-игр
+    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko') return; 
 
+    const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'request_fullscreen') {
         if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); }
       }
@@ -92,10 +94,9 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
       const state = snapshot.val() || {};
       pendingState.current = state; 
       
-      // ДОБАВЛЕНО: Сохраняем стейт для React компонента
       setReactGameState(state);
       
-      if (isIframeLoaded && iframeRef.current?.contentWindow && room.gameType !== 'deadofwinter') {
+      if (isIframeLoaded && iframeRef.current?.contentWindow && room.gameType !== 'deadofwinter' && room.gameType !== 'flappyneko') {
         iframeRef.current.contentWindow.postMessage({ 
           type: 'sync_state', 
           state: state,
@@ -107,7 +108,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id, room.players, isIframeLoaded, room.gameType]);
 
   useEffect(() => {
-    if (room.gameType === 'deadofwinter') return; // React-игры слушают экшены сами, если нужно
+    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko') return;
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
       const actionData = snapshot.val();
@@ -118,7 +119,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return () => unsubscribe();
   }, [room.id, user.id, isIframeLoaded, room.gameType]);
 
-  // ДОБАВЛЕНО: Логика маршрутизации
+  // МАРШРУТИЗАЦИЯ REACT ИГР
   if (room.gameType === 'deadofwinter') {
     return (
       <DeadOfWinterGame 
@@ -126,6 +127,17 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
         user={user} 
         gameState={reactGameState} 
         onLeave={handleLeaveGame} 
+      />
+    );
+  }
+
+  if (room.gameType === 'flappyneko') {
+    return (
+      <FlappyNekoGame
+        room={room}
+        user={user}
+        gameState={reactGameState}
+        onLeave={handleLeaveGame}
       />
     );
   }
