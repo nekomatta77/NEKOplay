@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { User } from '../types';
-import { Cat, UserCircle, Sparkles } from 'lucide-react';
+import { UserCircle, Sparkles } from 'lucide-react';
 import { ref, set, serverTimestamp } from 'firebase/database';
 import { db } from '../lib/firebase';
 
@@ -60,11 +60,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="relative bg-zinc-900/60 backdrop-blur-xl border border-zinc-800/80 p-8 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md z-10 my-8"
       >
+        {/* ИСПРАВЛЕНО: Блок динамического превью выбранной аватарки. Теперь закрывает ВСЮ область. Увеличен в 1.4х раза. */}
         <div className="flex justify-center mb-6">
           <div className="relative">
-            <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 rounded-full" />
-            <div className="relative bg-gradient-to-br from-indigo-500/20 to-violet-500/20 p-4 rounded-2xl border border-indigo-500/30">
-              <Cat className="w-10 h-10 text-indigo-400" />
+            {/* Мягкий внешний эффект свечения */}
+            <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-35 rounded-full" />
+            
+            {/* Основной контейнер превью: w-20 h-20 (увеличенный в 1.4ххх). Убраны padding и границы. */}
+            <div className="relative w-20 h-20 rounded-3xl overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all duration-300 bg-zinc-950/30 backdrop-blur-sm">
+              <img 
+                src={selectedAvatar} 
+                alt="Selected Profile Preview" 
+                // w-full h-full object-cover заставляет аватарку полностью закрывать область от края до края
+                className="w-full h-full object-cover rounded-2xl transition-transform duration-300 scale-105"
+              />
             </div>
           </div>
         </div>
