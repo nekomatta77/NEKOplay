@@ -14,8 +14,8 @@ interface SkinConfig {
   id: string;
   name: string;
   path: string;
-  radiusX: number; // Индивидуальный горизонтальный хитбокс
-  radiusY: number; // Индивидуальный вертикальный хитбокс
+  radiusX: number;
+  radiusY: number;
 }
 
 // Глобальный масштабирующий коэффициент для графики скинов
@@ -80,7 +80,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
   const GRAVITY = 0.4;
   const JUMP_FORCE = -7.5;
   const PIPE_WIDTH = 76;
-  const PIPE_GAP = 175; // Увеличенный зазор под индивидуальные прыжки
+  const PIPE_GAP = 175; 
   const BASE_WIDTH = 480;
   const BASE_HEIGHT = 640;
   const X_POSITION = 140;
@@ -146,7 +146,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
     });
   }, [room.id, user.id, user.name, currentSkin]);
 
-  // Красивый отсчет перед полетом
+  // Расчет красивого черного отсчета
   useEffect(() => {
     if (gameStatus !== 'countdown') {
       setCountdownText('');
@@ -218,6 +218,15 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
       pipes: [],
       startTime: Date.now(),
       players: updatedPlayers
+    });
+  };
+
+  // Метод перевода игры обратно в лобби силами хоста
+  const handleReturnToLobby = async () => {
+    const stateRef = ref(db, `rooms/${room.id}/gameState`);
+    await update(stateRef, {
+      status: 'waiting',
+      pipes: []
     });
   };
 
@@ -299,7 +308,6 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
       }
 
       const serverMe = networkPlayers[user.id];
-      // Определение спецификации хитбокса текущего скина
       const currentSpec = AVAILABLE_SKINS.find(s => s.id === (serverMe?.skinId || 'skin1')) || AVAILABLE_SKINS[0];
 
       if (gameStatus === 'countdown') {
@@ -324,7 +332,6 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
           myCatRef.current.rotation = Math.max(-0.3, myCatRef.current.rotation + 0.02 * dt);
         }
 
-        // Ограничения краев экрана используют вертикальный радиус текущего скина
         if (myCatRef.current.y > BASE_HEIGHT - currentSpec.radiusY) {
           myCatRef.current.y = BASE_HEIGHT - currentSpec.radiusY;
           myCatRef.current.velocity = 0;
@@ -344,7 +351,6 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
           myCatRef.current.isGhost = false;
           
           for (let p of pipes) {
-            // ИНДИВИДУАЛЬНЫЙ РАСЧЕТ КОЛЛИЗИИ: подстановка уникальных radiusX и radiusY активной модели
             const insideX = (X_POSITION + currentSpec.radiusX - 4 > p.x) && (X_POSITION - currentSpec.radiusX + 4 < p.x + PIPE_WIDTH);
             const hitTop = myCatRef.current.y - currentSpec.radiusY + 4 < p.top;
             const hitBottom = myCatRef.current.y + currentSpec.radiusY - 4 > p.top + PIPE_GAP;
@@ -361,7 +367,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
         }
       }
 
-      // Собственные мультяшные процедурные трубы
+      // Процедурные мультяшные трубы
       pipes.forEach((p: any) => {
         ctx.save();
         const CAP_HEIGHT = 30;
@@ -414,7 +420,6 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
         const drawY = isMe ? myCatRef.current.y : interpolatedPlayersRef.current[pId];
         const currentRotation = isMe ? myCatRef.current.rotation : (p.y > drawY ? 0.25 : -0.1);
 
-        // Получение спецификаций хитбокса для отрисовки конкретного игрока
         const playerSpec = AVAILABLE_SKINS.find(s => s.id === (p.skinId || 'skin1')) || AVAILABLE_SKINS[0];
 
         ctx.save();
@@ -430,7 +435,6 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
 
         const sprite = skinsImgRef.current[playerSpec.id];
 
-        // Отрисовка текстуры по индивидуальным осям x и y
         if (assetsLoaded && sprite && sprite.complete && sprite.naturalWidth !== 0) {
           ctx.drawImage(sprite, -playerSpec.radiusX, -playerSpec.radiusY, playerSpec.radiusX * 2, playerSpec.radiusY * 2);
         } else {
@@ -466,9 +470,9 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
     Object.keys(networkPlayers).every(pId => networkPlayers[pId].isGhost);
 
   return (
-    <div className="fixed inset-0 bg-[#0c0d14] flex flex-col items-center justify-center select-none text-slate-200 font-sans p-0 sm:p-4 z-50">
+    <div className="fixed inset-0 bg-[#0c0d14] flex flex-col items-center justify-center select-none text-slate-200 font-sans p-0 z-50">
       
-      {/* Счетчик очков */}
+      {/* Шапка счета */}
       <div className="absolute top-4 left-4 right-4 flex justify-between items-center bg-slate-900 border-2 border-slate-800 px-5 py-2.5 rounded-2xl max-w-md mx-auto shadow-xl z-20">
         <div className="flex flex-col">
           <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">СТАТУС</span>
@@ -482,7 +486,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
         </div>
       </div>
 
-      {/* Адаптивный холст */}
+      {/* Адаптивный холст игры */}
       <div 
         ref={containerRef}
         onClick={handleJump}
@@ -490,7 +494,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
       >
         <canvas ref={canvasRef} className="block w-full h-full" />
 
-        {/* Стилизованный черный отсчет */}
+        {/* Черный отсчет */}
         {gameStatus === 'countdown' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[0.5px]">
             <span className="text-8xl font-black text-black select-none tracking-tighter animate-ping">
@@ -499,7 +503,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
           </div>
         )}
 
-        {/* Темное лобби */}
+        {/* Экран лобби ожидания */}
         {gameStatus === 'waiting' && (
           <div className="absolute inset-0 bg-[#0c0d14]/98 flex flex-col items-center justify-between p-6 sm:p-8 text-center">
             
@@ -510,13 +514,8 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
               </div>
             ) : (
               <>
-                <div className="mt-12 flex flex-col items-center">
-                  <div className="w-12 h-12 bg-slate-900 border-2 border-slate-800 rounded-2xl flex items-center justify-center mb-3 text-sky-400 shadow-lg">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                  <h1 className="text-3xl font-black tracking-tight text-white uppercase">
+                <div className="mt-14 flex flex-col items-center">
+                  <h1 className="text-4xl font-black tracking-tight text-white uppercase">
                     FlappyNEKO
                   </h1>
                 </div>
@@ -543,7 +542,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
                   </div>
                 </div>
 
-                <div className="mb-6 w-full flex justify-center">
+                <div className="mb-6 w-full flex flex-col items-center gap-2">
                   {isHost ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleStartGame(); }}
@@ -552,43 +551,54 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
                       Начать
                     </button>
                   ) : (
-                    <div className="flex items-center justify-center space-x-3 bg-slate-900/80 px-6 py-3.5 rounded-xl border border-slate-800 max-w-xs mx-auto">
+                    <div className="flex items-center justify-center space-x-3 bg-slate-900/80 px-6 py-3.5 rounded-xl border border-slate-800 w-full max-w-xs mx-auto">
                       <div className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-ping" />
                       <span className="text-[11px] text-slate-400 font-bold tracking-wider uppercase">Ожидание лидера...</span>
                     </div>
                   )}
+
+                  {/* Общая кнопка отключения для всех игроков, доступная строго в лобби */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onLeave(); }}
+                    className="w-full max-w-xs bg-slate-900 hover:bg-rose-950/20 hover:text-rose-400 text-slate-400 py-2.5 rounded-xl text-xs font-black tracking-widest uppercase border-2 border-slate-800 transition-all active:scale-95 shadow-md"
+                  >
+                    Выйти
+                  </button>
                 </div>
               </>
             )}
           </div>
         )}
 
-        {/* Меню проигрыша */}
+        {/* Экран "Вы врезались" */}
         {allPlayersDead && (
           <div className="absolute inset-0 bg-[#0c0d14]/90 flex flex-col items-center justify-center p-6 text-center backdrop-blur-sm">
-            <h2 className="text-3xl font-black text-rose-500 uppercase tracking-tight mb-2">
+            <h2 className="text-3xl font-black text-rose-500 uppercase tracking-tight mb-8">
               Вы врезались
             </h2>
-            <p className="text-xs text-slate-500 mb-8 uppercase tracking-widest">Все операторы завершили полет</p>
+            
             {isHost && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleStartGame(); }}
-                className="bg-sky-500 hover:bg-sky-600 active:scale-95 transition-all text-white px-10 py-3.5 rounded-xl font-black text-xs tracking-wider uppercase border-b-4 border-sky-700 active:border-b-0 shadow-lg shadow-sky-500/10"
-              >
-                Следующий полет
-              </button>
+              <div className="w-full max-w-xs flex flex-col gap-3">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleStartGame(); }}
+                  className="w-full bg-sky-500 hover:bg-sky-600 active:scale-95 transition-all text-white py-3.5 rounded-xl font-black text-sm tracking-wider uppercase border-b-4 border-sky-700 active:border-b-0 shadow-lg"
+                >
+                  Следующий полет
+                </button>
+                
+                {/* Кнопка выхода только для хоста: выкидывает всех обратно в лобби */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleReturnToLobby(); }}
+                  className="w-full bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all text-slate-300 py-3 rounded-xl font-black text-xs tracking-wider uppercase border-b-4 border-slate-950 active:border-b-0 shadow-md"
+                >
+                  Выйти
+                </button>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Выйти */}
-      <button
-        onClick={onLeave}
-        className="mt-4 sm:mt-6 px-6 py-2 bg-slate-900 hover:bg-rose-950/30 hover:text-rose-400 text-slate-500 border-2 border-slate-800 hover:border-rose-900/30 rounded-xl text-xs font-black tracking-widest uppercase transition-all active:scale-95 shadow-md"
-      >
-        Выйти
-      </button>
     </div>
   );
 }
