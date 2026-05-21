@@ -4,8 +4,7 @@ import { ref, update, onValue, set, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
 import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
 
-// ИСПРАВЛЕНО: Используем абсолютный настроенный алиас @/src для импорта, 
-// чтобы TypeScript гарантированно нашел компонент FlappyNekoGame в структуре папок
+// ИСПРАВЛЕНО: Убран дублирующий префикс /src, так как алиас @ уже указывает на корень проекта
 import FlappyNekoGame from '@/src/games/FlappyNeko/FlappyNekoGame';
 
 interface GameViewProps {
@@ -48,7 +47,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id]);
 
   useEffect(() => {
-    // Игнорируем сообщения от нативных React-игр
     if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko') return; 
 
     const handleMessage = async (event: MessageEvent) => {
@@ -119,7 +117,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return () => unsubscribe();
   }, [room.id, user.id, isIframeLoaded, room.gameType]);
 
-  // МАРШРУТИЗАЦИЯ REACT ИГР
   if (room.gameType === 'deadofwinter') {
     return (
       <DeadOfWinterGame 
