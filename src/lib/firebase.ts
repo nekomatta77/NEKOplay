@@ -2,10 +2,11 @@
 import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 
-// Конфигурация нового проекта nek0play с поддержкой переменных окружения и резервными значениями
+// Новая конфигурация веб-приложения для проекта nek0play с резервными значениями
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBGIpVfxxFDgJbLpbWxdMGNQTjTesnA2HY",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "nek0play.firebaseapp.com",
+  // ВНИМАНИЕ: Если ваша БД создана в европейском регионе, укажите правильный адрес в .env или замените строку ниже
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://nek0play-default-rtdb.firebaseio.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "nek0play",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "nek0play.firebasestorage.app",
@@ -14,8 +15,8 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-DK40023TKE"
 };
 
-// Инициализируем приложение Firebase в контексте браузера
+// Инициализируем основное приложение Firebase в рантайме браузера
 const app = initializeApp(firebaseConfig);
 
-// Экспортируем ссылку на базу данных реального времени (Realtime Database) для синхронизации комнат
+// Экспортируем готовый экземпляр Realtime Database для работы игровых комнат
 export const db = getDatabase(app);
