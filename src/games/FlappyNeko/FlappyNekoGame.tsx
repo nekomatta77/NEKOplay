@@ -26,18 +26,18 @@ const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/nekomatta77/nekoplaya
 
 // 12 утвержденных скинов с персональными физическими размерами хитбоксов
 const SKIN_SPECS = [
-  { name: "Классика", rx: 22, ry: 22 },
-  { name: "Ворон", rx: 25, ry: 19 },
-  { name: "Свинка", rx: 23, ry: 23 },
-  { name: "Самолет", rx: 28, ry: 18 },
-  { name: "Квадракоптер", rx: 27, ry: 17 },
-  { name: "Баба Яга", rx: 19, ry: 27 },
-  { name: "Ночная Фурия", rx: 26, ry: 20 },
-  { name: "Аппа", rx: 26, ry: 22 },
-  { name: "Демон", rx: 22, ry: 22 },
-  { name: "Огненный дух", rx: 20, ry: 25 },
-  { name: "Ифрит", rx: 23, ry: 23 },
-  { name: "Алладин", rx: 29, ry: 15 }
+  { name: "Классика", rx: 30, ry: 30 },
+  { name: "Ворон", rx: 30, ry: 30 },
+  { name: "Свинка", rx: 35, ry: 35 },
+  { name: "Самолет", rx: 35, ry: 35 },
+  { name: "Квадракоптер", rx: 35, ry: 35 },
+  { name: "Баба Яга", rx: 50, ry: 50 },
+  { name: "Ночная Фурия", rx: 35, ry: 35 },
+  { name: "Аппа", rx: 35, ry: 35 },
+  { name: "Демон", rx: 35, ry: 35 },
+  { name: "Огненный дух", rx: 35, ry: 35 },
+  { name: "Ифрит", rx: 35, ry: 35 },
+  { name: "Алладин", rx: 35, ry: 35 }
 ];
 
 const AVAILABLE_SKINS: SkinConfig[] = SKIN_SPECS.map((spec, index) => {
