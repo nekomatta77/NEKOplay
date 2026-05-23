@@ -3,9 +3,8 @@ import { Room, User } from '../types';
 import { ref, update, onValue, set, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
 import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
-import FlappyNekoGame from '@/src/games/FlappyNeko/FlappyNekoGame';
-import NekoStackGame from '@/src/games/StacksNeko/NekoStackGame';
-import PixelRopeGame from '../games/PixelRope/PixelRopeGame'; // Импортируем нашу игру
+import FlappyNekoGame from '../games/FlappyNeko/FlappyNekoGame';
+import PixelRopeGame from '../games/PixelRope/PixelRopeGame';
 
 interface GameViewProps {
   room: Room;
@@ -45,8 +44,8 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id]);
 
   useEffect(() => {
-    // Добавлено исключение pixelrope для предотвращения выполнения логики iframe
-    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'nekostack' || room.gameType === 'pixelrope') return; 
+    // Исключаем встроенные игры из логики обработки событий iframe
+    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'pixelrope') return; 
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'request_fullscreen') {
@@ -87,13 +86,12 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
       pendingState.current = state; 
       setReactGameState(state);
       
-      // Исключаем отправку postMessage в iframe для pixelrope
+      // Исключаем отправку постов синхронизации в iframe для встроенных игр
       if (
         isIframeLoaded && 
         iframeRef.current?.contentWindow && 
         room.gameType !== 'deadofwinter' && 
         room.gameType !== 'flappyneko' &&
-        room.gameType !== 'nekostack' &&
         room.gameType !== 'pixelrope'
       ) {
         iframeRef.current.contentWindow.postMessage({ type: 'sync_state', state: state, roomPlayers: room.players }, '*');
@@ -103,8 +101,8 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id, room.players, isIframeLoaded, room.gameType]);
 
   useEffect(() => {
-    // Добавлено исключение pixelrope для экшенов
-    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'nekostack' || room.gameType === 'pixelrope') return;
+    // Исключаем прослушивание экшенов для встроенных игр
+    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'pixelrope') return;
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
       const actionData = snapshot.val();
@@ -122,15 +120,11 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   if (room.gameType === 'flappyneko') {
     return <FlappyNekoGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
   }
-  if (room.gameType === 'nekostack') {
-    return <NekoStackGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
-  }
-  
-  // Добавляем рендеринг PixelRope
   if (room.gameType === 'pixelrope') {
     return <PixelRopeGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
   }
 
+  // Логика формирования URL для внешних HTML5 игр внутри iframe
   const getGameUrl = () => {
     const playersCount = room.players?.length || 2;
     const isHost = room.players?.find(p => p.id === user.id)?.isHost || false;
