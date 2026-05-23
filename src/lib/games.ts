@@ -3,8 +3,16 @@ import { Game } from '../types';
 
 export const GAMES: Game[] = [
   {
-    id: 'flappyneko',
-    name: 'Флэппи Птичка',
+    id: 'Перелетики',
+    name: 'Pixel Rope',
+    description: 'Динамичная гонка на кошках-зацепах! Цепляйся за качающиеся неоновые платформы, рассчитывай инерцию и приди к финишу первым, оставив друзей позади.',
+    image: 'https://picsum.photos/seed/pixelrope/400/300?blur=1',
+    minPlayers: 1, 
+    maxPlayers: 8,
+  },
+  {
+    id: 'Флэппи Птичка',
+    name: 'Flappy Bird',
     description: 'Кроссплатформенный мультиплеерный заезд! Летите одновременно с 20 игроками, уворачивайтесь от труб. После падения вы становитесь призраком и продолжаете полет!',
     image: 'https://picsum.photos/seed/flappyneko/400/300?blur=1',
     minPlayers: 1, 
