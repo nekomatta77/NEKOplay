@@ -24,7 +24,7 @@ const SKIN_SCALE = 1.15;
 // Базовый путь к репозиторию ассетов
 const GITHUB_BASE_URL = 'https://raw.githubusercontent.com/nekomatta77/nekoplayassets/main/FlappyNEKO';
 
-// 12 утвержденных скинов с персональными физическими размерами хитбоксов
+// 12 утвержденных скинов с персональными визуальными размерами
 const SKIN_SPECS = [
   { name: "Классика", rx: 30, ry: 30 },
   { name: "Ворон", rx: 30, ry: 30 },
@@ -39,6 +39,10 @@ const SKIN_SPECS = [
   { name: "Ифрит", rx: 35, ry: 35 },
   { name: "Алладин", rx: 35, ry: 35 }
 ];
+
+// Единый стандартизированный хитбокс для честной игры (на базе Классики)
+const GAMEPLAY_RADIUS_X = 30 * SKIN_SCALE;
+const GAMEPLAY_RADIUS_Y = 30 * SKIN_SCALE;
 
 const AVAILABLE_SKINS: SkinConfig[] = SKIN_SPECS.map((spec, index) => {
   const skinNumber = index + 1;
@@ -308,7 +312,6 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
       }
 
       const serverMe = networkPlayers[user.id];
-      const currentSpec = AVAILABLE_SKINS.find(s => s.id === (serverMe?.skinId || 'skin1')) || AVAILABLE_SKINS[0];
 
       if (gameStatus === 'countdown') {
         myCatRef.current.y = 300 + Math.sin(now / 120) * 3;
@@ -332,12 +335,13 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
           myCatRef.current.rotation = Math.max(-0.3, myCatRef.current.rotation + 0.02 * dt);
         }
 
-        if (myCatRef.current.y > BASE_HEIGHT - currentSpec.radiusY) {
-          myCatRef.current.y = BASE_HEIGHT - currentSpec.radiusY;
+        // Физическое ограничение потолка и пола теперь строго одинаковое по константе GAMEPLAY_RADIUS_Y
+        if (myCatRef.current.y > BASE_HEIGHT - GAMEPLAY_RADIUS_Y) {
+          myCatRef.current.y = BASE_HEIGHT - GAMEPLAY_RADIUS_Y;
           myCatRef.current.velocity = 0;
         }
-        if (myCatRef.current.y < currentSpec.radiusY) {
-          myCatRef.current.y = currentSpec.radiusY;
+        if (myCatRef.current.y < GAMEPLAY_RADIUS_Y) {
+          myCatRef.current.y = GAMEPLAY_RADIUS_Y;
           myCatRef.current.velocity = 0;
         }
 
@@ -350,10 +354,11 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
         if (serverMe && !serverMe.isGhost) {
           myCatRef.current.isGhost = false;
           
+          // Проверка коллизий с трубами по стандартизированному хитбоксу
           for (let p of pipes) {
-            const insideX = (X_POSITION + currentSpec.radiusX - 4 > p.x) && (X_POSITION - currentSpec.radiusX + 4 < p.x + PIPE_WIDTH);
-            const hitTop = myCatRef.current.y - currentSpec.radiusY + 4 < p.top;
-            const hitBottom = myCatRef.current.y + currentSpec.radiusY - 4 > p.top + PIPE_GAP;
+            const insideX = (X_POSITION + GAMEPLAY_RADIUS_X - 4 > p.x) && (X_POSITION - GAMEPLAY_RADIUS_X + 4 < p.x + PIPE_WIDTH);
+            const hitTop = myCatRef.current.y - GAMEPLAY_RADIUS_Y + 4 < p.top;
+            const hitBottom = myCatRef.current.y + GAMEPLAY_RADIUS_Y - 4 > p.top + PIPE_GAP;
 
             if (insideX && (hitTop || hitBottom)) {
               myCatRef.current.isGhost = true;
@@ -420,6 +425,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
         const drawY = isMe ? myCatRef.current.y : interpolatedPlayersRef.current[pId];
         const currentRotation = isMe ? myCatRef.current.rotation : (p.y > drawY ? 0.25 : -0.1);
 
+        // Для отрисовки по-прежнему берем уникальные радиусы скина, чтобы визуальный размер оставался прежним!
         const playerSpec = AVAILABLE_SKINS.find(s => s.id === (p.skinId || 'skin1')) || AVAILABLE_SKINS[0];
 
         ctx.save();
@@ -436,6 +442,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
         const sprite = skinsImgRef.current[playerSpec.id];
 
         if (assetsLoaded && sprite && sprite.complete && sprite.naturalWidth !== 0) {
+          // Отрисовка сохраняет оригинальные пропорции скина
           ctx.drawImage(sprite, -playerSpec.radiusX, -playerSpec.radiusY, playerSpec.radiusX * 2, playerSpec.radiusY * 2);
         } else {
           ctx.fillStyle = isMe ? '#38bdf8' : '#fbbf24';
@@ -453,6 +460,7 @@ export default function FlappyNekoGame({ room, user, gameState, onLeave }: Flapp
         ctx.fillStyle = isMe ? '#0369a1' : '#b45309';
         ctx.font = 'bold 11px system-ui, sans-serif'; 
         ctx.textAlign = 'center';
+        // Имя над головой позиционируется с учетом визуального размера
         ctx.fillText(`${p.name.toUpperCase()} [${p.score || 0}]`, X_POSITION, drawY - (playerSpec.radiusY + 12));
         ctx.restore();
       });

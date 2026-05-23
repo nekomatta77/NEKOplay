@@ -4,8 +4,9 @@ import { ref, update, onValue, set, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
 import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
 
-// ИСПРАВЛЕНО: Убран дублирующий префикс /src, так как алиас @ уже указывает на корень проекта
+// Убран дублирующий префикс /src, так как алиас @ уже указывает на корень проекта
 import FlappyNekoGame from '@/src/games/FlappyNeko/FlappyNekoGame';
+import NekoStackGame from '@/src/games/StacksNeko/NekoStackGame';
 
 interface GameViewProps {
   room: Room;
@@ -47,7 +48,8 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id]);
 
   useEffect(() => {
-    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko') return; 
+    // Добавлен nekostack для предотвращения выполнения логики iframe-событий
+    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'nekostack') return; 
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'request_fullscreen') {
@@ -94,7 +96,14 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
       
       setReactGameState(state);
       
-      if (isIframeLoaded && iframeRef.current?.contentWindow && room.gameType !== 'deadofwinter' && room.gameType !== 'flappyneko') {
+      // Исключаем отправку postMessage в iframe, если запущена одна из встроенных игр
+      if (
+        isIframeLoaded && 
+        iframeRef.current?.contentWindow && 
+        room.gameType !== 'deadofwinter' && 
+        room.gameType !== 'flappyneko' &&
+        room.gameType !== 'nekostack'
+      ) {
         iframeRef.current.contentWindow.postMessage({ 
           type: 'sync_state', 
           state: state,
@@ -106,7 +115,8 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id, room.players, isIframeLoaded, room.gameType]);
 
   useEffect(() => {
-    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko') return;
+    // Добавлено исключение nekostack для листенера экшенов
+    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'nekostack') return;
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
       const actionData = snapshot.val();
@@ -117,6 +127,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return () => unsubscribe();
   }, [room.id, user.id, isIframeLoaded, room.gameType]);
 
+  // Секция рендеринга встроенных React-компонентов игр
   if (room.gameType === 'deadofwinter') {
     return (
       <DeadOfWinterGame 
@@ -139,6 +150,18 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     );
   }
 
+  if (room.gameType === 'nekostack') {
+    return (
+      <NekoStackGame
+        room={room}
+        user={user}
+        gameState={reactGameState}
+        onLeave={handleLeaveGame}
+      />
+    );
+  }
+
+  // Логика формирования URL для внешних HTML5 игр внутри iframe
   const getGameUrl = () => {
     const playersCount = room.players?.length || 2;
     const isHost = room.players?.find(p => p.id === user.id)?.isHost || false;

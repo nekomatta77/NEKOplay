@@ -42,4 +42,12 @@ export const GAMES: Game[] = [
     minPlayers: 2, 
     maxPlayers: 5,
   },
+  {
+    id: 'nekostack',
+    name: 'NEKO Stack',
+    description: 'Строительный онлайн-баттл на устойчивость! Сбрасывайте раскачивающиеся модерн-домики друг на друга по очереди. Удерживайте идеальный баланс башни и не дайте её каркасу рухнуть!',
+    image: 'https://picsum.photos/seed/nekostack/400/300?blur=2',
+    minPlayers: 1,
+    maxPlayers: 10,
+  },
 ];
