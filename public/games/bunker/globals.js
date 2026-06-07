@@ -17,21 +17,12 @@ var SVG_TARGET = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 
 
 var CAPACITY_MAP = { 3: 1, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4, 10: 4, 11: 5, 12: 5, 13: 6, 14: 6, 15: 7, 16: 7 };
 
-// === ШИФРОВАНИЕ КЛЮЧА ===
-const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
-
-function getApiKey() {
-    try { return atob(SECRET_KEY_BASE64); } catch(e) { return ""; }
-}
-
 function getAlivePlayers() { 
     // Получаем массив ID игроков, которые сейчас реально онлайн в комнате
     const connectedIds = (globalState.roomPlayers || []).map(p => p.id);
     
     return (globalState.players || []).filter(id => {
         const isKicked = globalState.playersData?.[id]?.kicked;
-        // Если roomPlayers пуст (например при локальном дебаге), игнорируем проверку онлайна. 
-        // Иначе проверяем, что игрок все еще в комнате.
         const isConnected = connectedIds.length === 0 || connectedIds.includes(id);
         
         return !isKicked && isConnected;
@@ -62,21 +53,15 @@ function addLog(text, type='info') {
     window.parent.postMessage({ type: 'update_state', updates }, '*'); 
 }
 
-// Принудительно пробрасываем в window, чтобы game.js их точно увидел
 window.isHost = isHost;
 window.myUserId = myUserId;
 window.myName = myName;
 window.globalState = globalState;
 window.database = database;
 
-// --- НЕЙРОСЕТЬ (Прямой запрос к OpenRouter) ---
+// --- НЕЙРОСЕТЬ (Скрытый запрос к Vercel API) ---
 const StoryGenerator = {
     async generate(aliveIds, playersData, world, onChunk) {
-        const apiKey = getApiKey();
-        if (!apiKey || apiKey.length < 10) {
-            return "СИСТЕМНАЯ ОШИБКА: Ключ API не найден или зашифрован неверно. Пожалуйста, проверьте SECRET_KEY_BASE64.";
-        }
-
         if (!world.catastrophe || !world.bunker) return "Данные о мире утеряны...";
 
         let survivorsInfo = aliveIds.map(id => {
@@ -116,19 +101,18 @@ const StoryGenerator = {
         const timeoutId = setTimeout(() => controller.abort(), 60000); 
 
         try {
-            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            // Обращаемся к локальному API Vercel
+            const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                    'HTTP-Referer': window.location.href,
-                    'X-Title': 'Bunker Simulation'
+                    'Content-Type': 'application/json'
                 },
                 signal: controller.signal,
                 body: JSON.stringify({
-                    model: 'arcee-ai/trinity-large-preview:free', 
+                    // Заменена модель на стабильную Llama 3
+                    model: 'meta-llama/llama-3-8b-instruct:free', 
                     messages: [{ role: 'user', content: prompt }], 
-                    max_tokens: 1000,
+                    max_tokens: 1500,
                     temperature: 0.8,
                     stream: true
                 })
@@ -137,7 +121,9 @@ const StoryGenerator = {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                return `ОШИБКА: Нейросеть недоступна или ключ API недействителен (Код ${response.status}).`;
+                const errorMsg = await response.text();
+                console.error("Ошибка от /api/generate:", errorMsg);
+                return `ОШИБКА: Нейросеть недоступна (Код ${response.status}). Причина: ${errorMsg}`;
             }
 
             const reader = response.body.getReader();
@@ -171,7 +157,8 @@ const StoryGenerator = {
             return fullText;
         } catch (e) {
             clearTimeout(timeoutId);
-            return "Связь с ИИ-системой прервана. Проверьте интернет или зашифрованный API-ключ.";
+            console.error("Fetch API Error:", e);
+            return "Связь с сервером прервана. Проверьте интернет или конфигурацию бэкенда.";
         }
     }
 };
