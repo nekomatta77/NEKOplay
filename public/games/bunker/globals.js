@@ -18,13 +18,10 @@ var SVG_TARGET = `<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2C6.48 
 var CAPACITY_MAP = { 3: 1, 4: 2, 5: 2, 6: 2, 7: 3, 8: 3, 9: 4, 10: 4, 11: 5, 12: 5, 13: 6, 14: 6, 15: 7, 16: 7 };
 
 function getAlivePlayers() { 
-    // Получаем массив ID игроков, которые сейчас реально онлайн в комнате
     const connectedIds = (globalState.roomPlayers || []).map(p => p.id);
-    
     return (globalState.players || []).filter(id => {
         const isKicked = globalState.playersData?.[id]?.kicked;
         const isConnected = connectedIds.length === 0 || connectedIds.includes(id);
-        
         return !isKicked && isConnected;
     }); 
 }
@@ -59,7 +56,7 @@ window.myName = myName;
 window.globalState = globalState;
 window.database = database;
 
-// --- НЕЙРОСЕТЬ (Скрытый запрос к Vercel API) ---
+// --- НЕЙРОСЕТЬ С АВТОМАТИЧЕСКИМ ПЕРЕКЛЮЧЕНИЕМ БЕСПЛАТНЫХ МОДЕЛЕЙ ---
 const StoryGenerator = {
     async generate(aliveIds, playersData, world, onChunk) {
         if (!world.catastrophe || !world.bunker) return "Данные о мире утеряны...";
@@ -74,91 +71,101 @@ const StoryGenerator = {
             - Фобия: ${p.phobia?.value || 'Нет'}
             - Хобби: ${p.hobby?.value || 'Нет'}
             - Секрет: ${p.secret?.value || 'Нет'}
-            - Факт/Особенность: ${p.fact?.value || 'Нет'}`;
+            - Факт: ${p.fact?.value || 'Нет'}`;
         }).join("\n\n");
 
-        const prompt = `Ты — суровый ИИ-рассказчик, пишущий детализированные, мрачные или реалистичные концовки для игры "Бункер".
+        const prompt = `Ты — суровый ИИ-рассказчик, пишущий детализированные, мрачные концовки для игры "Бункер".
         САМОЕ ГЛАВНОЕ ПРАВИЛО: ОТВЕЧАЙ СТРОГО НА РУССКОМ ЯЗЫКЕ! НИКАКОГО АНГЛИЙСКОГО!
 
         ДАННЫЕ О МИРЕ:
-        Катастрофа на поверхности: ${world.catastrophe.title} (${world.catastrophe.description}).
-        Характеристики бункера: ${world.bunker.title} (${world.bunker.description}).
+        Катастрофа: ${world.catastrophe.title} (${world.catastrophe.description}).
+        Бункер: ${world.bunker.title} (${world.bunker.description}).
         
-        ВЫЖИВШИЕ ВНУТРИ:
+        ВЫЖИВШИЕ:
         ${survivorsInfo}
         
-        ЗАДАЧА:
-        Напиши логичную, захватывающую и атмосферную концовку на 3-4 абзаца. Ты должен сплести все эти элементы воедино:
-        1. Хватит ли им ресурсов именно этого бункера, чтобы пережить именно эту катастрофу? 
-        2. Обязательно опиши, как пригодились (или помешали) их профессии и багаж для выживания.
-        3. Учти их здоровье, фобии, факты, хобби и СЕКРЕТЫ. Если в бункере есть тяжелобольные — опиши, смогли ли их вылечить или они стали обузой. Если кто-то скрывал опасный секрет - пусть он раскроется.
-        4. Если среди них есть нелюди, опиши их скрытую роль в бункере.
-        5. Не делай концовку всегда счастливой. Если набор выживших ужасен — они должны столкнуться с суровыми проблемами.
-        
-        Пиши художественным текстом в стиле постапокалипсиса. Не используй списки, жирный шрифт или звездочки.`;
+        ЗАДАЧА: Напиши логичную, атмосферную концовку на 3-4 абзаца. Хватит ли им ресурсов? Помогут ли профессии? Что будет с тяжелобольными? Раскрой секреты. Пиши в стиле постапокалипсиса.`;
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); 
+        // СПИСОК БЕСПЛАТНЫХ МОДЕЛЕЙ (от лучших и самых надежных к запасным)
+        const freeModels = [
+            'google/gemma-2-9b-it:free',
+            'mistralai/mistral-7b-instruct:free',
+            'qwen/qwen-2-7b-instruct:free',
+            'meta-llama/llama-3.2-3b-instruct:free',
+            'microsoft/phi-3-mini-128k-instruct:free'
+        ];
 
-        try {
-            // Обращаемся к локальному API Vercel
-            const response = await fetch('/api/generate', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json'
-                },
-                signal: controller.signal,
-                body: JSON.stringify({
-                    // Установлена правильная бесплатная текстовая модель из твоего списка
-                    model: 'nvidia/nemotron-3-ultra:free', 
-                    messages: [{ role: 'user', content: prompt }], 
-                    max_tokens: 1500,
-                    temperature: 0.8,
-                    stream: true
-                })
-            });
+        let fullText = "";
+        let success = false;
+        let lastError = "";
 
-            clearTimeout(timeoutId);
+        for (const modelSlug of freeModels) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 секунд на каждую модель
 
-            if (!response.ok) {
-                const errorMsg = await response.text();
-                console.error("Ошибка от /api/generate:", errorMsg);
-                return `ОШИБКА: Нейросеть недоступна (Код ${response.status}). Причина: ${errorMsg}`;
-            }
+            try {
+                console.log(`Пробуем сгенерировать концовку через модель: ${modelSlug}`);
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal,
+                    body: JSON.stringify({
+                        model: modelSlug,
+                        messages: [{ role: 'user', content: prompt }],
+                        max_tokens: 1500,
+                        temperature: 0.8,
+                        stream: true
+                    })
+                });
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let fullText = "";
+                clearTimeout(timeoutId);
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
-                
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
-                        try {
-                            const data = JSON.parse(trimmedLine.slice(6));
-                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
-                                fullText += data.choices[0].delta.content;
-                                if (onChunk) onChunk(fullText);
-                            }
-                        } catch(e) {}
+                if (!response.ok) {
+                    lastError = await response.text();
+                    console.warn(`Модель ${modelSlug} недоступна. Ошибка: ${lastError}. Переключаемся на следующую...`);
+                    continue; // Модель не сработала, идем к следующей в списке
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        const trimmedLine = line.trim();
+                        if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+                            try {
+                                const data = JSON.parse(trimmedLine.slice(6));
+                                if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
+                                    fullText += data.choices[0].delta.content;
+                                    if (onChunk) onChunk(fullText);
+                                }
+                            } catch(e) {}
+                        }
                     }
                 }
+                
+                if (fullText && fullText.trim() !== "") {
+                    success = true;
+                    break; // Успешно сгенерировали, прерываем цикл перебора!
+                }
+
+            } catch (e) {
+                clearTimeout(timeoutId);
+                console.error(`Сбой соединения с ${modelSlug}:`, e);
+                lastError = e.message;
             }
-            
-            if (!fullText || fullText.trim() === "") {
-                return "Связь с поверхностью прервана. ИИ-система не смогла передать итоговый отчет из-за сильных помех. \n\nТем не менее, гермодвери надежно заблокированы. Дальнейшая судьба выживших теперь исключительно в их собственных руках.";
-            }
-            return fullText;
-        } catch (e) {
-            clearTimeout(timeoutId);
-            console.error("Fetch API Error:", e);
-            return "Связь с сервером прервана. Проверьте интернет или конфигурацию бэкенда.";
         }
+
+        if (!success) {
+            return `КРИТИЧЕСКАЯ ОШИБКА: Все 5 бесплатных нейросетей отклонили запрос или недоступны. \nПоследний ответ серверов: ${lastError}\n\nГермодвери заблокированы. Дальнейшая судьба выживших неизвестна...`;
+        }
+        
+        return fullText;
     }
 };
