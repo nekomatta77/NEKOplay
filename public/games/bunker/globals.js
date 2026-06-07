@@ -109,8 +109,8 @@ const StoryGenerator = {
                 },
                 signal: controller.signal,
                 body: JSON.stringify({
-                    // ИСПРАВЛЕНИЕ: Актуальная бесплатная модель от Meta (если упадет, можно заменить на 'google/gemma-2-9b-it:free' или 'google/gemini-2.5-flash:free')
-                    model: 'meta-llama/llama-3.1-8b-instruct:free', 
+                    // Установлена правильная бесплатная текстовая модель из твоего списка
+                    model: 'nvidia/nemotron-3-ultra:free', 
                     messages: [{ role: 'user', content: prompt }], 
                     max_tokens: 1500,
                     temperature: 0.8,
