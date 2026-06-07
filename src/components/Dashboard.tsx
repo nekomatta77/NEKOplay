@@ -84,8 +84,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                // Заменена модель на стабильную Llama 3
-                model: 'meta-llama/llama-3-8b-instruct:free',
+                // ИСПРАВЛЕНО: Теперь кнопка "Тест ИИ" использует актуальную бесплатную модель
+                model: 'nvidia/nemotron-3-ultra:free',
                 messages: [{ role: 'user', content: 'Напиши короткое и жуткое приветствие для выживших в бункере (максимум 2 предложения).' }],
                 max_tokens: 150,
                 temperature: 0.8,
@@ -252,7 +252,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
             <p className="text-sm text-zinc-400">Присоединяйтесь к игре или создайте свою</p>
           </div>
           <div className="flex w-full sm:w-auto items-center gap-3">
-            {/* Кнопка теста ИИ */}
             <button 
               onClick={() => setShowAiModal(true)}
               className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold transition-colors"
