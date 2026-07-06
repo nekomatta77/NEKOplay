@@ -1,25 +1,34 @@
 // api/quiz.js
-export default async function handler(req, res) {
-    // Разрешаем только POST-запросы
+export const config = {
+    runtime: 'edge', // Возвращаем Edge, так как этот рантайм 100% работает в твоем проекте
+};
+
+export default async function handler(req) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
+        return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { 
+            status: 405, 
+            headers: { 'Content-Type': 'application/json' } 
+        });
     }
 
     try {
-        const { theme } = req.body;
+        const body = await req.json();
+        const { theme } = body;
 
-        // Берем ключ из переменных окружения Vercel
         const apiKey = process.env.BUNKER_API_KEY || process.env.VITE_OPENROUTER_API_KEY;
 
         if (!apiKey) {
-            return res.status(500).json({ error: "Ключ API не задан в переменных окружения Vercel!" });
+            return new Response(JSON.stringify({ error: "Ключ API не задан в Vercel!" }), { 
+                status: 500, 
+                headers: { 'Content-Type': 'application/json' } 
+            });
         }
 
         const prompt = `
         Ты — профессиональный генератор вопросов для интеллектуальной викторины.
         Составь ровно 1 интересный и исторически/фактически точный вопрос по теме: "${theme}".
         
-        Ты должен вернуть ответ СТРОГО в формате JSON объекта. Не добавляй никаких приветствий, markdown-разметки (не используй \`\`\`json) или пояснений. Только чистый JSON.
+        Ты должен вернуть ответ СТРОГО в формате JSON объекта. Не добавляй никаких приветствий, markdown-разметки или пояснений. Только чистый JSON.
         
         Структура ответа должна быть строго следующей:
         {
@@ -39,7 +48,7 @@ export default async function handler(req, res) {
                 'X-Title': 'NEKOplay Castle Quiz'
             },
             body: JSON.stringify({
-                model: "qwen/qwen-2.5-7b-instruct:free", // Используем бесплатную модель
+                model: "qwen/qwen-2.5-7b-instruct:free", // Используем строго бесплатную модель
                 messages: [
                     { role: "system", content: "Ты выдаешь ответы только в формате JSON без какого-либо дополнительного текста." },
                     { role: "user", content: prompt }
@@ -51,16 +60,24 @@ export default async function handler(req, res) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error("OpenRouter API Error:", response.status, errorText);
-            return res.status(response.status).json({ error: `OpenRouter Error: ${response.status}` });
+            return new Response(JSON.stringify({ error: `OpenRouter Error: ${response.status}` }), { 
+                status: response.status,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         const data = await response.json();
         
-        // Отправляем успешный ответ фронтенду
-        return res.status(200).json(data);
+        return new Response(JSON.stringify(data), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
 
     } catch (error) {
         console.error("Internal Server Error:", error);
-        return res.status(500).json({ error: `Server error: ${error.message}` });
+        return new Response(JSON.stringify({ error: `Server error: ${error.message}` }), { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }
