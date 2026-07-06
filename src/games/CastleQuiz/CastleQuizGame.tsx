@@ -1,11 +1,13 @@
 // src/games/CastleQuiz/CastleQuizGame.tsx
 import React, { useState, useEffect } from 'react';
-import { Room, Player } from '../../types';
+import { Room, User } from '../../types';
 import { generateQuizQuestion } from '../../lib/ai';
 
 interface Props {
   room: Room;
-  currentPlayer: Player;
+  user: User;
+  gameState?: any;
+  onLeave?: () => void;
 }
 
 // Структура нашей карты (Граф замков)
@@ -25,13 +27,13 @@ const CONNECTIONS = [
   [5, 7], [6, 7]  // К базе Игрока 2
 ];
 
-export const CastleQuizGame: React.FC<Props> = ({ room, currentPlayer }) => {
+export const CastleQuizGame: React.FC<Props> = ({ room, user, gameState, onLeave }) => {
   // Игроки (для простоты берем первых двух из комнаты)
   const player1 = room.players[0];
   const player2 = room.players[1] || room.players[0]; // Если играет 1 человек, он будет играть сам с собой для теста
 
   // Игровые состояния
-  const [gameState, setGameState] = useState<'setup' | 'playing' | 'gameOver'>('setup');
+  const [localGameState, setLocalGameState] = useState<'setup' | 'playing' | 'gameOver'>('setup');
   const [theme, setTheme] = useState<string>('Древний Египет');
   const [turnPlayerId, setTurnPlayerId] = useState<string>(player1.id);
   
@@ -75,7 +77,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, currentPlayer }) => {
 
   // Клик по замку на карте
   const handleCastleClick = async (castleId: number) => {
-    if (turnPlayerId !== currentPlayer.id) return; // Не наш ход
+    if (turnPlayerId !== user.id) return; // Не наш ход
     if (!canAttack(castleId)) return; // Слишком далеко
 
     setAttackingCastle(castleId);
@@ -119,7 +121,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, currentPlayer }) => {
   };
 
   // ЭКРАН НАСТРОЙКИ (Ввод темы)
-  if (gameState === 'setup') {
+  if (localGameState === 'setup') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
         <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl border border-purple-500/30 max-w-md w-full text-center">
@@ -140,7 +142,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, currentPlayer }) => {
           </div>
 
           <button 
-            onClick={() => setGameState('playing')}
+            onClick={() => setLocalGameState('playing')}
             className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-xl font-bold text-lg shadow-lg shadow-purple-500/20 transition-all transform hover:scale-[1.02]"
           >
             Начать битву
@@ -191,7 +193,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, currentPlayer }) => {
 
           {/* Отрисовка замков */}
           {castles.map(castle => {
-            const isClickable = canAttack(castle.id) && turnPlayerId === currentPlayer.id;
+            const isClickable = canAttack(castle.id) && turnPlayerId === user.id;
             const color = getPlayerColor(castle.ownerId);
             
             return (

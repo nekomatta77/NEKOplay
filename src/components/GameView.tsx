@@ -5,6 +5,7 @@ import { db } from '../lib/firebase';
 import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
 import FlappyNekoGame from '../games/FlappyNeko/FlappyNekoGame';
 import PixelRopeGame from '../games/PixelRope/PixelRopeGame';
+import CastleQuizGame from '../games/CastleQuiz/CastleQuizGame';
 
 interface GameViewProps {
   room: Room;
@@ -45,7 +46,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   useEffect(() => {
     // Исключаем встроенные игры из логики обработки событий iframe
-    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'pixelrope') return; 
+    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'pixelrope' || room.gameType === 'castlequiz') return; 
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'request_fullscreen') {
@@ -92,7 +93,8 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
         iframeRef.current?.contentWindow && 
         room.gameType !== 'deadofwinter' && 
         room.gameType !== 'flappyneko' &&
-        room.gameType !== 'pixelrope'
+        room.gameType !== 'pixelrope' &&
+        room.gameType !== 'castlequiz'
       ) {
         iframeRef.current.contentWindow.postMessage({ type: 'sync_state', state: state, roomPlayers: room.players }, '*');
       }
@@ -102,7 +104,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   useEffect(() => {
     // Исключаем прослушивание экшенов для встроенных игр
-    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'pixelrope') return;
+    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'pixelrope' || room.gameType === 'castlequiz') return;
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
       const actionData = snapshot.val();
@@ -122,6 +124,9 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }
   if (room.gameType === 'pixelrope') {
     return <PixelRopeGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
+  }
+  if (room.gameType === 'castlequiz') {
+    return <CastleQuizGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
   }
 
   // Логика формирования URL для внешних HTML5 игр внутри iframe
