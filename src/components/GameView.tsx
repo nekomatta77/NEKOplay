@@ -5,7 +5,8 @@ import { db } from '../lib/firebase';
 import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
 import FlappyNekoGame from '../games/FlappyNeko/FlappyNekoGame';
 import PixelRopeGame from '../games/PixelRope/PixelRopeGame';
-import CastleQuizGame from '../games/CastleQuiz/CastleQuizGame';
+// ВАЖНО: Импорт в фигурных скобках {}
+import { CastleQuizGame } from '../games/CastleQuiz/CastleQuizGame';
 
 interface GameViewProps {
   room: Room;
