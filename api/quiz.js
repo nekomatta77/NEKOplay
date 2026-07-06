@@ -1,24 +1,21 @@
 // api/quiz.js
 export const config = {
-    runtime: 'edge', // Используем Edge для высокой скорости ответа
+    runtime: 'edge', 
 };
 
 export default async function handler(req) {
-    // Разрешаем только POST-запросы
     if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
     try {
         const body = await req.json();
         const { theme } = body;
 
-        // Берем ключ из переменных окружения Vercel (тот же, что используется в generate.js)
         const apiKey = process.env.BUNKER_API_KEY || process.env.VITE_OPENROUTER_API_KEY;
 
         if (!apiKey) {
             return new Response(JSON.stringify({ error: "Ключ API не задан в переменных окружения Vercel!" }), { status: 500 });
         }
 
-        // Переносим промпт на сервер, чтобы скрыть логику игры от пользователей
         const prompt = `
         Ты — профессиональный генератор вопросов для интеллектуальной викторины.
         Составь ровно 1 интересный и исторически/фактически точный вопрос по теме: "${theme}".
@@ -34,7 +31,6 @@ export default async function handler(req) {
         }
         `;
 
-        // Делаем защищенный серверный запрос к OpenRouter (ошибки CORS здесь не существуют)
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -44,7 +40,8 @@ export default async function handler(req) {
                 'X-Title': 'NEKOplay Castle Quiz'
             },
             body: JSON.stringify({
-                model: "qwen/qwen-2.5-7b-instruct", // Используемая модель
+                // ИСПРАВЛЕНО: Добавлен суффикс :free
+                model: "qwen/qwen-2.5-7b-instruct:free", 
                 messages: [
                     { role: "system", content: "Ты выдаешь ответы только в формате JSON без какого-либо дополнительного текста." },
                     { role: "user", content: prompt }
@@ -53,7 +50,6 @@ export default async function handler(req) {
             })
         });
 
-        // Если OpenRouter выдал ошибку (например, упал), ловим ее
         if (!response.ok) {
             const errorText = await response.text();
             console.error("OpenRouter API Error:", response.status, errorText);
@@ -62,7 +58,6 @@ export default async function handler(req) {
 
         const data = await response.json();
         
-        // Возвращаем ответ фронтенду в формате JSON
         return new Response(JSON.stringify(data), {
             headers: { 'Content-Type': 'application/json' }
         });
