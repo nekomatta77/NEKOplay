@@ -1,19 +1,18 @@
 // api/quiz.js
-export const config = {
-    runtime: 'edge', 
-};
-
-export default async function handler(req) {
-    if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+export default async function handler(req, res) {
+    // Разрешаем только POST-запросы
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
+    }
 
     try {
-        const body = await req.json();
-        const { theme } = body;
+        const { theme } = req.body;
 
+        // Берем ключ из переменных окружения Vercel
         const apiKey = process.env.BUNKER_API_KEY || process.env.VITE_OPENROUTER_API_KEY;
 
         if (!apiKey) {
-            return new Response(JSON.stringify({ error: "Ключ API не задан в переменных окружения Vercel!" }), { status: 500 });
+            return res.status(500).json({ error: "Ключ API не задан в переменных окружения Vercel!" });
         }
 
         const prompt = `
@@ -40,8 +39,7 @@ export default async function handler(req) {
                 'X-Title': 'NEKOplay Castle Quiz'
             },
             body: JSON.stringify({
-                // ИСПРАВЛЕНО: Добавлен суффикс :free
-                model: "qwen/qwen-2.5-7b-instruct:free", 
+                model: "qwen/qwen-2.5-7b-instruct:free", // Используем бесплатную модель
                 messages: [
                     { role: "system", content: "Ты выдаешь ответы только в формате JSON без какого-либо дополнительного текста." },
                     { role: "user", content: prompt }
@@ -53,17 +51,16 @@ export default async function handler(req) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error("OpenRouter API Error:", response.status, errorText);
-            return new Response(JSON.stringify({ error: `OpenRouter Error: ${response.status}` }), { status: response.status });
+            return res.status(response.status).json({ error: `OpenRouter Error: ${response.status}` });
         }
 
         const data = await response.json();
         
-        return new Response(JSON.stringify(data), {
-            headers: { 'Content-Type': 'application/json' }
-        });
+        // Отправляем успешный ответ фронтенду
+        return res.status(200).json(data);
 
     } catch (error) {
         console.error("Internal Server Error:", error);
-        return new Response(JSON.stringify({ error: `Server error: ${error.message}` }), { status: 500 });
+        return res.status(500).json({ error: `Server error: ${error.message}` });
     }
 }
