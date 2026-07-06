@@ -50,4 +50,13 @@ export const GAMES: Game[] = [
     minPlayers: 2, 
     maxPlayers: 5,
   },
+  // НАША НОВАЯ ИГРА:
+  {
+    id: 'castlequiz', 
+    name: 'Битва Умов',
+    description: 'Стратегическая викторина с захватом замков. Выберите любую тему, и нейросеть сгенерирует уникальные вопросы для вашей битвы!',
+    image: 'https://picsum.photos/seed/castlequiz/400/300?blur=2', // Заглушка, потом заменишь на красивую картинку
+    minPlayers: 2, 
+    maxPlayers: 4,
+  }
 ];
