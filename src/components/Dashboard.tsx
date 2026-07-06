@@ -4,7 +4,7 @@ import { ref, onValue, push, set, serverTimestamp, remove } from 'firebase/datab
 import { db } from '../lib/firebase';
 import { GAMES } from '../lib/games';
 import { motion } from 'motion/react';
-import { LogOut, Plus, Users, Gamepad2, X, PlayCircle, LogOut as LeaveIcon, Bot } from 'lucide-react';
+import { LogOut, Plus, Users, Gamepad2, X, PlayCircle, LogOut as LeaveIcon } from 'lucide-react';
 
 interface DashboardProps {
   user: User;
@@ -17,12 +17,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
   const [roomName, setRoomName] = useState('Комната ' + user.name);
   const [selectedGameId, setSelectedGameId] = useState(GAMES[0].id); 
   const [maxPlayers, setMaxPlayers] = useState(GAMES[0].maxPlayers);
-  
-  // Состояния для теста ИИ
-  const [showAiModal, setShowAiModal] = useState(false);
-  const [aiResponse, setAiResponse] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
-
   const [isJoining, setIsJoining] = useState(false);
 
   const handleGameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -55,6 +49,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
           
           const isValidGame = roomData.gameType && GAMES.some(g => g.id === roomData.gameType);
 
+          // Удаляем пустые или устаревшие комнаты
           if (
             playersCount === 0 || 
             !isValidGame ||
@@ -74,63 +69,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
 
     return () => unsubscribe();
   }, []);
-
-  // Функция вызова API (Тест нейросети)
-  const handleAiTest = async () => {
-    setIsAiLoading(true);
-    setAiResponse("Установка соединения с сервером Vercel /api/generate...\n\n");
-    try {
-        const response = await fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                // ИСПРАВЛЕНО: Теперь кнопка "Тест ИИ" использует актуальную бесплатную модель
-                model: 'nvidia/nemotron-3-ultra:free',
-                messages: [{ role: 'user', content: 'Напиши короткое и жуткое приветствие для выживших в бункере (максимум 2 предложения).' }],
-                max_tokens: 150,
-                temperature: 0.8,
-                stream: true
-            })
-        });
-
-        if (!response.ok) {
-            const errText = await response.text();
-            setAiResponse(prev => prev + `ОШИБКА ${response.status}: ${errText}\n\nКод 404 означает, что модель временно недоступна или вы запустили игру локально.`);
-            setIsAiLoading(false);
-            return;
-        }
-
-        setAiResponse("");
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder("utf-8");
-
-        if (reader) {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
-                
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
-                        try {
-                            const data = JSON.parse(trimmedLine.slice(6));
-                            if (data.choices && data.choices[0].delta && data.choices[0].delta.content) {
-                                setAiResponse(prev => prev + data.choices[0].delta.content);
-                            }
-                        } catch(e) {}
-                    }
-                }
-            }
-        }
-    } catch (error: any) {
-        setAiResponse(prev => prev + `Критическая ошибка: ${error.message}`);
-    } finally {
-        setIsAiLoading(false);
-    }
-  };
 
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -253,18 +191,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
           </div>
           <div className="flex w-full sm:w-auto items-center gap-3">
             <button 
-              onClick={() => setShowAiModal(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl font-bold transition-colors"
-            >
-              <span className="hidden sm:inline">Тест ИИ</span>
-              <span className="sm:hidden">Тест</span>
-            </button>
-            <button 
               onClick={() => setShowModal(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold transition-colors"
             >
               <Plus className="w-5 h-5" />
-              <span className="hidden sm:inline">Создать комнату</span>
+              <span>Создать комнату</span>
             </button>
           </div>
         </div>
@@ -301,30 +232,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
           )}
         </div>
       </div>
-
-      {/* Окно Теста ИИ */}
-      {showAiModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-zinc-900 border border-emerald-500/30 p-6 sm:p-8 rounded-3xl w-full max-w-md relative">
-            <button onClick={() => setShowAiModal(false)} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6" /></button>
-            <h2 className="text-2xl font-black text-emerald-400 mb-6 flex items-center gap-2">
-              Тест связи с ИИ
-            </h2>
-            
-            <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 min-h-[150px] max-h-[300px] overflow-y-auto mb-6 text-zinc-300 whitespace-pre-wrap font-mono text-sm leading-relaxed">
-              {aiResponse || "Нажмите «Начать тест», чтобы отправить запрос."}
-            </div>
-
-            <button 
-              onClick={handleAiTest} 
-              disabled={isAiLoading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold uppercase tracking-wide transition-all disabled:opacity-50"
-            >
-              {isAiLoading ? 'Генерация...' : 'Начать тест'}
-            </button>
-          </motion.div>
-        </div>
-      )}
 
       {/* Окно создания комнаты */}
       {showModal && (
