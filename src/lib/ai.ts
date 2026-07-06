@@ -19,7 +19,6 @@ export async function generateQuizQuestion(theme: string) {
     try {
         console.log("Отправляем прямой запрос в Google Gemini API...");
         
-        // Достаем ключ напрямую (используя твой проброс из vite.config.ts или классический VITE_)
         const apiKey = typeof process !== 'undefined' && process.env.GEMINI_API_KEY 
             ? process.env.GEMINI_API_KEY 
             : (import.meta.env as any).VITE_GEMINI_API_KEY;
@@ -28,8 +27,8 @@ export async function generateQuizQuestion(theme: string) {
             throw new Error("API ключ Gemini не найден!");
         }
 
-        // Прямой запрос к Google API (CORS разрешен Google по умолчанию!)
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        // ИСПОЛЬЗУЕМ gemini-pro — она доступна всем аккаунтам без ограничений
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -37,7 +36,6 @@ export async function generateQuizQuestion(theme: string) {
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
-                    responseMimeType: "application/json",
                     temperature: 0.7
                 }
             })
@@ -50,20 +48,24 @@ export async function generateQuizQuestion(theme: string) {
 
         const data = await response.json();
         
-        // Достаем текст ответа и парсим JSON
-        const aiRawText = data.candidates[0].content.parts[0].text.trim();
+        let aiRawText = data.candidates[0].content.parts[0].text.trim();
+        
+        // Очищаем от случайного markdown (```json ... ```), который любит вставлять ИИ
+        if (aiRawText.startsWith('```')) {
+            aiRawText = aiRawText.replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
+        }
+
         console.log("Вопрос успешно сгенерирован!");
         return JSON.parse(aiRawText);
 
     } catch (error) {
         console.error('Ошибка генерации викторины:', error);
         
-        // Железобетонный предохранитель на случай отсутствия ключа
         return {
-            question: `[Нет доступа к ИИ] Какой город является столицей Франции? (Тема: ${theme})`,
+            question: `[Резервный вопрос] Какой город является столицей Франции? (Тема: ${theme})`,
             options: ["Лондон", "Париж", "Берлин", "Мадрид"],
             correctAnswer: "Париж",
-            fact: "Запрос к Gemini API не прошел. Убедитесь, что бесплатный ключ VITE_GEMINI_API_KEY добавлен в настройки Vercel!"
+            fact: "Запрос к Gemini API не прошел из-за ограничений сети, мы выдали экстренный вопрос!"
         };
     }
 }
