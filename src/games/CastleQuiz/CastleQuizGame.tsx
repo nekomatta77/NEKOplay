@@ -32,7 +32,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const player2 = room.players[1] || room.players[0]; 
   const isHost = user.id === player1.id;
 
-  // Игровые состояния (синхронизируются через Firebase)
   const [localGameState, setLocalGameState] = useState<'setup' | 'playing' | 'gameOver'>('setup');
   const [theme, setTheme] = useState<string>('Древний Египет');
   const [turnPlayerId, setTurnPlayerId] = useState<string>(player1.id);
@@ -43,7 +42,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string, fact: string, isCorrect: boolean } | null>(null);
 
-  // Подписка на Firebase: синхронизация состояния со всеми игроками
   useEffect(() => {
     const gameRef = ref(db, `rooms/${room.id}/gameState`);
     const unsubscribe = onValue(gameRef, (snapshot) => {
@@ -121,6 +119,16 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
 
     const data = await generateQuizQuestion(theme);
     
+    // ПРЕДОХРАНИТЕЛЬ: Если функция ИИ вернула краш
+    if (!data || data.error) {
+       update(ref(db, `rooms/${room.id}/gameState`), {
+         attackingCastle: null,
+         isGenerating: false
+       });
+       alert("Произошел критический сбой нейросети. Попробуйте еще раз!");
+       return;
+    }
+
     // Синхронизируем полученный вопрос
     update(ref(db, `rooms/${room.id}/gameState`), {
       questionData: data,
@@ -129,7 +137,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   };
 
   const handleAnswer = (selectedOption: string) => {
-    if (turnPlayerId !== user.id) return; // Отвечать может только атакующий
+    if (turnPlayerId !== user.id) return; 
 
     const isCorrect = selectedOption === questionData.correctAnswer;
     
@@ -143,13 +151,11 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       c.id === attackingCastle && isCorrect ? { ...c, ownerId: turnPlayerId } : c
     );
 
-    // Синхронизируем результат
     update(ref(db, `rooms/${room.id}/gameState`), {
       feedback: newFeedback,
       castles: newCastles
     });
 
-    // Через 4 секунды сбрасываем модалку и передаем ход
     setTimeout(() => {
       const nextPlayerId = turnPlayerId === player1.id ? player2.id : player1.id;
       update(ref(db, `rooms/${room.id}/gameState`), {
@@ -161,7 +167,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     }, 4000);
   };
 
-  // ЭКРАН НАСТРОЙКИ 
   if (localGameState === 'setup') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
@@ -203,7 +208,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     );
   }
 
-  // ОСНОВНОЙ ЭКРАН ИГРЫ
   return (
     <div className="relative flex flex-col items-center min-h-screen bg-[#0a0a0f] text-white overflow-hidden p-4">
       <div className="w-full max-w-4xl flex justify-between items-center bg-gray-800/50 p-4 rounded-2xl border border-gray-700/50 mb-8 backdrop-blur-sm">
@@ -267,7 +271,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         </svg>
       </div>
 
-      {/* МОДАЛЬНОЕ ОКНО АТАКИ */}
       {attackingCastle && (
         <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-2xl bg-gray-900 border border-gray-700 p-8 rounded-3xl shadow-2xl">
@@ -290,7 +293,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
                     <button 
                       key={idx}
                       onClick={() => handleAnswer(opt)}
-                      disabled={turnPlayerId !== user.id} // Блокируем кнопки для наблюдателя
+                      disabled={turnPlayerId !== user.id}
                       className={`p-4 bg-gray-800 border border-gray-700 rounded-xl transition-all text-lg font-medium text-left ${turnPlayerId === user.id ? 'hover:bg-purple-600 hover:border-purple-400 cursor-pointer' : 'opacity-70 cursor-not-allowed'} group`}
                     >
                       <span className="inline-block w-8 h-8 bg-gray-900 text-center leading-8 rounded-lg mr-3 transition-colors">
