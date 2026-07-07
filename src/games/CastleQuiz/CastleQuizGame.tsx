@@ -44,6 +44,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const [attackingCastle, setAttackingCastle] = useState<number | null>(null);
   const [questionData, setQuestionData] = useState<any>(null);
   const [feedback, setFeedback] = useState<{ message: string, fact: string, isCorrect: boolean } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const [timeLeft, setTimeLeft] = useState<number>(QUESTION_TIME_LIMIT);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -57,12 +58,16 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         if (data.theme) setTheme(data.theme);
         if (data.turnPlayerId) setTurnPlayerId(data.turnPlayerId);
         if (data.castles) setCastles(data.castles);
-        if (data.questions) setQuestions(data.questions);
+        
+        // В Firebase пустые массивы удаляются, поэтому используем фоллбэк на []
+        setQuestions(data.questions || []); 
+        
         if (data.winner) setWinner(data.winner);
         
         setAttackingCastle(data.attackingCastle || null);
         setQuestionData(data.questionData || null);
         setFeedback(data.feedback || null);
+        setIsGenerating(data.isGenerating || false);
         if (data.timeLeft !== undefined) setTimeLeft(data.timeLeft);
       }
     });
@@ -71,7 +76,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   }, [room.id]);
 
   useEffect(() => {
-    if (questionData && !feedback && turnPlayerId === user.id) {
+    if (questionData && !feedback && turnPlayerId === user.id && !isGenerating) {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           const newTime = prev - 1;
@@ -89,7 +94,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [questionData, feedback, turnPlayerId]);
+  }, [questionData, feedback, turnPlayerId, isGenerating]);
 
   const handleTimeUp = () => {
     processAnswer(false);
@@ -98,13 +103,11 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const handleStartGame = async () => {
     if (!isHost) return;
     
-    // Переводим всех игроков в статус ожидания генерации
     update(ref(db, `rooms/${room.id}/gameState`), {
       phase: 'generating',
       theme
     });
 
-    // Генерируем 20 вопросов за один раз
     const batch = await generateQuizBatch(theme);
     
     const initialCastles: Castle[] = [
@@ -117,7 +120,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       { id: 7, cx: 85, cy: 50, ownerId: player2.id, isBase: true }, 
     ];
 
-    // Начинаем игру и загружаем пачку вопросов в Firebase
     update(ref(db, `rooms/${room.id}/gameState`), {
       phase: 'playing',
       theme,
@@ -127,6 +129,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       attackingCastle: null,
       questionData: null,
       feedback: null,
+      isGenerating: false,
       winner: null,
       timeLeft: QUESTION_TIME_LIMIT
     });
@@ -150,24 +153,34 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     });
   };
 
-  const handleCastleClick = (castleId: number) => {
+  const handleCastleClick = async (castleId: number) => {
     if (turnPlayerId !== user.id) return; 
     if (!canAttack(castleId)) return;
+    if (attackingCastle) return; // Защита от двойного клика
 
-    if (questions.length === 0) {
-        alert("Боезапас вопросов исчерпан! В этой партии ничья по истощению.");
-        return;
-    }
+    let currentQuestions = [...questions];
 
-    // Берем первый вопрос из кэша и удаляем его из общего списка
-    const nextQuestion = questions[0];
-    const remainingQuestions = questions.slice(1);
-
+    // Открываем окно боя, если нужно докачать вопросы — включаем спиннер
     update(ref(db, `rooms/${room.id}/gameState`), {
       attackingCastle: castleId,
-      questionData: nextQuestion,
-      questions: remainingQuestions,
+      isGenerating: currentQuestions.length === 0,
       feedback: null,
+      questionData: null
+    });
+
+    // ДИНАМИЧЕСКАЯ ДОЗАРЯДКА: Если массив пуст, запрашиваем новую пачку у ИИ
+    if (currentQuestions.length === 0) {
+        const newBatch = await generateQuizBatch(theme);
+        currentQuestions = newBatch;
+    }
+
+    const nextQuestion = currentQuestions[0];
+    const remainingQuestions = currentQuestions.slice(1);
+
+    update(ref(db, `rooms/${room.id}/gameState`), {
+      questionData: nextQuestion,
+      questions: remainingQuestions, // Firebase может удалить пустой массив, это нормально
+      isGenerating: false,
       timeLeft: QUESTION_TIME_LIMIT
     });
   };
@@ -266,15 +279,14 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     );
   }
 
-  // --- ЭКРАН ГЕНЕРАЦИИ (Для обоих игроков) ---
+  // --- ЭКРАН ГЕНЕРАЦИИ ---
   if (localGameState === 'generating') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white p-4">
         <div className="bg-gray-800/80 backdrop-blur-md p-10 rounded-3xl shadow-2xl border border-purple-500/30 max-w-md w-full text-center flex flex-col items-center">
           <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
           <h2 className="text-2xl font-black text-purple-400 tracking-widest uppercase mb-3">Синтез боевого арсенала...</h2>
-          <p className="text-gray-400 text-sm">ИИ генерирует 20 уникальных вопросов по теме <span className="font-bold text-white">«{theme}»</span>.</p>
-          <p className="text-gray-500 text-xs mt-4">Это займет несколько секунд.</p>
+          <p className="text-gray-400 text-sm">ИИ генерирует начальный пул вопросов по теме <span className="font-bold text-white">«{theme}»</span>.</p>
         </div>
       </div>
     );
@@ -306,7 +318,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
               {room.players.find(p => p.id === turnPlayerId)?.name}
             </span>
           </div>
-          <div className="text-xs text-gray-500 mt-1">Остаток вопросов: {questions.length}</div>
+          <div className="text-xs text-gray-500 mt-1">Остаток пула: {questions.length} (Авто-пополнение)</div>
         </div>
 
         <div className={`flex items-center space-x-4 px-6 py-3 rounded-xl transition-all flex-row-reverse space-x-reverse ${turnPlayerId === player2.id ? 'bg-red-500/10 border border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'opacity-50 grayscale'}`}>
@@ -427,7 +439,13 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
             
             <div className="absolute top-0 left-0 w-full h-1 bg-purple-500/50 animate-[scan_2s_ease-in-out_infinite]"></div>
 
-            {questionData && !feedback ? (
+            {isGenerating ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
+                <h3 className="text-2xl font-black text-purple-400 tracking-widest uppercase">Дозарядка пула...</h3>
+                <p className="text-gray-500 mt-4 font-mono text-sm">Связь с серверами ИИ восстановлена</p>
+              </div>
+            ) : questionData && !feedback ? (
               <div className="animate-in slide-in-from-bottom-4">
                 
                 <div className="w-full h-2 bg-gray-800 rounded-full mb-8 overflow-hidden">
