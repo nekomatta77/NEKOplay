@@ -3,13 +3,12 @@
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
     
-    // Промпт теперь содержит жесткий запрет на рассуждения (Chain of Thought)
-    const prompt = `Тема: "${theme}". Сид: ${randomSeed}.
+    const prompt = `Тема: "${theme}".
     Действуй как главный редактор телевизионной викторины. Сгенерируй 7 уникальных вопросов.
     
-    АБСОЛЮТНО КРИТИЧЕСКИЕ ПРАВИЛА (ШТРАФ ЗА НАРУШЕНИЕ):
+    АБСОЛЮТНО КРИТИЧЕСКИЕ ПРАВИЛА:
     1. БЕЗ РАССУЖДЕНИЙ! Категорически запрещено писать свои мысли, "reasoning", "chain of thought", вступления или заключения.
-    2. НАЧИНАЙ ОТВЕТ СТРОГО С ТЕГА [Q]. Никаких JSON-структур, только чистый текст по шаблону.
+    2. НАЧИНАЙ ОТВЕТ СТРОГО С ТЕГА [Q]. Никаких JSON-структур, только чистый текст.
     3. АБСОЛЮТНАЯ ИСТОРИЧЕСКАЯ ТОЧНОСТЬ. 100% достоверные факты и цифры.
     4. Идеальный, грамотный русский язык (проверяй падежи).
     5. Используй ТОЛЬКО одинарные кавычки (''), двойные ("") запрещены.
@@ -22,16 +21,23 @@ export async function generateQuizBatch(theme: string) {
     `;
 
     try {
-        console.log("Запрашиваем вопросы у продвинутой нейросети (GPT-4o)...");
+        console.log("Запрашиваем вопросы у GPT-4o (через POST-запрос)...");
         
-        // Жестко фиксируем модель gpt-4o, чтобы избежать попадания на экспериментальные модели
-        const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=gpt-4o`;
-        
-        const response = await fetch(url, {
+        // ПЕРЕХОДИМ НА POST-ЗАПРОС! 
+        // Теперь промпт передается в теле запроса (body), а не в ссылке. Ошибки 404 больше не будет.
+        const response = await fetch('https://text.pollinations.ai/', {
+            method: 'POST',
             headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            }
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messages: [
+                    { role: 'system', content: 'You are a strict data generator. Output ONLY the requested format. No conversational text.' },
+                    { role: 'user', content: prompt }
+                ],
+                model: 'openai', // Принудительно требуем самую умную модель (GPT-4o)
+                seed: randomSeed
+            })
         });
 
         if (!response.ok) {
@@ -40,25 +46,22 @@ export async function generateQuizBatch(theme: string) {
 
         let text = await response.text();
         
-        // 1. АНТИ-HTML ЗАЩИТА (если упал сервер Cloudflare)
+        // Анти-HTML защита
         if (text.toLowerCase().includes('<!doctype html>') || text.toLowerCase().includes('<html')) {
-            throw new Error("Нейросеть недоступна (вернула HTML-страницу защиты)");
+            throw new Error("Нейросеть недоступна (вернула HTML)");
         }
 
-        // 2. АНТИ-JSON ЗАЩИТА (извлекаем текст, если API внезапно обернул его в JSON)
+        // Анти-JSON защита (если ИИ обернет ответ)
         try {
             if (text.trim().startsWith('{')) {
                 const parsed = JSON.parse(text);
-                // Ищем контент в стандартных полях ответа
                 text = parsed.content || parsed.message || parsed.response || parsed.text || text;
             }
-        } catch (e) {
-            // Игнорируем ошибку парсинга, значит текст пришел в сыром виде (это нормально)
-        }
+        } catch (e) {}
         
-        console.log("Ответ ИИ получен, начинаем жесткую фильтрацию...");
+        console.log("Ответ ИИ получен, начинаем фильтрацию...");
         
-        // Очистка от маркдауна и нормализация
+        // Очистка от маркдауна
         text = text.replace(/\*/g, '');
         text = text.replace(/```/g, '');
         text = text.replace(/\[Q\]:/gi, '[Q]').replace(/\[O\]:/gi, '[O]').replace(/\[A\]:/gi, '[A]').replace(/\[F\]:/gi, '[F]');
@@ -67,7 +70,6 @@ export async function generateQuizBatch(theme: string) {
         const blocks = text.split('[Q]');
         const questions: any[] = [];
 
-        // Парсим блоки
         for (let i = 1; i < blocks.length; i++) {
             const block = blocks[i];
             
@@ -83,7 +85,6 @@ export async function generateQuizBatch(theme: string) {
                 
                 const options = optionsText.split('|').map(o => o.trim()).filter(o => o.length > 0);
                 
-                // Добиваем варианты до 4, если ИИ ошибся
                 while(options.length < 4) {
                     options.push(`Резервный вариант ${options.length + 1}`);
                 }
@@ -91,7 +92,6 @@ export async function generateQuizBatch(theme: string) {
                     options.length = 4;
                 }
                 
-                // Пропускаем в игру только непустые вопросы
                 if (questionText.length > 5 && answerText.length > 1) {
                     questions.push({
                         question: questionText,
@@ -105,7 +105,7 @@ export async function generateQuizBatch(theme: string) {
 
         if (questions.length === 0) {
             console.error("Сырой текст от ИИ:", text); 
-            throw new Error("Парсер не смог найти ни одного тега [Q], [O], [A], [F]");
+            throw new Error("Парсер не смог найти ни одного тега");
         }
 
         console.log(`Успешно получено и отфильтровано вопросов: ${questions.length}`);
