@@ -1,7 +1,7 @@
 // src/games/CastleQuiz/CastleQuizGame.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Room, User } from '../../types';
-import { generateQuizQuestion } from '../../lib/ai';
+import { generateQuizBatch } from '../../lib/ai';
 import { ref, update, onValue } from 'firebase/database';
 import { db } from '../../lib/firebase';
 
@@ -27,22 +27,22 @@ const CONNECTIONS = [
   [5, 7], [6, 7] 
 ];
 
-const QUESTION_TIME_LIMIT = 20; // 20 секунд на ответ
+const QUESTION_TIME_LIMIT = 20; 
 
 export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const player1 = room.players[0];
   const player2 = room.players[1] || room.players[0]; 
   const isHost = user.id === player1.id;
 
-  const [localGameState, setLocalGameState] = useState<'setup' | 'playing' | 'gameOver'>('setup');
+  const [localGameState, setLocalGameState] = useState<'setup' | 'generating' | 'playing' | 'gameOver'>('setup');
   const [theme, setTheme] = useState<string>('Древний Египет');
   const [turnPlayerId, setTurnPlayerId] = useState<string>(player1.id);
   const [winner, setWinner] = useState<string | null>(null);
   
   const [castles, setCastles] = useState<Castle[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]);
   const [attackingCastle, setAttackingCastle] = useState<number | null>(null);
   const [questionData, setQuestionData] = useState<any>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string, fact: string, isCorrect: boolean } | null>(null);
 
   const [timeLeft, setTimeLeft] = useState<number>(QUESTION_TIME_LIMIT);
@@ -57,12 +57,12 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         if (data.theme) setTheme(data.theme);
         if (data.turnPlayerId) setTurnPlayerId(data.turnPlayerId);
         if (data.castles) setCastles(data.castles);
+        if (data.questions) setQuestions(data.questions);
         if (data.winner) setWinner(data.winner);
         
         setAttackingCastle(data.attackingCastle || null);
         setQuestionData(data.questionData || null);
         setFeedback(data.feedback || null);
-        setIsGenerating(data.isGenerating || false);
         if (data.timeLeft !== undefined) setTimeLeft(data.timeLeft);
       }
     });
@@ -70,7 +70,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     return () => unsubscribe();
   }, [room.id]);
 
-  // Управление таймером
   useEffect(() => {
     if (questionData && !feedback && turnPlayerId === user.id) {
       timerRef.current = setInterval(() => {
@@ -93,12 +92,20 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   }, [questionData, feedback, turnPlayerId]);
 
   const handleTimeUp = () => {
-    // Если время вышло - ответ неверный
     processAnswer(false);
   };
 
-  const handleStartGame = () => {
+  const handleStartGame = async () => {
     if (!isHost) return;
+    
+    // Переводим всех игроков в статус ожидания генерации
+    update(ref(db, `rooms/${room.id}/gameState`), {
+      phase: 'generating',
+      theme
+    });
+
+    // Генерируем 20 вопросов за один раз
+    const batch = await generateQuizBatch(theme);
     
     const initialCastles: Castle[] = [
       { id: 1, cx: 15, cy: 50, ownerId: player1.id, isBase: true },
@@ -110,24 +117,25 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       { id: 7, cx: 85, cy: 50, ownerId: player2.id, isBase: true }, 
     ];
 
+    // Начинаем игру и загружаем пачку вопросов в Firebase
     update(ref(db, `rooms/${room.id}/gameState`), {
       phase: 'playing',
       theme,
       turnPlayerId: player1.id,
       castles: initialCastles,
+      questions: batch,
       attackingCastle: null,
       questionData: null,
       feedback: null,
-      isGenerating: false,
       winner: null,
       timeLeft: QUESTION_TIME_LIMIT
     });
   };
 
   const getPlayerColor = (ownerId: string | null, isGlow = false) => {
-    if (ownerId === player1.id) return isGlow ? '#60a5fa' : '#3b82f6'; // Синий
-    if (ownerId === player2.id) return isGlow ? '#f87171' : '#ef4444'; // Красный
-    return isGlow ? '#6b7280' : '#374151'; // Нейтральный серый
+    if (ownerId === player1.id) return isGlow ? '#60a5fa' : '#3b82f6'; 
+    if (ownerId === player2.id) return isGlow ? '#f87171' : '#ef4444'; 
+    return isGlow ? '#6b7280' : '#374151'; 
   };
 
   const canAttack = (targetCastleId: number) => {
@@ -142,32 +150,24 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     });
   };
 
-  const handleCastleClick = async (castleId: number) => {
+  const handleCastleClick = (castleId: number) => {
     if (turnPlayerId !== user.id) return; 
     if (!canAttack(castleId)) return;
 
-    update(ref(db, `rooms/${room.id}/gameState`), {
-      attackingCastle: castleId,
-      isGenerating: true,
-      feedback: null,
-      questionData: null,
-      timeLeft: QUESTION_TIME_LIMIT
-    });
-
-    const data = await generateQuizQuestion(theme);
-    
-    if (!data || data.error) {
-       update(ref(db, `rooms/${room.id}/gameState`), {
-         attackingCastle: null,
-         isGenerating: false
-       });
-       alert("Сбой нейросети. Попробуйте еще раз!");
-       return;
+    if (questions.length === 0) {
+        alert("Боезапас вопросов исчерпан! В этой партии ничья по истощению.");
+        return;
     }
 
+    // Берем первый вопрос из кэша и удаляем его из общего списка
+    const nextQuestion = questions[0];
+    const remainingQuestions = questions.slice(1);
+
     update(ref(db, `rooms/${room.id}/gameState`), {
-      questionData: data,
-      isGenerating: false,
+      attackingCastle: castleId,
+      questionData: nextQuestion,
+      questions: remainingQuestions,
+      feedback: null,
       timeLeft: QUESTION_TIME_LIMIT
     });
   };
@@ -190,7 +190,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       c.id === attackingCastle && isCorrect ? { ...c, ownerId: turnPlayerId } : c
     );
 
-    // Проверка на победу: если захвачена чужая база
     if (isCorrect && targetCastle?.isBase) {
       newPhase = 'gameOver';
       gameWinner = turnPlayerId;
@@ -210,7 +209,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       winner: gameWinner
     });
 
-    // Если игра не окончена, передаем ход через 4 секунды
     if (newPhase === 'playing') {
       setTimeout(() => {
         const nextPlayerId = turnPlayerId === player1.id ? player2.id : player1.id;
@@ -268,11 +266,25 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     );
   }
 
+  // --- ЭКРАН ГЕНЕРАЦИИ (Для обоих игроков) ---
+  if (localGameState === 'generating') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white p-4">
+        <div className="bg-gray-800/80 backdrop-blur-md p-10 rounded-3xl shadow-2xl border border-purple-500/30 max-w-md w-full text-center flex flex-col items-center">
+          <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
+          <h2 className="text-2xl font-black text-purple-400 tracking-widest uppercase mb-3">Синтез боевого арсенала...</h2>
+          <p className="text-gray-400 text-sm">ИИ генерирует 20 уникальных вопросов по теме <span className="font-bold text-white">«{theme}»</span>.</p>
+          <p className="text-gray-500 text-xs mt-4">Это займет несколько секунд.</p>
+        </div>
+      </div>
+    );
+  }
+
   // --- ЭКРАН ИГРЫ ---
   return (
     <div className="relative flex flex-col items-center min-h-screen bg-[#050508] text-white overflow-hidden p-4 font-sans">
       
-      {/* HUD (Головы игроков и статус) */}
+      {/* HUD */}
       <div className="w-full max-w-5xl flex justify-between items-center bg-gray-900/80 p-4 rounded-2xl border border-gray-800 shadow-lg mb-6 backdrop-blur-md z-10">
         <div className={`flex items-center space-x-4 px-6 py-3 rounded-xl transition-all ${turnPlayerId === player1.id ? 'bg-blue-500/10 border border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'opacity-50 grayscale'}`}>
           <div className="w-12 h-12 rounded-full bg-blue-600 border-2 border-blue-400 overflow-hidden">
@@ -294,6 +306,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
               {room.players.find(p => p.id === turnPlayerId)?.name}
             </span>
           </div>
+          <div className="text-xs text-gray-500 mt-1">Остаток вопросов: {questions.length}</div>
         </div>
 
         <div className={`flex items-center space-x-4 px-6 py-3 rounded-xl transition-all flex-row-reverse space-x-reverse ${turnPlayerId === player2.id ? 'bg-red-500/10 border border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'opacity-50 grayscale'}`}>
@@ -309,8 +322,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
 
       {/* ТАКТИЧЕСКАЯ КАРТА */}
       <div className="relative w-full max-w-5xl aspect-[21/9] bg-gray-950 rounded-3xl border border-gray-800 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden">
-        
-        {/* Фоновая сетка для эстетики киберпанка/голограммы */}
         <div className="absolute inset-0 opacity-10" 
              style={{ backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
         </div>
@@ -323,13 +334,11 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
             </filter>
           </defs>
 
-          {/* Линии связей */}
           {CONNECTIONS.map((conn, i) => {
             const from = castles.find(c => c.id === conn[0]);
             const to = castles.find(c => c.id === conn[1]);
             if (!from || !to) return null;
             
-            // Если оба замка принадлежат одному игроку, линия подсвечивается его цветом
             const isOwnedConn = from.ownerId && from.ownerId === to.ownerId;
             const strokeColor = isOwnedConn ? getPlayerColor(from.ownerId, true) : "#1f2937";
             
@@ -347,9 +356,8 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
             );
           })}
 
-          {/* Замки / Узлы */}
           {castles.map(castle => {
-            const isClickable = canAttack(castle.id) && turnPlayerId === user.id;
+            const isClickable = canAttack(castle.id) && turnPlayerId === user.id && !attackingCastle;
             const color = getPlayerColor(castle.ownerId);
             const glowColor = getPlayerColor(castle.ownerId, true);
             
@@ -360,10 +368,8 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
                 style={{ transformOrigin: `${castle.cx}% ${castle.cy}%` }}
                 onClick={() => handleCastleClick(castle.id)}
               >
-                {/* Пульсирующее поле вокруг узла */}
                 <circle cx={`${castle.cx}%`} cy={`${castle.cy}%`} r={castle.isBase ? "45" : "35"} fill={glowColor} opacity="0.1" className="animate-pulse" />
                 
-                {/* Шестиугольник базы */}
                 <polygon 
                   points={
                     castle.isBase 
@@ -377,14 +383,12 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
                   className="transition-colors duration-500"
                 />
 
-                {/* Иконка внутри (Корона для базы, точка для обычного) */}
                 {castle.isBase ? (
                   <text x={`${castle.cx}%`} y={`${castle.cy}%`} fontSize="16" fill="#fff" textAnchor="middle" dominantBaseline="central" className="font-bold">★</text>
                 ) : (
                   <circle cx={`${castle.cx}%`} cy={`${castle.cy}%`} r="4" fill="#fff" opacity="0.5" />
                 )}
 
-                {/* Прицел для атаки */}
                 {isClickable && (
                   <circle cx={`${castle.cx}%`} cy={`${castle.cy}%`} r={castle.isBase ? "35" : "28"} fill="none" stroke="#fff" strokeWidth="2" strokeDasharray="6 6" className="animate-spin-slow" />
                 )}
@@ -421,19 +425,11 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="w-full max-w-3xl bg-gray-900/90 border border-purple-500/30 p-8 md:p-12 rounded-3xl shadow-[0_0_60px_rgba(168,85,247,0.2)] relative overflow-hidden">
             
-            {/* Анимация сканирования на фоне карточки */}
             <div className="absolute top-0 left-0 w-full h-1 bg-purple-500/50 animate-[scan_2s_ease-in-out_infinite]"></div>
 
-            {isGenerating ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
-                <h3 className="text-2xl font-black text-purple-400 tracking-widest uppercase">Нейросеть генерирует бой...</h3>
-                <p className="text-gray-500 mt-4 font-mono text-sm">Подключение к базе данных знаний: {theme}</p>
-              </div>
-            ) : questionData && !feedback ? (
+            {questionData && !feedback ? (
               <div className="animate-in slide-in-from-bottom-4">
                 
-                {/* Таймер бар */}
                 <div className="w-full h-2 bg-gray-800 rounded-full mb-8 overflow-hidden">
                   <div 
                     className="h-full transition-all duration-1000 ease-linear"
@@ -496,7 +492,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         </div>
       )}
 
-      {/* Глобальные стили для специфичных анимаций игры */}
       <style>{`
         @keyframes scan {
           0% { transform: translateY(0); }
