@@ -1,22 +1,15 @@
 // src/lib/ai.ts
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
     
-    // Явно указываем типы для параметров callback-функции в map (_: any, i: number), чтобы TS не ругался
+    // Явно указываем типы, чтобы TypeScript был доволен
     const getFallback = () => Array(7).fill(null).map((_: any, i: number) => ({
-        question: `[Офлайн режим] Вопрос №${i + 1} по теме: "${theme}"? (Сид: ${randomSeed})`,
+        question: `[Аварийный протокол] Вопрос №${i + 1} по теме: "${theme}"? (Сид: ${randomSeed})`,
         options: ["Протокол Альфа", "Протокол Бета", "Протокол Гамма", "Протокол Дельта"],
         correctAnswer: "Протокол Альфа",
-        fact: "Активированы резервные алгоритмы. Проверьте подключение или валидность API ключа."
+        fact: "Связь с ИИ прервалась. Активированы резервные алгоритмы."
     }));
-
-    if (!GEMINI_API_KEY) {
-        console.error("КРИТИЧЕСКАЯ ОШИБКА: API ключ отсутствует!");
-        return getFallback();
-    }
 
     const systemPrompt = `Ты — главный редактор телевизионной викторины. Твоя задача выдать 7 уникальных вопросов.
     
@@ -34,40 +27,48 @@ export async function generateQuizBatch(theme: string) {
     [F] Достоверный факт`;
 
     try {
-        console.log("Запрашиваем данные у нейросети...");
+        console.log("Запрашиваем данные у GPT-4o (через безопасный POST-запрос)...");
         
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        // Используем POST-запрос. Это позволяет отправлять длинные промпты 
+        // и использовать мощную модель GPT-4o абсолютно бесплатно и БЕЗ КЛЮЧЕЙ.
+        const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: `${systemPrompt}\n\nТема: "${theme}". Сгенерируй 7 вопросов.`
-                    }]
-                }],
-                generationConfig: {
-                    temperature: 0.7 
-                }
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `Тема: "${theme}". Сгенерируй 7 вопросов.` }
+                ],
+                model: 'openai', // Принудительно заставляем сервер использовать OpenAI GPT-4o
+                seed: randomSeed
             })
         });
 
         if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(`Ошибка API: ${response.status} - ${JSON.stringify(errData)}`);
+            throw new Error(`Ошибка сети: ${response.status}`);
         }
 
-        const data = await response.json();
+        let text = await response.text();
         
-        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
-            throw new Error("Структура ответа API изменилась или пуста");
+        // Анти-HTML защита
+        if (text.toLowerCase().includes('<!doctype html>') || text.toLowerCase().includes('<html')) {
+            throw new Error("Нейросеть недоступна (вернула HTML)");
         }
-        let text = data.candidates[0].content.parts[0].text;
+
+        // Анти-JSON защита (на случай если ИИ обернет ответ)
+        try {
+            if (text.trim().startsWith('{')) {
+                const parsed = JSON.parse(text);
+                text = parsed.content || parsed.message || parsed.response || parsed.text || text;
+            }
+        } catch (e) {}
         
-        console.log("Ответ от ИИ получен! Запускаем жесткую фильтрацию...");
+        console.log("Ответ ИИ получен, начинаем фильтрацию...");
         
-        text = text.replace(/\*/g, '').replace(/```/g, '');
+        text = text.replace(/\*/g, '');
+        text = text.replace(/```/g, '');
         text = text.replace(/\[Q\]:/gi, '[Q]').replace(/\[O\]:/gi, '[O]').replace(/\[A\]:/gi, '[A]').replace(/\[F\]:/gi, '[F]');
         text = text.replace(/\[q\]/gi, '[Q]').replace(/\[o\]/gi, '[O]').replace(/\[a\]/gi, '[A]').replace(/\[f\]/gi, '[F]');
 
@@ -87,7 +88,6 @@ export async function generateQuizBatch(theme: string) {
                 const answerText = block.substring(idxA + 3, idxF).trim();
                 const factText = block.substring(idxF + 3).replace(/---/g, '').trim();
                 
-                // ИСПРАВЛЕНИЕ ОШИБКИ: Явно указываем (o: string)
                 const options = optionsText.split('|').map((o: string) => o.trim()).filter((o: string) => o.length > 0);
                 
                 while(options.length < 4) {
@@ -113,7 +113,7 @@ export async function generateQuizBatch(theme: string) {
             throw new Error("Парсер не смог найти ни одного тега");
         }
 
-        console.log(`Успешно получено вопросов: ${questions.length}`);
+        console.log(`Успешно получено вопросов от ИИ: ${questions.length}`);
         return questions;
 
     } catch (error) {
