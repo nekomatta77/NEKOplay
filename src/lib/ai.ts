@@ -1,69 +1,73 @@
 // src/lib/ai.ts
 
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
     
-    const prompt = `Тема: "${theme}".
-    Действуй как главный редактор телевизионной викторины. Сгенерируй 7 уникальных вопросов.
+    // Явно указываем типы для параметров callback-функции в map (_: any, i: number), чтобы TS не ругался
+    const getFallback = () => Array(7).fill(null).map((_: any, i: number) => ({
+        question: `[Офлайн режим] Вопрос №${i + 1} по теме: "${theme}"? (Сид: ${randomSeed})`,
+        options: ["Протокол Альфа", "Протокол Бета", "Протокол Гамма", "Протокол Дельта"],
+        correctAnswer: "Протокол Альфа",
+        fact: "Активированы резервные алгоритмы. Проверьте подключение или валидность API ключа."
+    }));
+
+    if (!GEMINI_API_KEY) {
+        console.error("КРИТИЧЕСКАЯ ОШИБКА: API ключ отсутствует!");
+        return getFallback();
+    }
+
+    const systemPrompt = `Ты — главный редактор телевизионной викторины. Твоя задача выдать 7 уникальных вопросов.
     
     АБСОЛЮТНО КРИТИЧЕСКИЕ ПРАВИЛА:
-    1. БЕЗ РАССУЖДЕНИЙ! Категорически запрещено писать свои мысли, "reasoning", "chain of thought", вступления или заключения.
-    2. НАЧИНАЙ ОТВЕТ СТРОГО С ТЕГА [Q]. Никаких JSON-структур, только чистый текст.
-    3. АБСОЛЮТНАЯ ИСТОРИЧЕСКАЯ ТОЧНОСТЬ. 100% достоверные факты и цифры.
-    4. Идеальный, грамотный русский язык (проверяй падежи).
-    5. Используй ТОЛЬКО одинарные кавычки (''), двойные ("") запрещены.
+    1. БЕЗ РАССУЖДЕНИЙ! Категорически запрещено писать свои мысли, "reasoning", вступления или заключения. 
+    2. НАЧИНАЙ ОТВЕТ СТРОГО С ТЕГА [Q]. Никаких JSON или приветствий, только чистый текст.
+    3. АБСОЛЮТНАЯ ИСТОРИЧЕСКАЯ ТОЧНОСТЬ. 100% достоверные факты.
+    4. Идеальный русский язык, правильные падежи.
+    5. Используй ТОЛЬКО одинарные кавычки (''), двойные запрещены.
     
     Шаблон каждого вопроса строго такой:
     [Q] Текст вопроса
     [O] Вариант 1 | Вариант 2 | Вариант 3 | Вариант 4
     [A] Правильный вариант (точная копия из [O])
-    [F] Достоверный факт
-    `;
+    [F] Достоверный факт`;
 
     try {
-        console.log("Запрашиваем вопросы у GPT-4o (через POST-запрос)...");
+        console.log("Запрашиваем данные у нейросети...");
         
-        // ПЕРЕХОДИМ НА POST-ЗАПРОС! 
-        // Теперь промпт передается в теле запроса (body), а не в ссылке. Ошибки 404 больше не будет.
-        const response = await fetch('https://text.pollinations.ai/', {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                messages: [
-                    { role: 'system', content: 'You are a strict data generator. Output ONLY the requested format. No conversational text.' },
-                    { role: 'user', content: prompt }
-                ],
-                model: 'openai', // Принудительно требуем самую умную модель (GPT-4o)
-                seed: randomSeed
+                contents: [{
+                    parts: [{
+                        text: `${systemPrompt}\n\nТема: "${theme}". Сгенерируй 7 вопросов.`
+                    }]
+                }],
+                generationConfig: {
+                    temperature: 0.7 
+                }
             })
         });
 
         if (!response.ok) {
-            throw new Error(`Ошибка сети: ${response.status}`);
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(`Ошибка API: ${response.status} - ${JSON.stringify(errData)}`);
         }
 
-        let text = await response.text();
+        const data = await response.json();
         
-        // Анти-HTML защита
-        if (text.toLowerCase().includes('<!doctype html>') || text.toLowerCase().includes('<html')) {
-            throw new Error("Нейросеть недоступна (вернула HTML)");
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts) {
+            throw new Error("Структура ответа API изменилась или пуста");
         }
-
-        // Анти-JSON защита (если ИИ обернет ответ)
-        try {
-            if (text.trim().startsWith('{')) {
-                const parsed = JSON.parse(text);
-                text = parsed.content || parsed.message || parsed.response || parsed.text || text;
-            }
-        } catch (e) {}
+        let text = data.candidates[0].content.parts[0].text;
         
-        console.log("Ответ ИИ получен, начинаем фильтрацию...");
+        console.log("Ответ от ИИ получен! Запускаем жесткую фильтрацию...");
         
-        // Очистка от маркдауна
-        text = text.replace(/\*/g, '');
-        text = text.replace(/```/g, '');
+        text = text.replace(/\*/g, '').replace(/```/g, '');
         text = text.replace(/\[Q\]:/gi, '[Q]').replace(/\[O\]:/gi, '[O]').replace(/\[A\]:/gi, '[A]').replace(/\[F\]:/gi, '[F]');
         text = text.replace(/\[q\]/gi, '[Q]').replace(/\[o\]/gi, '[O]').replace(/\[a\]/gi, '[A]').replace(/\[f\]/gi, '[F]');
 
@@ -83,7 +87,8 @@ export async function generateQuizBatch(theme: string) {
                 const answerText = block.substring(idxA + 3, idxF).trim();
                 const factText = block.substring(idxF + 3).replace(/---/g, '').trim();
                 
-                const options = optionsText.split('|').map(o => o.trim()).filter(o => o.length > 0);
+                // ИСПРАВЛЕНИЕ ОШИБКИ: Явно указываем (o: string)
+                const options = optionsText.split('|').map((o: string) => o.trim()).filter((o: string) => o.length > 0);
                 
                 while(options.length < 4) {
                     options.push(`Резервный вариант ${options.length + 1}`);
@@ -108,17 +113,11 @@ export async function generateQuizBatch(theme: string) {
             throw new Error("Парсер не смог найти ни одного тега");
         }
 
-        console.log(`Успешно получено и отфильтровано вопросов: ${questions.length}`);
+        console.log(`Успешно получено вопросов: ${questions.length}`);
         return questions;
 
     } catch (error) {
         console.error('Ошибка ИИ, загрузка резерва:', error);
-        
-        return Array(7).fill(null).map((_, i) => ({
-            question: `[Сбой нейросети] Вопрос №${i + 1} по теме: "${theme}"? (Сид: ${randomSeed})`,
-            options: ["Протокол Альфа", "Протокол Бета", "Протокол Гамма", "Протокол Дельта"],
-            correctAnswer: "Протокол Альфа",
-            fact: "Связь с основным ИИ была нарушена. Активированы резервные алгоритмы."
-        }));
+        return getFallback();
     }
 }
