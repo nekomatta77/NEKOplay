@@ -10,8 +10,7 @@ export async function generateQuizBatch(theme: string) {
         fact: "Связь с нейросетью нестабильна. Используется автономный пул вопросов."
     }));
 
-    const systemPrompt = `Ты — профессиональный редактор интеллектуальных игр и строгий JSON-генератор.
-Твоя задача — составить 7 сложных, интересных вопросов на тему: "${theme}".
+    const systemPrompt = `Ты — профессиональный редактор интеллектуальных игр. Твоя задача — составить 7 сложных, интересных вопросов на тему: "${theme}".
 
 КРИТЕРИИ:
 1. Безупречный литературный русский язык.
@@ -21,7 +20,7 @@ export async function generateQuizBatch(theme: string) {
 5. РОВНО 7 вопросов.
 
 ФОРМАТ ВЫВОДА:
-Верни СТРОГО валидный JSON-массив. НИКАКОГО дополнительного текста до или после массива. Никаких приветствий, markdown-разметки или пояснений. Только квадратные скобки и объекты внутри.
+Верни СТРОГО валидный JSON-массив. НИКАКОГО дополнительного текста. Никаких приветствий.
 [
   {
     "question": "Текст вопроса?",
@@ -32,7 +31,7 @@ export async function generateQuizBatch(theme: string) {
 ]`;
 
     try {
-        console.log("Запрашиваем нейросеть (Ультимативный парсер v2.0)...");
+        console.log("Запрашиваем нейросеть (Ультимативный парсер v3.0)...");
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -46,7 +45,7 @@ export async function generateQuizBatch(theme: string) {
                 ],
                 model: 'openai', 
                 seed: randomSeed,
-                jsonMode: true // Форсируем вывод в формате JSON (поддерживается многими LLM)
+                jsonMode: true
             })
         });
 
@@ -54,50 +53,62 @@ export async function generateQuizBatch(theme: string) {
 
         let text = await response.text();
         console.log("Ответ получен. RAW TEXT (первые 150 символов):", text.substring(0, 150).replace(/\n/g, '\\n'));
-        console.log("Запуск многоуровневой очистки...");
+        
+        // УРОВЕНЬ 1: Снятие обертки API (Главный фикс)
+        // Если API вернуло полный JSON-объект (например, с полями role, reasoning, content)
+        try {
+            const apiResponse = JSON.parse(text);
+            if (apiResponse && typeof apiResponse === 'object') {
+                // Вытаскиваем сам текст из нужного поля
+                if (typeof apiResponse.content === 'string') {
+                    text = apiResponse.content;
+                } else if (apiResponse.choices?.[0]?.message?.content) {
+                    text = apiResponse.choices[0].message.content;
+                }
+            }
+        } catch (e) {
+            // Если распарсить весь текст как JSON не вышло, значит API вернуло просто текст.
+            // Игнорируем и идем дальше.
+        }
+
+        // УРОВЕНЬ 2: Очистка от маркдауна
+        text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
         let parsedData: any = null;
 
-        // УРОВЕНЬ 1: Очистка от маркдауна (если ИИ все же его добавил)
-        text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-        // УРОВЕНЬ 2: Жесткое извлечение массива
-        // Ищем первую открывающую и последнюю закрывающую скобки массива
+        // УРОВЕНЬ 3: Жесткое извлечение структуры массива
         const firstBracket = text.indexOf('[');
         const lastBracket = text.lastIndexOf(']');
         
         if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
             let jsonString = text.substring(firstBracket, lastBracket + 1);
             
-            // Санитизация 1: Убираем висячие запятые перед закрывающими скобками (частая ошибка LLM)
+            // Санитизация: убираем висячие запятые (частая ошибка нейросетей)
             jsonString = jsonString.replace(/,\s*([\]}])/g, '$1');
-            
-            // Санитизация 2: Убиваем реальные переносы строк, так как они ломают JSON.parse внутри строковых значений
-            jsonString = jsonString.replace(/\n/g, ' '); 
-            jsonString = jsonString.replace(/\r/g, '');
             
             try {
                 parsedData = JSON.parse(jsonString);
             } catch (e) {
-                console.warn("Первичный парсинг массива не удался, пробуем объект...", e);
+                console.warn("Обычный парсинг массива не удался, чистим переносы строк...", e);
+                // Если ИИ вставил неэкранированные переносы прямо внутрь строковых значений
+                jsonString = jsonString.replace(/\n/g, ' ').replace(/\r/g, '');
+                try {
+                    parsedData = JSON.parse(jsonString);
+                } catch (finalError) {
+                    throw new Error(`Структура JSON массива безнадежно повреждена: ${(finalError as Error).message}`);
+                }
             }
-        } 
-        
-        // УРОВЕНЬ 3: Резервный поиск объекта (если ИИ завернул массив в { "questions": [...] })
-        if (!parsedData) {
-             const firstBrace = text.indexOf('{');
-             const lastBrace = text.lastIndexOf('}');
-             if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        } else {
+            // Резерв: Поиск объекта { "questions": [...] }, если ИИ не послушал промт
+            const firstBrace = text.indexOf('{');
+            const lastBrace = text.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
                  let jsonString = text.substring(firstBrace, lastBrace + 1);
                  jsonString = jsonString.replace(/,\s*([\]}])/g, '$1').replace(/\n/g, ' ');
-                 try {
-                     parsedData = JSON.parse(jsonString);
-                 } catch(e) {
-                     throw new Error("Сбой критического парсинга: структура JSON безнадежно повреждена.");
-                 }
-             } else {
-                 throw new Error("В ответе ИИ отсутствуют структуры массива [] или объекта {}.");
-             }
+                 parsedData = JSON.parse(jsonString);
+            } else {
+                throw new Error("В ответе ИИ нет структур массива [] или объекта {}.");
+            }
         }
 
         // УРОВЕНЬ 4: Локализация массива внутри распарсенных данных
@@ -126,7 +137,7 @@ export async function generateQuizBatch(theme: string) {
         const validQuestions = questionsRaw.map((q: any, index: number) => {
             let options = Array.isArray(q.options) ? [...q.options] : ["Вариант А", "Вариант Б", "Вариант В", "Вариант Г"];
             
-            // Защита от пустых ответов
+            // Фильтрация пустых строк, которые иногда выдает ИИ
             options = options.filter(opt => opt && String(opt).trim() !== "");
             
             while(options.length < 4) options.push(`Доп. вариант ${options.length + 1}`);
@@ -134,14 +145,13 @@ export async function generateQuizBatch(theme: string) {
 
             const correct = q.correctAnswer || options[0];
             
-            // Если ИИ забыл добавить правильный ответ в массив вариантов
             if (!options.includes(correct)) {
                 options[Math.floor(Math.random() * 4)] = correct; 
             }
 
             options = options.map(opt => String(opt));
 
-            // Правильная рандомизация вариантов ответов (Алгоритм Фишера-Йетса)
+            // Правильная рандомизация вариантов (Фишер-Йетс)
             for (let i = options.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [options[i], options[j]] = [options[j], options[i]];
@@ -155,10 +165,10 @@ export async function generateQuizBatch(theme: string) {
             };
         });
 
-        return validQuestions.slice(0, 7); // Гарантируем возврат ровно 7 вопросов
+        return validQuestions.slice(0, 7);
 
     } catch (error) {
         console.error('Критическая ошибка ИИ:', error);
-        return getFallback(); // Автоматически переходим на локальные вопросы без падения игры
+        return getFallback();
     }
 }
