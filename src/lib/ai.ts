@@ -1,8 +1,5 @@
 // src/lib/ai.ts
 
-// Твой ключ Cerebras, надежно зашифрованный в Base64
-const CEREBRAS_KEY_BASE64 = "Y3NrLTk1ZDZodzZrNW53aGVyeXJjZXJwbXYzcmt0bXR5cGZ5Yzg5dHB2OGttMjI1cmtwbg=="; 
-
 // --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
 function extractValidQuestionsFromText(text: string): any[] {
     const results: any[] = [];
@@ -63,61 +60,24 @@ function extractValidQuestionsFromText(text: string): any[] {
 }
 
 export async function generateQuizBatch(theme: string) {
-    const systemPrompt = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
-КРИТИЧЕСКИЕ ПРАВИЛА:
-1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО реальные, достоверные факты. Никаких выдуманных механик или предметов.
-2. Текстовые ответы в массиве "options", А НЕ ЦИФРЫ.
-3. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "options". Не пиши туда номер ответа!
-4. СТРОГО ИСПОЛЬЗУЙ КЛЮЧИ: question, options, correctAnswer, fact.
-
-Формат (строго без пробелов и текста):
-[{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]`;
-
     try {
-        console.log(`⚡ Запрашиваем ИИ (Cerebras Llama 3.1 - Ultra Fast)...`);
+        console.log(`⚡ Запрашиваем ИИ через внутренний Vercel API...`);
         
-        const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+        // Обращаемся к НАШЕМУ серверу (папка api, файл quiz.js). CORS физически невозможен.
+        const response = await fetch('/api/quiz', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                // Расшифровываем ключ в момент отправки
-                'Authorization': `Bearer ${atob(CEREBRAS_KEY_BASE64)}`
-            },
-            body: JSON.stringify({
-                // Топовая модель Llama 3.1 70B
-                model: "llama3.1-70b", 
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Тема: "${theme}". Только JSON массив из 10 вопросов.` }
-                ],
-                // Гарантируем JSON ответ
-                response_format: { type: "json_object" }
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme })
         });
 
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error("Cerebras API Error Response:", errText);
-            throw new Error(`API Error: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`Internal Server Error: ${response.status}`);
 
         const data = await response.json();
         let text = data.choices?.[0]?.message?.content?.trim() || "";
         
         let questionsRaw = extractValidQuestionsFromText(text);
 
-        if (questionsRaw.length === 0) {
-            const match = text.match(/\[[\s\S]*\]/);
-            if (match) {
-                try {
-                    const parsed = JSON.parse(match[0].replace(/,\s*([\]}])/g, '$1'));
-                    if (Array.isArray(parsed) && parsed.length > 0) questionsRaw = parsed;
-                } catch(e) {}
-            }
-        }
-
         if (!questionsRaw || questionsRaw.length === 0) {
-            console.error("RAW TEXT (провал извлечения):", text.substring(0, 200));
             throw new Error("Empty Array");
         }
 
@@ -135,7 +95,6 @@ export async function generateQuizBatch(theme: string) {
                 const idx = parseInt(correct, 10) - 1;
                 if (idx >= 0 && idx < options.length) correct = options[idx];
             }
-
             if (!options.includes(correct)) correct = options[0];
 
             for (let i = options.length - 1; i > 0; i--) {
@@ -151,11 +110,11 @@ export async function generateQuizBatch(theme: string) {
             };
         });
 
-        console.log(`✅ Cerebras успешно сгенерировал вопросов: ${validQuestions.length}`);
+        console.log(`✅ ИИ успешно сгенерировал вопросов: ${validQuestions.length}`);
         return validQuestions.slice(0, 10); 
 
     } catch (error) {
-        console.warn("🛡️ Ошибка парсинга или сети (Cerebras). Возвращаем пустой массив.", error);
+        console.warn("🛡️ Ошибка парсинга или сети. Возвращаем пустой массив.", error);
         return []; 
     }
 }
