@@ -75,6 +75,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   }, [room.id]);
 
   useEffect(() => {
+    // Включаем таймер только если мы в активной фазе вопроса и это ход текущего игрока
     if (questionData && !feedback && turnPlayerId === user.id && !isGenerating) {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
@@ -93,7 +94,8 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [questionData, feedback, turnPlayerId, isGenerating]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionData, feedback, turnPlayerId, isGenerating, room.id, user.id]);
 
   const handleTimeUp = () => {
     processAnswer(false);
@@ -166,6 +168,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       questionData: null
     });
 
+    // Если вопросы кончились, генерируем новую партию прямо во время боя
     if (currentQuestions.length === 0) {
         const newBatch = await generateQuizBatch(theme);
         currentQuestions = newBatch;
