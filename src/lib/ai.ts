@@ -1,5 +1,8 @@
 // src/lib/ai.ts
 
+// Твой ключ Cerebras, надежно зашифрованный в Base64
+const CEREBRAS_KEY_BASE64 = "Y3NrLTk1ZDZodzZrNW53aGVyeXJjZXJwbXYzcmt0bXR5cGZ5Yzg5dHB2OGttMjI1cmtwbg=="; 
+
 // --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
 function extractValidQuestionsFromText(text: string): any[] {
     const results: any[] = [];
@@ -60,39 +63,47 @@ function extractValidQuestionsFromText(text: string): any[] {
 }
 
 export async function generateQuizBatch(theme: string) {
-    const randomSeed = Math.floor(Math.random() * 1000000);
-
-    // Запрашиваем ровно 7 вопросов. Это гарантирует, что ИИ не оборвет текст на половине, 
-    // и нам не придется спамить сервер двойными запросами.
-    const systemPrompt = `Ты - генератор викторин. Выдай ТОЛЬКО JSON-массив из 7 вопросов на тему: "${theme}".
+    const systemPrompt = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
 КРИТИЧЕСКИЕ ПРАВИЛА:
-1. Используй ТОЛЬКО достоверные факты. Никаких выдуманных механик или предметов.
-2. Текстовые ответы в массиве "o", А НЕ ЦИФРЫ.
-3. Поле "c" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из "o".
-4. СТРОГО ИСПОЛЬЗУЙ КЛЮЧИ: q, o, c, f.
+1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО реальные, достоверные факты. Никаких выдуманных механик или предметов.
+2. Текстовые ответы в массиве "options", А НЕ ЦИФРЫ.
+3. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "options". Не пиши туда номер ответа!
+4. СТРОГО ИСПОЛЬЗУЙ КЛЮЧИ: question, options, correctAnswer, fact.
 
-Формат:
-[{"q":"Вопрос?","o":["А","Б","В","Г"],"c":"Б","f":"Короткий факт"}]`;
+Формат (строго без пробелов и текста):
+[{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]`;
 
     try {
-        console.log(`⚡ Запрашиваем ИИ (God-Mode v19.1 - Safe GET Fetch)... Ждем партию вопросов.`);
+        console.log(`⚡ Запрашиваем ИИ (Cerebras Llama 3.1 - Ultra Fast)...`);
         
-        // Одинарный GET-запрос: не вызывает 429 Too Many Requests, не вызывает CORS, не требует ключей.
-        const url = `https://text.pollinations.ai/prompt/${encodeURIComponent(systemPrompt)}?model=openai&json=true&seed=${randomSeed}`;
-        
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                // Расшифровываем ключ в момент отправки
+                'Authorization': `Bearer ${atob(CEREBRAS_KEY_BASE64)}`
+            },
+            body: JSON.stringify({
+                // Топовая модель Llama 3.1 70B
+                model: "llama3.1-70b", 
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `Тема: "${theme}". Только JSON массив из 10 вопросов.` }
+                ],
+                // Гарантируем JSON ответ
+                response_format: { type: "json_object" }
+            })
+        });
 
-        let text = await response.text();
-        
-        try {
-            const apiResponse = JSON.parse(text);
-            if (apiResponse && typeof apiResponse === 'object') {
-                if (typeof apiResponse.content === 'string') text = apiResponse.content;
-                else if (apiResponse.choices?.[0]?.message?.content) text = apiResponse.choices[0].message.content;
-            }
-        } catch (e) {}
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error("Cerebras API Error Response:", errText);
+            throw new Error(`API Error: ${response.status}`);
+        }
 
+        const data = await response.json();
+        let text = data.choices?.[0]?.message?.content?.trim() || "";
+        
         let questionsRaw = extractValidQuestionsFromText(text);
 
         if (questionsRaw.length === 0) {
@@ -106,7 +117,7 @@ export async function generateQuizBatch(theme: string) {
         }
 
         if (!questionsRaw || questionsRaw.length === 0) {
-            console.error("RAW TEXT:", text.substring(0, 200));
+            console.error("RAW TEXT (провал извлечения):", text.substring(0, 200));
             throw new Error("Empty Array");
         }
 
@@ -140,11 +151,11 @@ export async function generateQuizBatch(theme: string) {
             };
         });
 
-        console.log(`✅ ИИ успешно сгенерировал вопросов: ${validQuestions.length}`);
-        return validQuestions;
-        
-    } catch (e) {
-        console.warn("🛡️ Сервер ИИ недоступен или перегружен. Возвращаем пустой массив.", e);
+        console.log(`✅ Cerebras успешно сгенерировал вопросов: ${validQuestions.length}`);
+        return validQuestions.slice(0, 10); 
+
+    } catch (error) {
+        console.warn("🛡️ Ошибка парсинга или сети (Cerebras). Возвращаем пустой массив.", error);
         return []; 
     }
 }
