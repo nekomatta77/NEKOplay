@@ -1,8 +1,5 @@
 // src/lib/ai.ts
 
-// Твой ключ DeepSeek, зашифрованный в Base64 для обхода защиты GitHub
-const DEEPSEEK_KEY_BASE64 = "c2stMjg2NGZmOWY0N2M5NGU4NDk3NGRmMzYzMGQ2Y2FiOGI=";
-
 // --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
 function extractValidQuestionsFromText(text: string): any[] {
     const results: any[] = [];
@@ -63,45 +60,39 @@ function extractValidQuestionsFromText(text: string): any[] {
 }
 
 export async function generateQuizBatch(theme: string) {
-    const systemPrompt = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
+    const randomSeed = Math.floor(Math.random() * 1000000);
+
+    // Запрашиваем ровно 7 вопросов. Это гарантирует, что ИИ не оборвет текст на половине, 
+    // и нам не придется спамить сервер двойными запросами.
+    const systemPrompt = `Ты - генератор викторин. Выдай ТОЛЬКО JSON-массив из 7 вопросов на тему: "${theme}".
 КРИТИЧЕСКИЕ ПРАВИЛА:
-1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО реальные, достоверные факты.
+1. Используй ТОЛЬКО достоверные факты. Никаких выдуманных механик или предметов.
 2. Текстовые ответы в массиве "o", А НЕ ЦИФРЫ.
-3. Поле "c" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "o". Не пиши туда номер ответа!
+3. Поле "c" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из "o".
 4. СТРОГО ИСПОЛЬЗУЙ КЛЮЧИ: q, o, c, f.
 
-Формат (строго без пробелов и лишнего текста):
+Формат:
 [{"q":"Вопрос?","o":["А","Б","В","Г"],"c":"Б","f":"Короткий факт"}]`;
 
     try {
-        console.log(`⚡ Запрашиваем ИИ (DeepSeek API - Base64 Hidden Key)...`);
+        console.log(`⚡ Запрашиваем ИИ (God-Mode v19.1 - Safe GET Fetch)... Ждем партию вопросов.`);
         
-        const response = await fetch('https://api.deepseek.com/chat/completions', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                // Расшифровываем ключ прямо перед отправкой
-                'Authorization': `Bearer ${atob(DEEPSEEK_KEY_BASE64)}`
-            },
-            body: JSON.stringify({
-                // Используем флагманскую модель DeepSeek
-                model: "deepseek-chat", 
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Тема: "${theme}". Только JSON массив из 10 вопросов.` }
-                ]
-            })
-        });
-
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error("API Error Response:", errText);
-            throw new Error(`API Error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        let text = data.choices?.[0]?.message?.content?.trim() || "";
+        // Одинарный GET-запрос: не вызывает 429 Too Many Requests, не вызывает CORS, не требует ключей.
+        const url = `https://text.pollinations.ai/prompt/${encodeURIComponent(systemPrompt)}?model=openai&json=true&seed=${randomSeed}`;
         
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+        let text = await response.text();
+        
+        try {
+            const apiResponse = JSON.parse(text);
+            if (apiResponse && typeof apiResponse === 'object') {
+                if (typeof apiResponse.content === 'string') text = apiResponse.content;
+                else if (apiResponse.choices?.[0]?.message?.content) text = apiResponse.choices[0].message.content;
+            }
+        } catch (e) {}
+
         let questionsRaw = extractValidQuestionsFromText(text);
 
         if (questionsRaw.length === 0) {
@@ -115,7 +106,7 @@ export async function generateQuizBatch(theme: string) {
         }
 
         if (!questionsRaw || questionsRaw.length === 0) {
-            console.error("RAW TEXT (провал извлечения):", text.substring(0, 200));
+            console.error("RAW TEXT:", text.substring(0, 200));
             throw new Error("Empty Array");
         }
 
@@ -125,7 +116,6 @@ export async function generateQuizBatch(theme: string) {
             
             while(options.length < 4) options.push(`Доп. вариант ${options.length + 1}`);
             if (options.length > 4) options.length = 4;
-            
             options = options.map(opt => String(opt));
 
             let correct = String(q.correctAnswer || q.c || options[0]);
@@ -151,10 +141,10 @@ export async function generateQuizBatch(theme: string) {
         });
 
         console.log(`✅ ИИ успешно сгенерировал вопросов: ${validQuestions.length}`);
-        return validQuestions.slice(0, 10); 
-
-    } catch (error) {
-        console.warn("🛡️ Ошибка парсинга или сети. Возвращаем пустой массив.", error);
+        return validQuestions;
+        
+    } catch (e) {
+        console.warn("🛡️ Сервер ИИ недоступен или перегружен. Возвращаем пустой массив.", e);
         return []; 
     }
 }
