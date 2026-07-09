@@ -59,7 +59,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         if (data.turnPlayerId) setTurnPlayerId(data.turnPlayerId);
         if (data.castles) setCastles(data.castles);
         
-        // В Firebase пустые массивы удаляются, поэтому используем фоллбэк на []
         setQuestions(data.questions || []); 
         
         if (data.winner) setWinner(data.winner);
@@ -156,11 +155,10 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const handleCastleClick = async (castleId: number) => {
     if (turnPlayerId !== user.id) return; 
     if (!canAttack(castleId)) return;
-    if (attackingCastle) return; // Защита от двойного клика
+    if (attackingCastle) return;
 
     let currentQuestions = [...questions];
 
-    // Открываем окно боя, если нужно докачать вопросы — включаем спиннер
     update(ref(db, `rooms/${room.id}/gameState`), {
       attackingCastle: castleId,
       isGenerating: currentQuestions.length === 0,
@@ -168,7 +166,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       questionData: null
     });
 
-    // ДИНАМИЧЕСКАЯ ДОЗАРЯДКА: Если массив пуст, запрашиваем новую пачку у ИИ
     if (currentQuestions.length === 0) {
         const newBatch = await generateQuizBatch(theme);
         currentQuestions = newBatch;
@@ -179,7 +176,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
 
     update(ref(db, `rooms/${room.id}/gameState`), {
       questionData: nextQuestion,
-      questions: remainingQuestions, // Firebase может удалить пустой массив, это нормально
+      questions: remainingQuestions, 
       isGenerating: false,
       timeLeft: QUESTION_TIME_LIMIT
     });
@@ -235,7 +232,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     }
   };
 
-  // --- ЭКРАН НАСТРОЙКИ ---
   if (localGameState === 'setup') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white p-4">
@@ -279,20 +275,19 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     );
   }
 
-  // --- ЭКРАН ГЕНЕРАЦИИ ---
   if (localGameState === 'generating') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white p-4">
         <div className="bg-gray-800/80 backdrop-blur-md p-10 rounded-3xl shadow-2xl border border-purple-500/30 max-w-md w-full text-center flex flex-col items-center">
           <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
           <h2 className="text-2xl font-black text-purple-400 tracking-widest uppercase mb-3">Синтез боевого арсенала...</h2>
-          <p className="text-gray-400 text-sm">ИИ генерирует начальный пул вопросов по теме <span className="font-bold text-white">«{theme}»</span>.</p>
+          <p className="text-gray-400 text-sm mb-2">Бесплатная нейросеть формирует пул вопросов по теме <span className="font-bold text-white">«{theme}»</span>.</p>
+          <p className="text-green-400 text-xs font-mono uppercase tracking-widest bg-green-900/20 px-3 py-1 rounded border border-green-500/30 mt-2">API ключи не требуются</p>
         </div>
       </div>
     );
   }
 
-  // --- ЭКРАН ИГРЫ ---
   return (
     <div className="relative flex flex-col items-center min-h-screen bg-[#050508] text-white overflow-hidden p-4 font-sans">
       
@@ -443,7 +438,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
               <div className="flex flex-col items-center justify-center py-16">
                 <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
                 <h3 className="text-2xl font-black text-purple-400 tracking-widest uppercase">Дозарядка пула...</h3>
-                <p className="text-gray-500 mt-4 font-mono text-sm">Связь с серверами ИИ восстановлена</p>
+                <p className="text-gray-500 mt-4 font-mono text-sm">Открытое AI соединение установлено</p>
               </div>
             ) : questionData && !feedback ? (
               <div className="animate-in slide-in-from-bottom-4">
