@@ -1,23 +1,22 @@
 // src/lib/ai.ts
 
-// Берем ключ СТРОГО из файла .env (GitHub его не увидит)
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+// API-ключи больше не требуются! 
+// Мы используем публичный прокси-эндпоинт Pollinations AI, который под капотом использует 
+// мощные модели (GPT/Mistral/Llama) абсолютно бесплатно и без ключей.
 
 export async function generateQuizBatch(theme: string) {
+    // Генерируем уникальный сид, чтобы каждый раз получать разные вопросы даже на одну тему
     const randomSeed = Math.floor(Math.random() * 1000000);
     
+    // Фолбэк на случай, если у пользователя пропадет интернет
     const getFallback = () => Array(7).fill(null).map((_: any, i: number) => ({
         question: `[Офлайн режим] Вопрос №${i + 1} по теме: "${theme}"? (Сид: ${randomSeed})`,
         options: ["Протокол Альфа", "Протокол Бета", "Протокол Гамма", "Протокол Дельта"],
         correctAnswer: "Протокол Альфа",
-        fact: "Активированы резервные алгоритмы."
+        fact: "Активированы резервные алгоритмы из-за отсутствия связи с нейросетью."
     }));
 
-    if (!OPENROUTER_API_KEY) {
-        console.error("КРИТИЧЕСКАЯ ОШИБКА: API ключ отсутствует!");
-        return getFallback();
-    }
-
+    // Оставляем ваш жесткий системный промпт, он отлично написан
     const systemPrompt = `Ты — главный редактор телевизионной викторины. Твоя задача выдать 7 уникальных вопросов.
     
     АБСОЛЮТНО КРИТИЧЕСКИЕ ПРАВИЛА:
@@ -34,49 +33,43 @@ export async function generateQuizBatch(theme: string) {
     [F] Достоверный факт`;
 
     try {
-        console.log("Молниеносный запрос к OpenRouter (Gemini 2.0 Flash)...");
+        console.log("Молниеносный запрос к бесплатной нейросети (Pollinations AI)...");
         
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        // Делаем POST запрос к открытому API. Он не требует заголовков авторизации.
+        const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:5173', 
-                'X-Title': 'NEKOplay',
             },
             body: JSON.stringify({
-                model: 'google/gemini-2.0-flash-exp:free',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: `Тема: "${theme}". Сгенерируй 7 вопросов.` }
                 ],
-                temperature: 0.7,
-                seed: randomSeed
+                seed: randomSeed, // Передаем сид для уникальности
+                model: 'openai' // Просим использовать модель уровня GPT для максимального качества
             })
         });
 
         if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(`Ошибка OpenRouter: ${response.status} - ${JSON.stringify(errData)}`);
+            throw new Error(`Ошибка открытого API: ${response.status}`);
         }
 
-        const data = await response.json();
+        // ВАЖНО: Pollinations возвращает сразу текстовую строку, а не сложный JSON объект
+        let text = await response.text();
         
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-            throw new Error("Структура ответа API пуста");
-        }
+        console.log("Ответ от нейросети получен! Запускаем фильтрацию...");
         
-        let text = data.choices[0].message.content;
-        
-        console.log("Ответ от ИИ получен! Запускаем фильтрацию...");
-        
+        // Очистка от маркдауна и нормализация регистра тегов
         text = text.replace(/\*/g, '').replace(/```/g, '');
         text = text.replace(/\[Q\]:/gi, '[Q]').replace(/\[O\]:/gi, '[O]').replace(/\[A\]:/gi, '[A]').replace(/\[F\]:/gi, '[F]');
         text = text.replace(/\[q\]/gi, '[Q]').replace(/\[o\]/gi, '[O]').replace(/\[a\]/gi, '[A]').replace(/\[f\]/gi, '[F]');
 
+        // Парсинг текста по блокам [Q]
         const blocks = text.split('[Q]');
         const questions: any[] = [];
 
+        // Начинаем с 1, так как элемент 0 - это пустота перед первым тегом [Q]
         for (let i = 1; i < blocks.length; i++) {
             const block = blocks[i];
             
@@ -90,8 +83,10 @@ export async function generateQuizBatch(theme: string) {
                 const answerText = block.substring(idxA + 3, idxF).trim();
                 const factText = block.substring(idxF + 3).replace(/---/g, '').trim();
                 
+                // Разбиваем варианты ответов по разделителю '|'
                 const options = optionsText.split('|').map((o: string) => o.trim()).filter((o: string) => o.length > 0);
                 
+                // Защита от кривой генерации: если вариантов меньше 4, добиваем заглушками
                 while(options.length < 4) {
                     options.push(`Вариант ${options.length + 1}`);
                 }
@@ -112,14 +107,14 @@ export async function generateQuizBatch(theme: string) {
 
         if (questions.length === 0) {
             console.error("Сырой текст от ИИ:", text); 
-            throw new Error("Парсер не смог найти ни одного тега");
+            throw new Error("Парсер не смог найти ни одного тега. Вероятно, сбой формата.");
         }
 
         console.log(`Успешно получено вопросов от ИИ: ${questions.length}`);
         return questions;
 
     } catch (error) {
-        console.error('Ошибка ИИ, загрузка резерва:', error);
+        console.error('Критическая ошибка ИИ, активирован оффлайн-резерв:', error);
         return getFallback();
     }
 }
