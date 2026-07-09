@@ -66,23 +66,20 @@ function extractValidQuestionsFromText(text: string): any[] {
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
 
-    // ИСПРАВЛЕННЫЙ ПРОМПТ: Убраны цифры, добавлены жесткие правила совпадения строк
-    const systemPrompt = `Ты - генератор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
+    // Строгий промпт, запрещающий цифры
+    const systemPrompt = `Ты - строгий генератор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
 КРИТИЧЕСКИ ВАЖНО:
 1. В массиве "options" должны быть полноценные текстовые ответы, а НЕ ЦИФРЫ (1, 2, 3, 4).
 2. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "options". Не пиши туда номер ответа!
 
 Идеальный пример формата:
-[{"question":"Столица Франции?","options":["Париж","Лондон","Рим","Берлин"],"correctAnswer":"Париж","fact":"Париж знаменит Эйфелевой башней."}]
+[{"question":"Какая планета красная?","options":["Венера","Марс","Юпитер","Сатурн"],"correctAnswer":"Марс","fact":"Марс выглядит красным из-за оксида железа."}]
 
 Никакого текста до или после JSON. Без markdown.`;
 
-    // УВЕЛИЧЕННЫЙ ТАЙМ-АУТ: 45 секунд для генерации 10 вопросов
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000); 
-
     try {
-        console.log(`⚡ Запрашиваем ИИ (God-Mode v13.0 - Text Fix)... Ожидание до 45 секунд.`);
+        // ТАЙМ-АУТ УДАЛЕН ПОЛНОСТЬЮ. Ждем столько, сколько нужно нейросети.
+        console.log(`⚡ Запрашиваем ИИ (God-Mode v14.0 - No Timeout)... Ждем ответа без ограничений по времени.`);
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -95,13 +92,10 @@ export async function generateQuizBatch(theme: string) {
                 model: 'openai', 
                 seed: randomSeed,
                 jsonMode: true
-            }),
-            signal: controller.signal
+            })
         });
 
-        clearTimeout(timeoutId); 
-
-        if (!response.ok) throw new Error("API Limit");
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
         let text = await response.text();
         
@@ -126,6 +120,7 @@ export async function generateQuizBatch(theme: string) {
         }
 
         if (!questionsRaw || questionsRaw.length === 0) {
+            console.error("RAW TEXT (провал извлечения):", text.substring(0, 200));
             throw new Error("Empty Array");
         }
 
@@ -140,21 +135,20 @@ export async function generateQuizBatch(theme: string) {
 
             let correct = String(q.correctAnswer || options[0]);
 
-            // ЗАЩИТА 1: Если ИИ всё-таки вернул цифру вместо текста (например, "2" или "3")
+            // ПРЕДОХРАНИТЕЛЬ: Если ИИ всё-таки прислал цифру (например "2") вместо текста, 
+            // мы берем текст ответа под этим номером, чтобы игра не засчитала правильный ответ как ошибку.
             if (/^[0-9]+$/.test(correct)) {
                 const idx = parseInt(correct, 10) - 1;
-                // Заменяем цифру на реальный текст из массива options
                 if (idx >= 0 && idx < options.length) {
                     correct = options[idx];
                 }
             }
 
-            // ЗАЩИТА 2: Если текст ответа математически не совпадает ни с одним вариантом
             if (!options.includes(correct)) {
-                correct = options[0]; // Принудительно назначаем первый попавшийся ответ правильным, чтобы игра не ломалась
+                correct = options[0];
             }
 
-            // Перемешивание (Фишер-Йетс)
+            // Перемешивание ответов (Фишер-Йетс)
             for (let i = options.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [options[i], options[j]] = [options[j], options[i]];
@@ -169,11 +163,10 @@ export async function generateQuizBatch(theme: string) {
         });
 
         console.log(`✅ ИИ успешно сгенерировал вопросов: ${validQuestions.length}`);
-        return validQuestions.slice(0, 10); // Выдаем максимум 10 вопросов
+        return validQuestions.slice(0, 10); 
 
     } catch (error) {
-        clearTimeout(timeoutId);
-        console.warn("🛡️ API недоступно или не успело ответить. Возвращаем пустой массив.");
+        console.warn("🛡️ Глобальная ошибка сети (браузер разорвал соединение). Возвращаем пустой массив.", error);
         return []; 
     }
 }
