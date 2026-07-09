@@ -215,8 +215,8 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         const remainingQuestions = currentQuestions.slice(1) || [];
 
         await update(ref(db, `rooms/${room.id}/gameState`), {
-          questionData: nextQuestion, // 100% объект, никогда не undefined
-          questions: remainingQuestions, // 100% массив, никогда не undefined
+          questionData: nextQuestion, 
+          questions: remainingQuestions, 
           isGenerating: false,
           timeLeft: QUESTION_TIME_LIMIT
         });
@@ -333,8 +333,8 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         <div className="bg-gray-800/80 backdrop-blur-md p-10 rounded-3xl shadow-2xl border border-purple-500/30 max-w-md w-full text-center flex flex-col items-center">
           <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
           <h2 className="text-2xl font-black text-purple-400 tracking-widest uppercase mb-3">Синтез боевого арсенала...</h2>
-          <p className="text-gray-400 text-sm mb-2">Бесплатная нейросеть формирует пул вопросов по теме <span className="font-bold text-white">«{theme}»</span>.</p>
-          <p className="text-green-400 text-xs font-mono uppercase tracking-widest bg-green-900/20 px-3 py-1 rounded border border-green-500/30 mt-2">API ключи не требуются</p>
+          <p className="text-gray-400 text-sm mb-2">Нейросеть Gemini формирует пул вопросов по теме <span className="font-bold text-white">«{theme}»</span>.</p>
+          <p className="text-green-400 text-xs font-mono uppercase tracking-widest bg-green-900/20 px-3 py-1 rounded border border-green-500/30 mt-2">API ключи скрыты и защищены</p>
         </div>
       </div>
     );
