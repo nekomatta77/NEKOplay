@@ -1,6 +1,5 @@
 // src/lib/ai.ts
 
-// Тот самый ключ из твоего Смехлыста (спрятан в base64)
 const OPENROUTER_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
 
 // --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
@@ -63,7 +62,6 @@ function extractValidQuestionsFromText(text: string): any[] {
 }
 
 export async function generateQuizBatch(theme: string) {
-    // Строгий промпт, запрещающий галлюцинации и цифры
     const systemPrompt = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
 КРИТИЧЕСКИЕ ПРАВИЛА:
 1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО реальные, достоверные факты. Никаких выдуманных механик или предметов.
@@ -74,19 +72,16 @@ export async function generateQuizBatch(theme: string) {
 [{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]`;
 
     try {
-        console.log(`⚡ Запрашиваем ИИ (OpenRouter API - Stable Mode)...`);
+        console.log(`⚡ Запрашиваем ИИ (OpenRouter API - CORS Fix)...`);
         
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
+            // ИСПРАВЛЕНИЕ: Оставили только базовые заголовки, как в Смехлысте, чтобы не злить браузер
             headers: { 
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${atob(OPENROUTER_KEY_BASE64)}`,
-                'HTTP-Referer': 'https://nekoplay.vercel.app',
-                'X-Title': 'NEKOplay'
+                'Authorization': `Bearer ${atob(OPENROUTER_KEY_BASE64)}`
             },
             body: JSON.stringify({
-                // Используем сверхбыструю бесплатную модель от Google (отлично работает с JSON)
-                // Если захочешь, можешь поменять на "arcee-ai/trinity-large-preview:free" как в смехлысте
                 model: "google/gemini-2.0-flash-lite-preview-02-05:free", 
                 messages: [
                     { role: 'system', content: systemPrompt },
@@ -128,7 +123,6 @@ export async function generateQuizBatch(theme: string) {
 
             let correct = String(q.correctAnswer || q.c || options[0]);
 
-            // ПРЕДОХРАНИТЕЛЬ: Защита от цифр в ответах
             if (/^[0-9]+$/.test(correct)) {
                 const idx = parseInt(correct, 10) - 1;
                 if (idx >= 0 && idx < options.length) correct = options[idx];
@@ -136,7 +130,6 @@ export async function generateQuizBatch(theme: string) {
 
             if (!options.includes(correct)) correct = options[0];
 
-            // Рандомизация ответов (Фишер-Йетс)
             for (let i = options.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [options[i], options[j]] = [options[j], options[i]];
