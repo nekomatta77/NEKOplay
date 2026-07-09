@@ -3,40 +3,37 @@
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
     
-    // Фолбэк на случай критических сбоев
     const getFallback = () => Array(7).fill(null).map((_, i) => ({
-        question: `[Сбой связи] Вопрос №${i + 1} по теме: "${theme}"?`,
+        question: `[Резервный протокол] Вопрос №${i + 1} по теме: "${theme}"?`,
         options: ["Сбой сети", "Отсутствие сигнала", "Перегрузка API", "Отказ протокола"],
         correctAnswer: "Перегрузка API",
-        fact: "Нейросеть временно недоступна или выдала нестандартный ответ. Попробуйте еще раз."
+        fact: "Связь с нейросетью нестабильна. Используется автономный пул вопросов."
     }));
 
-    // Обновленный промпт: теперь мы явно просим ОБЪЕКТ с массивом внутри
-    const systemPrompt = `Ты — профессиональный редактор интеллектуальных игр уровня "Что? Где? Когда?" и "Своя Игра".
-Твоя задача — составить 7 потрясающих, сложных и глубоких вопросов на тему: "${theme}".
+    // Максимально прямолинейный промпт. Просим только чистый массив.
+    const systemPrompt = `Ты — профессиональный редактор интеллектуальных игр уровня "Что? Где? Когда?".
+Твоя задача — составить 7 сложных, интересных и неочевидных вопросов на тему: "${theme}".
 
 КРИТЕРИИ КАЧЕСТВА:
 1. Безупречный литературный русский язык, правильные падежи, богатая лексика.
-2. Вопросы на эрудицию, дедукцию и логику, а не просто "в каком году...".
-3. Поле 'fact' должно содержать развернутый, удивительный факт.
+2. Вопросы на эрудицию, дедукцию и логику.
+3. Поле 'fact' должно содержать развернутый, удивительный факт, раскрывающий суть ответа.
 4. 100% историческая и научная достоверность.
 
-ТЕХНИЧЕСКИЙ ФОРМАТ:
-Верни строго валидный JSON-ОБЪЕКТ, в котором есть один ключ "questions". Значение этого ключа — массив из 7 вопросов.
-Пример структуры:
-{
-  "questions": [
-    {
-      "question": "Текст увлекательного вопроса?",
-      "options": ["Правдоподобный вариант", "Правильный вариант", "Хитрый вариант", "Абсурдный вариант"],
-      "correctAnswer": "Правильный вариант",
-      "fact": "Развернутый интересный факт, раскрывающий суть ответа."
-    }
-  ]
-}`;
+ТЕХНИЧЕСКИЙ ФОРМАТ (КРИТИЧЕСКИ ВАЖНО):
+Верни СТРОГО валидный JSON-массив. Никаких объектов, никаких слов "Вот ваши вопросы", никакой markdown разметки. Структура должна начинаться с [ и заканчиваться ].
+Пример:
+[
+  {
+    "question": "Текст вопроса?",
+    "options": ["Вариант 1", "Вариант 2", "Вариант 3", "Вариант 4"],
+    "correctAnswer": "Вариант 2",
+    "fact": "Интересный факт."
+  }
+]`;
 
     try {
-        console.log("Отправка запроса к AI (в режиме JSON Object/Expert)...");
+        console.log("Запрашиваем нейросеть (надежный Array-режим)...");
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -46,59 +43,46 @@ export async function generateQuizBatch(theme: string) {
             body: JSON.stringify({
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Тема: "${theme}". Сгенерируй JSON-объект с 7 качественными вопросами.` }
+                    { role: 'user', content: `Тема: "${theme}". Сгенерируй JSON-массив из 7 вопросов.` }
                 ],
                 model: 'openai', 
-                seed: randomSeed,
-                jsonMode: true 
+                seed: randomSeed
+                // Убрали jsonMode: true, так как он ломал выдачу на стороне прокси
             })
         });
 
         if (!response.ok) {
-            throw new Error(`Ошибка открытого API: ${response.status}`);
+            throw new Error(`Ошибка API: ${response.status}`);
         }
 
         let text = await response.text();
-        console.log("Получен ответ от нейросети, запускаем парсер...");
+        console.log("Ответ получен. Вырезаем массив из текста...");
 
-        // Жесткая очистка от маркдауна и словесного мусора
+        // Жесткая очистка от маркдауна
         text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
-        // Ищем начало и конец JSON-объекта
-        const startIdx = text.indexOf('{');
-        const endIdx = text.lastIndexOf('}');
-        if (startIdx !== -1 && endIdx !== -1) {
-            text = text.substring(startIdx, endIdx + 1);
-        }
-
-        const parsedData = JSON.parse(text);
-
-        // --- БРОНЕБОЙНЫЙ ПОИСК МАССИВА ---
-        let questionsRaw: any[] = [];
+        // БРОНЕБОЙНЫЙ ЗАХВАТ: Ищем границы именно массива [ ]
+        const startIdx = text.indexOf('[');
+        const endIdx = text.lastIndexOf(']');
         
-        if (Array.isArray(parsedData)) {
-            // Если ИИ проигнорировал объект и все-таки вернул массив
-            questionsRaw = parsedData;
-        } else if (parsedData && Array.isArray(parsedData.questions)) {
-            // Идеальный сценарий (ключ questions)
-            questionsRaw = parsedData.questions;
-        } else if (parsedData && typeof parsedData === 'object') {
-            // Если ИИ назвал ключ по-другому (например, "data" или "quiz"), просто ищем первый попавшийся массив
-            const possibleArray = Object.values(parsedData).find(val => Array.isArray(val));
-            if (possibleArray) {
-                questionsRaw = possibleArray as any[];
-            }
+        if (startIdx !== -1 && endIdx !== -1 && startIdx < endIdx) {
+            // Вырезаем ровно от первой [ до последней ]
+            // Если нейросеть завернула массив в объект, это вытащит массив ИЗ объекта!
+            text = text.substring(startIdx, endIdx + 1);
+        } else {
+            throw new Error("Нейросеть не вернула структуру массива (не найдены символы [ и ]).");
         }
 
-        if (!questionsRaw || questionsRaw.length === 0) {
-            throw new Error("Парсер отработал, но массив вопросов пуст или не найден в структуре JSON.");
+        const questionsRaw = JSON.parse(text);
+
+        if (!Array.isArray(questionsRaw) || questionsRaw.length === 0) {
+            throw new Error("Парсер отработал, но извлеченная структура не является массивом.");
         }
 
-        console.log(`Успешно извлечено вопросов: ${questionsRaw.length}. Применяем рандомизацию...`);
+        console.log(`Успешно распознано вопросов: ${questionsRaw.length}. Применяем анти-чит рандомизацию...`);
 
-        // Нормализация и перемешивание
+        // Нормализация и перемешивание вариантов ответов
         const validQuestions = questionsRaw.map((q: any) => {
-            // Защита от отсутствующих options
             let options = Array.isArray(q.options) ? [...q.options] : ["Вариант А", "Вариант Б", "Вариант В", "Вариант Г"];
             
             while(options.length < 4) {
@@ -113,7 +97,7 @@ export async function generateQuizBatch(theme: string) {
                 options[Math.floor(Math.random() * 4)] = correct; 
             }
 
-            // Рандомизация ответов
+            // Перемешиваем ответы, чтобы верный не всегда был первым
             options = options.sort(() => Math.random() - 0.5);
 
             return {
@@ -124,11 +108,10 @@ export async function generateQuizBatch(theme: string) {
             };
         });
 
-        // Нам нужно ровно 7 вопросов (обрезаем, если ИИ выдал больше)
         return validQuestions.slice(0, 7);
 
     } catch (error) {
-        console.error('Критическая ошибка ИИ:', error);
+        console.error('Критическая ошибка ИИ. Загружен оффлайн-резерв:', error);
         return getFallback();
     }
 }
