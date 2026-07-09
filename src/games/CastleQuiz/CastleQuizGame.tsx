@@ -45,7 +45,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const [questionData, setQuestionData] = useState<any>(null);
   const [feedback, setFeedback] = useState<{ message: string, fact: string, isCorrect: boolean } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isProcessingLocal, setIsProcessingLocal] = useState(false); // Защита от спама кликами
+  const [isProcessingLocal, setIsProcessingLocal] = useState(false); 
 
   const [timeLeft, setTimeLeft] = useState<number>(QUESTION_TIME_LIMIT);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -69,7 +69,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         setFeedback(data.feedback || null);
         setIsGenerating(data.isGenerating || false);
         if (data.timeLeft !== undefined) setTimeLeft(data.timeLeft);
-        setIsProcessingLocal(false); // Снимаем блокировку после обновления стейта с сервера
+        setIsProcessingLocal(false); 
       }
     });
 
@@ -77,7 +77,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   }, [room.id]);
 
   useEffect(() => {
-    // Включаем таймер только если мы в активной фазе вопроса и это ход текущего игрока
     if (questionData && !feedback && turnPlayerId === user.id && !isGenerating && !isProcessingLocal) {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
@@ -107,36 +106,52 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     if (!isHost || isProcessingLocal) return;
     setIsProcessingLocal(true);
     
-    update(ref(db, `rooms/${room.id}/gameState`), {
-      phase: 'generating',
-      theme
-    });
+    try {
+        await update(ref(db, `rooms/${room.id}/gameState`), {
+          phase: 'generating',
+          theme
+        });
 
-    const batch = await generateQuizBatch(theme);
-    
-    const initialCastles: Castle[] = [
-      { id: 1, cx: 15, cy: 50, ownerId: player1.id, isBase: true },
-      { id: 2, cx: 35, cy: 25, ownerId: null, isBase: false },
-      { id: 3, cx: 35, cy: 75, ownerId: null, isBase: false },
-      { id: 4, cx: 50, cy: 50, ownerId: null, isBase: false },     
-      { id: 5, cx: 65, cy: 25, ownerId: null, isBase: false },
-      { id: 6, cx: 65, cy: 75, ownerId: null, isBase: false },
-      { id: 7, cx: 85, cy: 50, ownerId: player2.id, isBase: true }, 
-    ];
+        let batch = await generateQuizBatch(theme);
+        
+        // ЗАЩИТА 1: Если API вернуло пустоту при старте игры
+        if (!batch || batch.length === 0) {
+            batch = [{
+                question: "Сеть ИИ недоступна. Начать резервный бой?",
+                options: ["Да", "Согласен", "Подтверждаю", "В бой"],
+                correctAnswer: "Да",
+                fact: "ИИ не смог сгенерировать вопросы, система работает в автономном режиме."
+            }];
+        }
+        
+        const initialCastles: Castle[] = [
+          { id: 1, cx: 15, cy: 50, ownerId: player1.id, isBase: true },
+          { id: 2, cx: 35, cy: 25, ownerId: null, isBase: false },
+          { id: 3, cx: 35, cy: 75, ownerId: null, isBase: false },
+          { id: 4, cx: 50, cy: 50, ownerId: null, isBase: false },     
+          { id: 5, cx: 65, cy: 25, ownerId: null, isBase: false },
+          { id: 6, cx: 65, cy: 75, ownerId: null, isBase: false },
+          { id: 7, cx: 85, cy: 50, ownerId: player2.id, isBase: true }, 
+        ];
 
-    update(ref(db, `rooms/${room.id}/gameState`), {
-      phase: 'playing',
-      theme,
-      turnPlayerId: player1.id,
-      castles: initialCastles,
-      questions: batch,
-      attackingCastle: null,
-      questionData: null,
-      feedback: null,
-      isGenerating: false,
-      winner: null,
-      timeLeft: QUESTION_TIME_LIMIT
-    });
+        await update(ref(db, `rooms/${room.id}/gameState`), {
+          phase: 'playing',
+          theme,
+          turnPlayerId: player1.id,
+          castles: initialCastles,
+          questions: batch,
+          attackingCastle: null,
+          questionData: null,
+          feedback: null,
+          isGenerating: false,
+          winner: null,
+          timeLeft: QUESTION_TIME_LIMIT
+        });
+    } catch (error) {
+        console.error("Ошибка старта игры:", error);
+    } finally {
+        setIsProcessingLocal(false);
+    }
   };
 
   const getPlayerColor = (ownerId: string | null, isGlow = false) => {
@@ -163,30 +178,53 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     if (attackingCastle) return;
 
     setIsProcessingLocal(true);
-    let currentQuestions = [...questions];
+    
+    try {
+        let currentQuestions = [...questions];
 
-    update(ref(db, `rooms/${room.id}/gameState`), {
-      attackingCastle: castleId,
-      isGenerating: currentQuestions.length === 0,
-      feedback: null,
-      questionData: null
-    });
+        await update(ref(db, `rooms/${room.id}/gameState`), {
+          attackingCastle: castleId,
+          isGenerating: currentQuestions.length === 0,
+          feedback: null,
+          questionData: null
+        });
 
-    // Если вопросы кончились, генерируем новую партию прямо во время боя
-    if (currentQuestions.length === 0) {
-        const newBatch = await generateQuizBatch(theme);
-        currentQuestions = newBatch;
+        // Если вопросы кончились, генерируем новую партию
+        if (currentQuestions.length === 0) {
+            const newBatch = await generateQuizBatch(theme);
+            if (newBatch && newBatch.length > 0) {
+                currentQuestions = newBatch;
+            } else {
+                // ЗАЩИТА 2: Если API вернуло пустоту во время дозарядки
+                currentQuestions = [{
+                    question: "Аварийное восстановление системы завершено?",
+                    options: ["Да", "Так точно", "Определенно", "Подтверждаю"],
+                    correctAnswer: "Да",
+                    fact: "Очередная партия вопросов не была доставлена вовремя."
+                }];
+            }
+        }
+
+        // АБСОЛЮТНАЯ ЗАЩИТА ОТ UNDEFINED ДЛЯ FIREBASE
+        const nextQuestion = currentQuestions[0] || {
+            question: "Технический сбой синхронизации. Продолжить?",
+            options: ["Да", "Ок", "Принять", "Далее"],
+            correctAnswer: "Да",
+            fact: "Защитный протокол предотвратил падение базы данных."
+        };
+        const remainingQuestions = currentQuestions.slice(1) || [];
+
+        await update(ref(db, `rooms/${room.id}/gameState`), {
+          questionData: nextQuestion, // 100% объект, никогда не undefined
+          questions: remainingQuestions, // 100% массив, никогда не undefined
+          isGenerating: false,
+          timeLeft: QUESTION_TIME_LIMIT
+        });
+    } catch (error) {
+        console.error("Ошибка при атаке замка:", error);
+    } finally {
+        setIsProcessingLocal(false);
     }
-
-    const nextQuestion = currentQuestions[0];
-    const remainingQuestions = currentQuestions.slice(1);
-
-    update(ref(db, `rooms/${room.id}/gameState`), {
-      questionData: nextQuestion,
-      questions: remainingQuestions, 
-      isGenerating: false,
-      timeLeft: QUESTION_TIME_LIMIT
-    });
   };
 
   const handleAnswerClick = (selectedOption: string) => {
@@ -198,7 +236,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
     processAnswer(isCorrect);
   };
 
-  const processAnswer = (isCorrect: boolean) => {
+  const processAnswer = async (isCorrect: boolean) => {
     let newPhase = 'playing';
     let gameWinner = null;
     let finalMessage = isCorrect ? 'Территория захвачена!' : 'Атака отбита!';
@@ -220,23 +258,28 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       isCorrect
     };
 
-    update(ref(db, `rooms/${room.id}/gameState`), {
-      feedback: newFeedback,
-      castles: newCastles,
-      phase: newPhase,
-      winner: gameWinner
-    });
-
-    if (newPhase === 'playing') {
-      setTimeout(() => {
-        const nextPlayerId = turnPlayerId === player1.id ? player2.id : player1.id;
-        update(ref(db, `rooms/${room.id}/gameState`), {
-          attackingCastle: null,
-          questionData: null,
-          feedback: null,
-          turnPlayerId: nextPlayerId
+    try {
+        await update(ref(db, `rooms/${room.id}/gameState`), {
+          feedback: newFeedback,
+          castles: newCastles,
+          phase: newPhase,
+          winner: gameWinner
         });
-      }, 4000);
+
+        if (newPhase === 'playing') {
+          setTimeout(() => {
+            const nextPlayerId = turnPlayerId === player1.id ? player2.id : player1.id;
+            update(ref(db, `rooms/${room.id}/gameState`), {
+              attackingCastle: null,
+              questionData: null,
+              feedback: null,
+              turnPlayerId: nextPlayerId
+            });
+          }, 4000);
+        }
+    } catch (error) {
+        console.error("Ошибка при ответе:", error);
+        setIsProcessingLocal(false);
     }
   };
 
