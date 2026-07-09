@@ -4,7 +4,6 @@
 function extractValidQuestionsFromText(text: string): any[] {
     const results: any[] = [];
     
-    // 1. Попытка рекурсивного парсинга целого объекта
     try {
         const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
         const parsed = JSON.parse(cleanText);
@@ -28,7 +27,6 @@ function extractValidQuestionsFromText(text: string): any[] {
         // Переход к стековому сканеру при обрыве текста
     }
 
-    // 2. Стековый сканер (вырезает уцелевшие объекты из сломанного JSON)
     let stack: number[] = [];
     let inString = false;
     let escapeNext = false;
@@ -68,18 +66,23 @@ function extractValidQuestionsFromText(text: string): any[] {
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
 
-    const systemPrompt = `Ты - генератор викторин. Выдай ТОЛЬКО JSON-массив из 5 вопросов на тему: "${theme}".
-Формат:
-[{"question":"?","options":["1","2","3","4"],"correctAnswer":"2","fact":"!"}]
-Без разметки, без текста.`;
+    // ИСПРАВЛЕННЫЙ ПРОМПТ: Убраны цифры, добавлены жесткие правила совпадения строк
+    const systemPrompt = `Ты - генератор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
+КРИТИЧЕСКИ ВАЖНО:
+1. В массиве "options" должны быть полноценные текстовые ответы, а НЕ ЦИФРЫ (1, 2, 3, 4).
+2. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "options". Не пиши туда номер ответа!
 
-    // ГЛАВНЫЙ ФИКС: Увеличиваем тайм-аут до 25 секунд.
-    // Раньше было 7 секунд, и скрипт просто убивал ИИ до того, как тот успевал дописать вопросы!
+Идеальный пример формата:
+[{"question":"Столица Франции?","options":["Париж","Лондон","Рим","Берлин"],"correctAnswer":"Париж","fact":"Париж знаменит Эйфелевой башней."}]
+
+Никакого текста до или после JSON. Без markdown.`;
+
+    // УВЕЛИЧЕННЫЙ ТАЙМ-АУТ: 45 секунд для генерации 10 вопросов
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); 
+    const timeoutId = setTimeout(() => controller.abort(), 45000); 
 
     try {
-        console.log(`⚡ Запрашиваем ИИ (God-Mode v12.0 - Extended Timeout)... Ожидание до 25 секунд.`);
+        console.log(`⚡ Запрашиваем ИИ (God-Mode v13.0 - Text Fix)... Ожидание до 45 секунд.`);
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -102,7 +105,6 @@ export async function generateQuizBatch(theme: string) {
 
         let text = await response.text();
         
-        // Попытка снять обертку API
         try {
             const apiResponse = JSON.parse(text);
             if (apiResponse && typeof apiResponse === 'object') {
@@ -124,7 +126,6 @@ export async function generateQuizBatch(theme: string) {
         }
 
         if (!questionsRaw || questionsRaw.length === 0) {
-            console.error("RAW TEXT (провал извлечения):", text.substring(0, 200));
             throw new Error("Empty Array");
         }
 
@@ -134,12 +135,26 @@ export async function generateQuizBatch(theme: string) {
             
             while(options.length < 4) options.push(`Доп. вариант ${options.length + 1}`);
             if (options.length > 4) options.length = 4;
-
-            const correct = q.correctAnswer || options[0];
-            if (!options.includes(correct)) options[Math.floor(Math.random() * 4)] = correct; 
-
+            
             options = options.map(opt => String(opt));
 
+            let correct = String(q.correctAnswer || options[0]);
+
+            // ЗАЩИТА 1: Если ИИ всё-таки вернул цифру вместо текста (например, "2" или "3")
+            if (/^[0-9]+$/.test(correct)) {
+                const idx = parseInt(correct, 10) - 1;
+                // Заменяем цифру на реальный текст из массива options
+                if (idx >= 0 && idx < options.length) {
+                    correct = options[idx];
+                }
+            }
+
+            // ЗАЩИТА 2: Если текст ответа математически не совпадает ни с одним вариантом
+            if (!options.includes(correct)) {
+                correct = options[0]; // Принудительно назначаем первый попавшийся ответ правильным, чтобы игра не ломалась
+            }
+
+            // Перемешивание (Фишер-Йетс)
             for (let i = options.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [options[i], options[j]] = [options[j], options[i]];
@@ -148,18 +163,17 @@ export async function generateQuizBatch(theme: string) {
             return {
                 question: q.question || `Сбой дешифровки #${index + 1}`,
                 options: options,
-                correctAnswer: String(correct),
+                correctAnswer: correct,
                 fact: q.fact || "Факт утерян."
             };
         });
 
         console.log(`✅ ИИ успешно сгенерировал вопросов: ${validQuestions.length}`);
-        return validQuestions.slice(0, 5);
+        return validQuestions.slice(0, 10); // Выдаем максимум 10 вопросов
 
     } catch (error) {
         clearTimeout(timeoutId);
-        console.warn("🛡️ API недоступно или не успело ответить за 25 секунд. Возвращаем пустой массив.");
-        // Возвращаем строго пустой массив без резервных локальных вопросов (как ты и просил)
+        console.warn("🛡️ API недоступно или не успело ответить. Возвращаем пустой массив.");
         return []; 
     }
 }
