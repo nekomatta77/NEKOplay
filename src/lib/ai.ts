@@ -22,7 +22,7 @@ function extractValidQuestionsFromText(text: string): any[] {
         }
         deepSearch(parsed);
         
-        if (results.length > 0) return return results;
+        if (results.length > 0) return results; // Исправлено: теперь тут один return
     } catch (e) {}
 
     let stack: number[] = [];
@@ -64,15 +64,16 @@ export async function generateQuizBatch(theme: string) {
 
     const systemPrompt = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
 КРИТИЧЕСКИЕ ПРАВИЛА:
-1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО реальные, достоверные факты. Никаких выдуманных предметов.
-2. Текстовые ответы в массиве "options", А НЕ ЦИФРЫ.
-3. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "options". Не пиши туда номер ответа!
+1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО достоверные факты. Никаких выдуманных механик или предметов.
+2. Текстовые ответы в массиве "o", А НЕ ЦИФРЫ.
+3. Поле "c" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из "o".
+4. СТРОГО ИСПОЛЬЗУЙ КЛЮЧИ: q, o, c, f.
 
-Формат (строго без пробелов, ключи: question, options, correctAnswer, fact):
-[{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]`;
+Формат (строго без пробелов и текста):
+[{"q":"Вопрос?","o":["А","Б","В","Г"],"c":"Б","f":"Короткий факт"}]`;
 
     try {
-        console.log(`⚡ Запрашиваем ИИ (Pollinations Mistral API - NO KEYS, NO CORS)...`);
+        console.log(`⚡ Запрашиваем ИИ (God-Mode v17.1 - Fixed Typo)... Ждем 10 вопросов.`);
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -80,12 +81,11 @@ export async function generateQuizBatch(theme: string) {
                 'Content-Type': 'application/json' 
             },
             body: JSON.stringify({
-                // ФОРСИРУЕМ MISTRAL: Эта модель не тратит символы на "размышления" и отвечает быстро
-                model: "mistral", 
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Тема: "${theme}". ID: ${Date.now()}. Только JSON массив 10 вопросов.` }
+                    { role: 'user', content: `Тема: "${theme}". ID: ${Date.now()}. Только JSON массив из 10 вопросов.` }
                 ],
+                model: 'mistral', 
                 seed: randomSeed,
                 jsonMode: true
             })
@@ -155,7 +155,7 @@ export async function generateQuizBatch(theme: string) {
         return validQuestions.slice(0, 10); 
 
     } catch (error) {
-        console.warn("🛡️ Ошибка парсинга или сети (Mistral). Возвращаем пустой массив.", error);
+        console.warn("🛡️ Ошибка парсинга или сети. Возвращаем пустой массив.", error);
         return []; 
     }
 }
