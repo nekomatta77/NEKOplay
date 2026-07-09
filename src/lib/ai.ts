@@ -13,7 +13,8 @@ function extractValidQuestionsFromText(text: string): any[] {
             if (Array.isArray(obj)) {
                 obj.forEach(deepSearch);
             } else if (typeof obj === 'object') {
-                if (obj.question && Array.isArray(obj.options)) {
+                // Поддержка и старых (question), и новых сжатых (q) ключей
+                if ((obj.question || obj.q) && Array.isArray(obj.options || obj.o)) {
                     results.push(obj);
                 } else {
                     Object.values(obj).forEach(deepSearch);
@@ -23,9 +24,7 @@ function extractValidQuestionsFromText(text: string): any[] {
         deepSearch(parsed);
         
         if (results.length > 0) return results;
-    } catch (e) {
-        // Переход к стековому сканеру при обрыве текста
-    }
+    } catch (e) {}
 
     let stack: number[] = [];
     let inString = false;
@@ -49,8 +48,8 @@ function extractValidQuestionsFromText(text: string): any[] {
                         const cleanStr = objStr.replace(/\n/g, ' ').replace(/\r/g, '').replace(/,\s*([\]}])/g, '$1');
                         const parsed = JSON.parse(cleanStr);
                         
-                        if (parsed && parsed.question && Array.isArray(parsed.options)) {
-                            if (!results.some(q => q.question === parsed.question)) {
+                        if (parsed && (parsed.question || parsed.q) && Array.isArray(parsed.options || parsed.o)) {
+                            if (!results.some(q => (q.question || q.q) === (parsed.question || parsed.q))) {
                                 results.push(parsed);
                             }
                         }
@@ -66,20 +65,20 @@ function extractValidQuestionsFromText(text: string): any[] {
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
 
-    // Строгий промпт, запрещающий цифры
-    const systemPrompt = `Ты - строгий генератор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
-КРИТИЧЕСКИ ВАЖНО:
-1. В массиве "options" должны быть полноценные текстовые ответы, а НЕ ЦИФРЫ (1, 2, 3, 4).
-2. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "options". Не пиши туда номер ответа!
+    // ВЕРСИЯ 15.0: Жесткая компрессия JSON и запрет галлюцинаций
+    const systemPrompt = `Ты - строгий генератор викторин. Тема: "${theme}".
+ВЫДАЙ РОВНО 5 ВОПРОСОВ. Ни больше, ни меньше.
+КРИТИЧЕСКИЕ ПРАВИЛА:
+1. АНТИ-ГАЛЛЮЦИНАЦИИ: 100% достоверность! ЗАПРЕЩЕНО выдумывать несуществующие предметы (например "шар землетрясения" в Minecraft - это бред). Используй ТОЛЬКО реальные факты (в играх - только ванильные механики).
+2. Текстовые ответы в массиве "o", А НЕ ЦИФРЫ.
+3. "c" - точный правильный текстовый ответ.
+4. Для обхода лимита символов сервера используй ТОЛЬКО ключи: q, o, c, f.
 
-Идеальный пример формата:
-[{"question":"Какая планета красная?","options":["Венера","Марс","Юпитер","Сатурн"],"correctAnswer":"Марс","fact":"Марс выглядит красным из-за оксида железа."}]
-
-Никакого текста до или после JSON. Без markdown.`;
+Формат (строго без пробелов):
+[{"q":"Вопрос?","o":["А","Б","В","Г"],"c":"Б","f":"Короткий факт"}]`;
 
     try {
-        // ТАЙМ-АУТ УДАЛЕН ПОЛНОСТЬЮ. Ждем столько, сколько нужно нейросети.
-        console.log(`⚡ Запрашиваем ИИ (God-Mode v14.0 - No Timeout)... Ждем ответа без ограничений по времени.`);
+        console.log(`⚡ Запрашиваем ИИ (God-Mode v15.0 - Compression & Anti-Hallucination)...`);
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -87,7 +86,7 @@ export async function generateQuizBatch(theme: string) {
             body: JSON.stringify({
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Тема: "${theme}". ID: ${Date.now()}. Только JSON массив.` }
+                    { role: 'user', content: `Тема: "${theme}". ID: ${Date.now()}. Жду сжатый JSON массив из 5 вопросов.` }
                 ],
                 model: 'openai', 
                 seed: randomSeed,
@@ -124,8 +123,9 @@ export async function generateQuizBatch(theme: string) {
             throw new Error("Empty Array");
         }
 
+        // РАСПАКОВКА: Превращаем сжатые ключи обратно в нормальные, понятные игре
         const validQuestions = questionsRaw.map((q: any, index: number) => {
-            let options = Array.isArray(q.options) ? [...q.options] : ["Вариант А", "Вариант Б", "В", "Г"];
+            let options = Array.isArray(q.options || q.o) ? [...(q.options || q.o)] : ["Вариант А", "Вариант Б", "В", "Г"];
             options = options.filter(opt => opt && String(opt).trim() !== "");
             
             while(options.length < 4) options.push(`Доп. вариант ${options.length + 1}`);
@@ -133,10 +133,8 @@ export async function generateQuizBatch(theme: string) {
             
             options = options.map(opt => String(opt));
 
-            let correct = String(q.correctAnswer || options[0]);
+            let correct = String(q.correctAnswer || q.c || options[0]);
 
-            // ПРЕДОХРАНИТЕЛЬ: Если ИИ всё-таки прислал цифру (например "2") вместо текста, 
-            // мы берем текст ответа под этим номером, чтобы игра не засчитала правильный ответ как ошибку.
             if (/^[0-9]+$/.test(correct)) {
                 const idx = parseInt(correct, 10) - 1;
                 if (idx >= 0 && idx < options.length) {
@@ -148,25 +146,25 @@ export async function generateQuizBatch(theme: string) {
                 correct = options[0];
             }
 
-            // Перемешивание ответов (Фишер-Йетс)
+            // Рандомизация позиций (Фишер-Йетс)
             for (let i = options.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [options[i], options[j]] = [options[j], options[i]];
             }
 
             return {
-                question: q.question || `Сбой дешифровки #${index + 1}`,
+                question: String(q.question || q.q || `Сбой дешифровки #${index + 1}`),
                 options: options,
                 correctAnswer: correct,
-                fact: q.fact || "Факт утерян."
+                fact: String(q.fact || q.f || "Факт утерян.")
             };
         });
 
         console.log(`✅ ИИ успешно сгенерировал вопросов: ${validQuestions.length}`);
-        return validQuestions.slice(0, 10); 
+        return validQuestions.slice(0, 5); 
 
     } catch (error) {
-        console.warn("🛡️ Глобальная ошибка сети (браузер разорвал соединение). Возвращаем пустой массив.", error);
+        console.warn("🛡️ Ошибка парсинга или сети. Возвращаем пустой массив.", error);
         return []; 
     }
 }
