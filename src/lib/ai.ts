@@ -1,8 +1,5 @@
 // src/lib/ai.ts
 
-// Твой новый ключ OpenRouter, надежно зашифрованный в Base64 для обхода защиты GitHub
-const OPENROUTER_KEY_BASE64 = "c2stb3ItdjEtMDliOGM2MGZhMDQ2MmZjMzJlOTRlOTM2M2YwOWZmYmYyYzMxN2UzMmFjMmNkODYyNmNkODEyZTQxNzVmMDI3YQ==";
-
 // --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
 function extractValidQuestionsFromText(text: string): any[] {
     const results: any[] = [];
@@ -25,7 +22,7 @@ function extractValidQuestionsFromText(text: string): any[] {
         }
         deepSearch(parsed);
         
-        if (results.length > 0) return results;
+        if (results.length > 0) return return results;
     } catch (e) {}
 
     let stack: number[] = [];
@@ -63,9 +60,11 @@ function extractValidQuestionsFromText(text: string): any[] {
 }
 
 export async function generateQuizBatch(theme: string) {
+    const randomSeed = Math.floor(Math.random() * 1000000);
+
     const systemPrompt = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
 КРИТИЧЕСКИЕ ПРАВИЛА:
-1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО реальные, достоверные факты. Никаких выдуманных механик или предметов.
+1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО реальные, достоверные факты. Никаких выдуманных предметов.
 2. Текстовые ответы в массиве "options", А НЕ ЦИФРЫ.
 3. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "options". Не пиши туда номер ответа!
 
@@ -73,29 +72,37 @@ export async function generateQuizBatch(theme: string) {
 [{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]`;
 
     try {
-        console.log(`⚡ Запрашиваем ИИ (OpenRouter API - Base64 Hidden Key)...`);
+        console.log(`⚡ Запрашиваем ИИ (Pollinations Mistral API - NO KEYS, NO CORS)...`);
         
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
             headers: { 
-                'Content-Type': 'application/json',
-                // Расшифровываем ключ "на лету" с помощью встроенной функции atob()
-                'Authorization': `Bearer ${atob(OPENROUTER_KEY_BASE64)}`
+                'Content-Type': 'application/json' 
             },
             body: JSON.stringify({
-                model: "google/gemini-2.0-flash-lite-preview-02-05:free", 
+                // ФОРСИРУЕМ MISTRAL: Эта модель не тратит символы на "размышления" и отвечает быстро
+                model: "mistral", 
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Тема: "${theme}". Жду массив из 10 вопросов. Только JSON.` }
-                ]
+                    { role: 'user', content: `Тема: "${theme}". ID: ${Date.now()}. Только JSON массив 10 вопросов.` }
+                ],
+                seed: randomSeed,
+                jsonMode: true
             })
         });
 
         if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
-        const data = await response.json();
-        let text = data.choices?.[0]?.message?.content?.trim() || "";
+        let text = await response.text();
         
+        try {
+            const apiResponse = JSON.parse(text);
+            if (apiResponse && typeof apiResponse === 'object') {
+                if (typeof apiResponse.content === 'string') text = apiResponse.content;
+                else if (apiResponse.choices?.[0]?.message?.content) text = apiResponse.choices[0].message.content;
+            }
+        } catch (e) {}
+
         let questionsRaw = extractValidQuestionsFromText(text);
 
         if (questionsRaw.length === 0) {
@@ -148,7 +155,7 @@ export async function generateQuizBatch(theme: string) {
         return validQuestions.slice(0, 10); 
 
     } catch (error) {
-        console.warn("🛡️ Ошибка парсинга или сети (OpenRouter). Возвращаем пустой массив.", error);
+        console.warn("🛡️ Ошибка парсинга или сети (Mistral). Возвращаем пустой массив.", error);
         return []; 
     }
 }
