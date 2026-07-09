@@ -7,11 +7,18 @@ import { User, Room } from './types';
 import { ref, onValue } from 'firebase/database';
 import { db } from './lib/firebase';
 
+// Бронебойный ленивый импорт с защитой от кэша Vercel
 const GameView = React.lazy(() => {
   return Promise.all([
-    import('./components/GameView'),
+    import('./components/GameView').catch((error) => {
+      console.warn('Обнаружена новая версия приложения. Сбрасываем кэш...', error);
+      // Если файл чанка удален с сервера (Vercel обновил билд), 
+      // принудительно перезагружаем страницу у пользователя.
+      window.location.reload(); 
+      return { default: () => <LoadingScreen /> }; // Возвращаем заглушку, пока идет релоад
+    }),
     new Promise(resolve => setTimeout(resolve, 1500))
-  ]).then(([module]) => module);
+  ]).then(([module]) => module as any);
 });
 
 export default function App() {
