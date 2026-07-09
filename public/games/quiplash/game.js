@@ -55,7 +55,7 @@ function playSound(type) {
     } catch(e) {}
 }
 
-// --- СИНТЕЗАТОР РЕЧИ (АВТОНОМНЫЙ МУЖСКОЙ БАС) ---
+// --- СИНТЕЗАТОР РЕЧИ (ЛОКАЛЬНЫЙ) ---
 async function speakText(text) {
     if (!isHost) return;
 
@@ -67,6 +67,7 @@ async function speakText(text) {
     const cleanText = text.replace(/<[^>]*>?/gm, ' ').replace(/[^\w\sа-яА-ЯёЁ0-9.,!?\-:;]/g, '').trim().substring(0, 150);
     if (!cleanText) return;
 
+    // Полностью перешли на встроенный синтезатор браузера (никаких CORS и 404 ошибок)
     const playLocal = () => {
         if (!window.speechSynthesis) return;
         window.speechSynthesis.cancel();
@@ -82,6 +83,9 @@ async function speakText(text) {
         window.speechSynthesis.speak(u);
     };
 
+    playLocal();
+}
+
     const playCloud = (url) => {
         return new Promise((resolve, reject) => {
             const audio = new Audio(); audio.crossOrigin = "anonymous"; audio.src = url; currentTTSAudio = audio;
@@ -96,7 +100,6 @@ async function speakText(text) {
     } catch (e) {
         playLocal();
     }
-}
 
 // --- SVG ИКОНКИ ---
 const SVGS = {
@@ -159,13 +162,21 @@ function startLocalTimer(deadlineMs, displayId, onExpireCallback, timerKey) {
 async function fetchFromAI(systemPrompt) {
     try {
         const SECRET_KEY_BASE64 = "c2stb3ItdjEtNjMxNzBjYWNmOTBkZDc0MjA5Mzk3YTBhZWYyMjdhNDM1ZmIyMmVkZmQ2NTQ5OWQxZDYxZTU0NWY5NTcxMWVjMg==";
-        const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 8000);
+        // Увеличил таймаут до 15 секунд для надежности
+        const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 15000);
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST', signal: controller.signal,
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${atob(SECRET_KEY_BASE64)}` },
-            body: JSON.stringify({ model: "arcee-ai/trinity-large-preview:free", messages: [{ role: "system", content: systemPrompt }] })
+            body: JSON.stringify({ 
+                // ИСПРАВЛЕНИЕ: Заменили мертвую модель на стабильную, бесплатную Gemini
+                model: "google/gemini-2.0-flash-lite-preview-02-05:free", 
+                messages: [{ role: "system", content: systemPrompt }] 
+            })
         });
-        clearTimeout(timeoutId); const data = await response.json(); return data.choices[0].message.content.trim();
+        clearTimeout(timeoutId); 
+        if (!response.ok) throw new Error("API Error");
+        const data = await response.json(); 
+        return data.choices[0].message.content.trim();
     } catch(e) { return null; }
 }
 
