@@ -31,8 +31,8 @@ export default async function handler(req: any, res: any) {
 {"questions": [{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]}`;
 
     try {
-        // ИСПОЛЬЗУЕМ gemini-2.5-flash (модель 1.5-flash устарела и была удалена серверами Google)
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+        // ИСПОЛЬЗУЕМ актуальную версию gemini-3.5-flash
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_KEY}`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json'
