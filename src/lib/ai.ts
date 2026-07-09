@@ -1,120 +1,54 @@
-// src/lib/ai.ts
+// api/quiz.ts
 
-// --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
-function extractValidQuestionsFromText(text: string): any[] {
-    const results: any[] = [];
-    
-    try {
-        const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleanText);
-        
-        function deepSearch(obj: any) {
-            if (!obj) return;
-            if (Array.isArray(obj)) {
-                obj.forEach(deepSearch);
-            } else if (typeof obj === 'object') {
-                if ((obj.question || obj.q) && Array.isArray(obj.options || obj.o)) {
-                    results.push(obj);
-                } else {
-                    Object.values(obj).forEach(deepSearch);
-                }
-            }
-        }
-        deepSearch(parsed);
-        
-        if (results.length > 0) return results;
-    } catch (e) {}
-
-    let stack: number[] = [];
-    let inString = false;
-    let escapeNext = false;
-
-    for (let i = 0; i < text.length; i++) {
-        const char = text[i];
-        if (escapeNext) { escapeNext = false; continue; }
-        if (char === '\\') { escapeNext = true; continue; }
-        if (char === '"') { inString = !inString; continue; }
-
-        if (!inString) {
-            if (char === '{') stack.push(i);
-            else if (char === '}') {
-                if (stack.length > 0) {
-                    const startIndex = stack.pop()!;
-                    const objStr = text.substring(startIndex, i + 1);
-                    try {
-                        const cleanStr = objStr.replace(/\n/g, ' ').replace(/\r/g, '').replace(/,\s*([\]}])/g, '$1');
-                        const parsed = JSON.parse(cleanStr);
-                        
-                        if (parsed && (parsed.question || parsed.q) && Array.isArray(parsed.options || parsed.o)) {
-                            if (!results.some(q => (q.question || q.q) === (parsed.question || parsed.q))) {
-                                results.push(parsed);
-                            }
-                        }
-                    } catch (e) {}
-                }
-            }
-        }
+export default async function handler(req: any, res: any) {
+    // Разрешаем только POST-запросы
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
     }
-    
-    return results;
-}
 
-export async function generateQuizBatch(theme: string) {
+    const { theme } = req.body;
+    
+    // Твой зашифрованный ключ Cerebras
+    const CEREBRAS_KEY_BASE64 = "Y3NrLTk1ZDZodzZrNW53aGVyeXJjZXJwbXYzcmt0bXR5cGZ5Yzg5dHB2OGttMjI1cmtwbg==";
+    // Расшифровываем ключ для сервера
+    const CEREBRAS_KEY = Buffer.from(CEREBRAS_KEY_BASE64, 'base64').toString('utf8');
+
+    const systemPrompt = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
+КРИТИЧЕСКИЕ ПРАВИЛА:
+1. АНТИ-ГАЛЛЮЦИНАЦИИ: Используй ТОЛЬКО реальные, достоверные факты. Никаких выдуманных механик или предметов.
+2. Текстовые ответы в массиве "options", А НЕ ЦИФРЫ.
+3. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из массива "options". Не пиши туда номер ответа!
+4. СТРОГО ИСПОЛЬЗУЙ КЛЮЧИ: question, options, correctAnswer, fact.
+
+Формат (строго без пробелов):
+[{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]`;
+
     try {
-        console.log(`⚡ Запрашиваем ИИ через внутренний Vercel API...`);
-        
-        // Обращаемся к НАШЕМУ серверу (папка api, файл quiz.js). CORS физически невозможен.
-        const response = await fetch('/api/quiz', {
+        const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ theme })
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${CEREBRAS_KEY}`
+            },
+            body: JSON.stringify({
+                model: "llama3.1-70b", 
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `Тема: "${theme}". Только JSON массив из 10 вопросов.` }
+                ],
+                response_format: { type: "json_object" }
+            })
         });
 
-        if (!response.ok) throw new Error(`Internal Server Error: ${response.status}`);
+        if (!response.ok) {
+            const errText = await response.text();
+            return res.status(response.status).json({ error: errText });
+        }
 
         const data = await response.json();
-        let text = data.choices?.[0]?.message?.content?.trim() || "";
-        
-        let questionsRaw = extractValidQuestionsFromText(text);
+        return res.status(200).json(data);
 
-        if (!questionsRaw || questionsRaw.length === 0) {
-            throw new Error("Empty Array");
-        }
-
-        const validQuestions = questionsRaw.map((q: any, index: number) => {
-            let options = Array.isArray(q.options || q.o) ? [...(q.options || q.o)] : ["Вариант А", "Вариант Б", "В", "Г"];
-            options = options.filter(opt => opt && String(opt).trim() !== "");
-            
-            while(options.length < 4) options.push(`Доп. вариант ${options.length + 1}`);
-            if (options.length > 4) options.length = 4;
-            options = options.map(opt => String(opt));
-
-            let correct = String(q.correctAnswer || q.c || options[0]);
-
-            if (/^[0-9]+$/.test(correct)) {
-                const idx = parseInt(correct, 10) - 1;
-                if (idx >= 0 && idx < options.length) correct = options[idx];
-            }
-            if (!options.includes(correct)) correct = options[0];
-
-            for (let i = options.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [options[i], options[j]] = [options[j], options[i]];
-            }
-
-            return {
-                question: String(q.question || q.q || `Сбой дешифровки #${index + 1}`),
-                options: options,
-                correctAnswer: correct,
-                fact: String(q.fact || q.f || "Факт утерян.")
-            };
-        });
-
-        console.log(`✅ ИИ успешно сгенерировал вопросов: ${validQuestions.length}`);
-        return validQuestions.slice(0, 10); 
-
-    } catch (error) {
-        console.warn("🛡️ Ошибка парсинга или сети. Возвращаем пустой массив.", error);
-        return []; 
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 }

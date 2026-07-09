@@ -1,6 +1,6 @@
-// api/quiz.js
+// api/quiz.ts
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
     // Разрешаем только POST-запросы
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     
     // Твой зашифрованный ключ Cerebras
     const CEREBRAS_KEY_BASE64 = "Y3NrLTk1ZDZodzZrNW53aGVyeXJjZXJwbXYzcmt0bXR5cGZ5Yzg5dHB2OGttMjI1cmtwbg==";
-    // Расшифровываем ключ для сервера (в Node.js используется Buffer)
+    // Расшифровываем ключ для сервера
     const CEREBRAS_KEY = Buffer.from(CEREBRAS_KEY_BASE64, 'base64').toString('utf8');
 
     const systemPrompt = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-массив из 10 вопросов на тему: "${theme}".
@@ -24,7 +24,6 @@ export default async function handler(req, res) {
 [{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]`;
 
     try {
-        // Серверный запрос к Cerebras (здесь не бывает CORS!)
         const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
             method: 'POST',
             headers: { 
@@ -47,10 +46,9 @@ export default async function handler(req, res) {
         }
 
         const data = await response.json();
-        // Отправляем успешный ответ обратно в твою игру
         return res.status(200).json(data);
 
-    } catch (error) {
-        return res.status(500).json({ error: error.message });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 }
