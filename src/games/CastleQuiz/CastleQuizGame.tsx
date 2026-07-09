@@ -45,7 +45,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const [questionData, setQuestionData] = useState<any>(null);
   const [feedback, setFeedback] = useState<{ message: string, fact: string, isCorrect: boolean } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isProcessingLocal, setIsProcessingLocal] = useState(false); // ЗАЩИТА ОТ ДВОЙНЫХ КЛИКОВ
+  const [isProcessingLocal, setIsProcessingLocal] = useState(false); // Защита от спама кликами
 
   const [timeLeft, setTimeLeft] = useState<number>(QUESTION_TIME_LIMIT);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -69,6 +69,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         setFeedback(data.feedback || null);
         setIsGenerating(data.isGenerating || false);
         if (data.timeLeft !== undefined) setTimeLeft(data.timeLeft);
+        setIsProcessingLocal(false); // Снимаем блокировку после обновления стейта с сервера
       }
     });
 
@@ -76,7 +77,8 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   }, [room.id]);
 
   useEffect(() => {
-    if (questionData && !feedback && turnPlayerId === user.id && !isGenerating) {
+    // Включаем таймер только если мы в активной фазе вопроса и это ход текущего игрока
+    if (questionData && !feedback && turnPlayerId === user.id && !isGenerating && !isProcessingLocal) {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
           const newTime = prev - 1;
@@ -95,14 +97,15 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [questionData, feedback, turnPlayerId, isGenerating, room.id, user.id]);
+  }, [questionData, feedback, turnPlayerId, isGenerating, isProcessingLocal, room.id, user.id]);
 
   const handleTimeUp = () => {
     processAnswer(false);
   };
 
   const handleStartGame = async () => {
-    if (!isHost) return;
+    if (!isHost || isProcessingLocal) return;
+    setIsProcessingLocal(true);
     
     update(ref(db, `rooms/${room.id}/gameState`), {
       phase: 'generating',
@@ -155,54 +158,40 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   };
 
   const handleCastleClick = async (castleId: number) => {
-    if (turnPlayerId !== user.id) return; 
+    if (turnPlayerId !== user.id || isProcessingLocal) return; 
     if (!canAttack(castleId)) return;
-    if (attackingCastle || isProcessingLocal) return; // СЕКРЕТНЫЙ ФИКС: Запрет двойного клика
+    if (attackingCastle) return;
 
-    setIsProcessingLocal(true); // Включаем локальную блокировку кликов
+    setIsProcessingLocal(true);
+    let currentQuestions = [...questions];
 
-    try {
-        let currentQuestions = [...questions];
+    update(ref(db, `rooms/${room.id}/gameState`), {
+      attackingCastle: castleId,
+      isGenerating: currentQuestions.length === 0,
+      feedback: null,
+      questionData: null
+    });
 
-        update(ref(db, `rooms/${room.id}/gameState`), {
-          attackingCastle: castleId,
-          isGenerating: currentQuestions.length === 0,
-          feedback: null,
-          questionData: null
-        });
-
-        // Если вопросы кончились, генерируем новую партию прямо во время боя
-        if (currentQuestions.length === 0) {
-            const newBatch = await generateQuizBatch(theme);
-            // Жесткая проверка: даже если ИИ рухнул, берем хотя бы один технический вопрос
-            if (newBatch && newBatch.length > 0) {
-                currentQuestions = newBatch;
-            } else {
-                currentQuestions = [{
-                    question: "Аварийное восстановление системы завершено?",
-                    options: ["Да", "Так точно", "Определенно", "Подтверждаю"],
-                    correctAnswer: "Да",
-                    fact: "Иногда нейросети уходят на перекур."
-                }];
-            }
-        }
-
-        const nextQuestion = currentQuestions[0];
-        const remainingQuestions = currentQuestions.slice(1);
-
-        update(ref(db, `rooms/${room.id}/gameState`), {
-          questionData: nextQuestion,
-          questions: remainingQuestions, 
-          isGenerating: false,
-          timeLeft: QUESTION_TIME_LIMIT
-        });
-    } finally {
-        setIsProcessingLocal(false); // Снимаем блокировку после успешного обновления Firebase
+    // Если вопросы кончились, генерируем новую партию прямо во время боя
+    if (currentQuestions.length === 0) {
+        const newBatch = await generateQuizBatch(theme);
+        currentQuestions = newBatch;
     }
+
+    const nextQuestion = currentQuestions[0];
+    const remainingQuestions = currentQuestions.slice(1);
+
+    update(ref(db, `rooms/${room.id}/gameState`), {
+      questionData: nextQuestion,
+      questions: remainingQuestions, 
+      isGenerating: false,
+      timeLeft: QUESTION_TIME_LIMIT
+    });
   };
 
   const handleAnswerClick = (selectedOption: string) => {
-    if (turnPlayerId !== user.id) return; 
+    if (turnPlayerId !== user.id || isProcessingLocal) return; 
+    setIsProcessingLocal(true);
     if (timerRef.current) clearInterval(timerRef.current);
     
     const isCorrect = selectedOption === questionData.correctAnswer;
@@ -277,9 +266,10 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
 
               <button 
                 onClick={handleStartGame}
-                className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl font-bold text-lg shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all transform hover:scale-[1.02] uppercase tracking-wider"
+                disabled={isProcessingLocal}
+                className={`w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-bold text-lg shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all uppercase tracking-wider ${isProcessingLocal ? 'opacity-50 cursor-not-allowed' : 'hover:from-purple-500 hover:to-indigo-500 transform hover:scale-[1.02]'}`}
               >
-                Инициировать бой
+                {isProcessingLocal ? 'Подготовка...' : 'Инициировать бой'}
               </button>
             </>
           ) : (
@@ -383,7 +373,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
           })}
 
           {castles.map(castle => {
-            const isClickable = canAttack(castle.id) && turnPlayerId === user.id && !attackingCastle;
+            const isClickable = canAttack(castle.id) && turnPlayerId === user.id && !attackingCastle && !isProcessingLocal;
             const color = getPlayerColor(castle.ownerId);
             const glowColor = getPlayerColor(castle.ownerId, true);
             
@@ -488,9 +478,9 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
                     <button 
                       key={idx}
                       onClick={() => handleAnswerClick(opt)}
-                      disabled={turnPlayerId !== user.id}
+                      disabled={turnPlayerId !== user.id || isProcessingLocal}
                       className={`relative p-5 bg-gray-800/80 border border-gray-700 rounded-2xl transition-all text-lg font-medium text-left overflow-hidden group
-                        ${turnPlayerId === user.id 
+                        ${(turnPlayerId === user.id && !isProcessingLocal)
                           ? 'hover:bg-purple-900/40 hover:border-purple-400 cursor-pointer shadow-lg hover:shadow-purple-500/20 hover:-translate-y-1' 
                           : 'opacity-50 cursor-not-allowed'}`}
                     >
