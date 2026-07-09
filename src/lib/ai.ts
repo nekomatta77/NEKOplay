@@ -1,10 +1,37 @@
 // src/lib/ai.ts
 
-// --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
+// --- АБСОЛЮТНАЯ ЗАЩИТА v8.0: Рекурсия + Стековый сканер ---
 function extractValidQuestionsFromText(text: string): any[] {
     const results: any[] = [];
-    let startIndex = -1;
-    let depth = 0;
+    
+    // УРОВЕНЬ 1: Умный поиск по валидному дереву (Если ИИ обернул массив в { "questions": [...] })
+    try {
+        const cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanText);
+        
+        function deepSearch(obj: any) {
+            if (!obj) return;
+            if (Array.isArray(obj)) {
+                obj.forEach(deepSearch);
+            } else if (typeof obj === 'object') {
+                // Если мы наткнулись на сам объект вопроса
+                if (obj.question && Array.isArray(obj.options)) {
+                    results.push(obj);
+                } else {
+                    // Иначе идем глубже по всем ключам
+                    Object.values(obj).forEach(deepSearch);
+                }
+            }
+        }
+        deepSearch(parsed);
+        
+        if (results.length > 0) return results;
+    } catch (e) {
+        // Если штатный парсинг упал (ответ оборван), идем к запасному сканеру
+    }
+
+    // УРОВЕНЬ 2: Стековый сканер (Вырезает целые объекты из оборванного мусора на любой глубине)
+    let stack: number[] = [];
     let inString = false;
     let escapeNext = false;
 
@@ -17,27 +44,24 @@ function extractValidQuestionsFromText(text: string): any[] {
 
         if (!inString) {
             if (char === '{') {
-                if (depth === 0) startIndex = i;
-                depth++;
+                stack.push(i); // Запоминаем старт любого объекта
             } else if (char === '}') {
-                if (depth > 0) {
-                    depth--;
-                    // Нашли конец объекта
-                    if (depth === 0 && startIndex !== -1) {
-                        const objStr = text.substring(startIndex, i + 1);
-                        try {
-                            // Жесткая очистка внутри объекта перед парсингом
-                            const cleanStr = objStr.replace(/\n/g, ' ').replace(/\r/g, '').replace(/,\s*}/g, '}');
-                            const parsed = JSON.parse(cleanStr);
-                            
-                            // Проверяем, что это именно вопрос
-                            if (parsed && parsed.question && Array.isArray(parsed.options)) {
+                if (stack.length > 0) {
+                    const startIndex = stack.pop()!;
+                    const objStr = text.substring(startIndex, i + 1);
+                    try {
+                        const cleanStr = objStr.replace(/\n/g, ' ').replace(/\r/g, '').replace(/,\s*}/g, '}');
+                        const parsed = JSON.parse(cleanStr);
+                        
+                        // Проверяем, что достали именно вопрос
+                        if (parsed && parsed.question && Array.isArray(parsed.options)) {
+                            // Исключаем дубликаты
+                            if (!results.some(q => q.question === parsed.question)) {
                                 results.push(parsed);
                             }
-                        } catch (e) {
-                            // Игнорируем сломанный блок (если оборвалась связь)
                         }
-                        startIndex = -1;
+                    } catch (e) {
+                        // Игнорируем сломанный блок
                     }
                 }
             }
@@ -50,7 +74,6 @@ function extractValidQuestionsFromText(text: string): any[] {
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
     
-    // Резервный пул вопросов на случай падения серверов ИИ (чтобы live-сервер игры не ложился)
     const getFallback = () => Array(5).fill(null).map((_, i) => ({
         question: `[Автономный протокол] Вопрос №${i + 1} по теме: "${theme}"?`,
         options: ["Сбой сети", "Отсутствие сигнала", "Перегрузка API", "Отказ сервера"],
@@ -73,7 +96,7 @@ export async function generateQuizBatch(theme: string) {
 ]`;
 
     try {
-        console.log("Запрашиваем нейросеть (Ультимативный парсер v7.0 - Stable API)...");
+        console.log("Запрашиваем нейросеть (Ультимативный парсер v8.0 - Deep Extract)...");
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -85,9 +108,9 @@ export async function generateQuizBatch(theme: string) {
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: `Тема: "${theme}". Сгенерируй массив без лишних слов.` }
                 ],
-                model: 'openai', // <-- ФИКС 404 ОШИБКИ: Используем разрешенный алиас сервера
+                model: 'openai', 
                 seed: randomSeed,
-                jsonMode: true   // <-- Блокирует рассуждения нейросети на стороне сервера
+                jsonMode: true
             })
         });
 
@@ -96,7 +119,7 @@ export async function generateQuizBatch(theme: string) {
         let text = await response.text();
         console.log("Ответ получен. RAW TEXT (первые 150 символов):", text.substring(0, 150).replace(/\n/g, '\\n'));
         
-        // Снятие обертки API (Если сервер всё-таки вернул JSON объект с полем content)
+        // Снятие обертки API (Если есть)
         try {
             const apiResponse = JSON.parse(text);
             if (apiResponse && typeof apiResponse === 'object') {
@@ -110,7 +133,7 @@ export async function generateQuizBatch(theme: string) {
             // Оставляем текст как есть
         }
 
-        // Вытаскиваем объекты
+        // Вытаскиваем объекты через наш пуленепробиваемый парсер
         let questionsRaw = extractValidQuestionsFromText(text);
 
         if (questionsRaw.length === 0) {
@@ -120,7 +143,6 @@ export async function generateQuizBatch(theme: string) {
 
         console.log(`Успешно спасено целых вопросов: ${questionsRaw.length}.`);
 
-        // Нормализация данных и перемешивание вариантов
         const validQuestions = questionsRaw.map((q: any, index: number) => {
             let options = Array.isArray(q.options) ? [...q.options] : ["Вариант А", "Вариант Б", "Вариант В", "Вариант Г"];
             
@@ -137,7 +159,6 @@ export async function generateQuizBatch(theme: string) {
 
             options = options.map(opt => String(opt));
 
-            // Алгоритм Фишера-Йетса
             for (let i = options.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [options[i], options[j]] = [options[j], options[i]];
