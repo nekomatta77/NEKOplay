@@ -1,12 +1,11 @@
 // src/lib/ai.ts
 
-// Используем ключ из .env или вшитый (твой рабочий ключ OpenRouter)
+// Берем ключ СТРОГО из файла .env (GitHub его не увидит)
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
 
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
     
-    // Резервный пул с явным указанием типов (чтобы TypeScript не ругался)
     const getFallback = () => Array(7).fill(null).map((_: any, i: number) => ({
         question: `[Офлайн режим] Вопрос №${i + 1} по теме: "${theme}"? (Сид: ${randomSeed})`,
         options: ["Протокол Альфа", "Протокол Бета", "Протокол Гамма", "Протокол Дельта"],
@@ -42,12 +41,11 @@ export async function generateQuizBatch(theme: string) {
             headers: {
                 'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
                 'Content-Type': 'application/json',
-                // Эти заголовки просит OpenRouter
                 'HTTP-Referer': 'http://localhost:5173', 
                 'X-Title': 'NEKOplay',
             },
             body: JSON.stringify({
-                model: 'google/gemini-2.0-flash-exp:free', // Сверхбыстрая и бесплатная модель
+                model: 'google/gemini-2.0-flash-exp:free',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: `Тема: "${theme}". Сгенерируй 7 вопросов.` }
@@ -72,7 +70,6 @@ export async function generateQuizBatch(theme: string) {
         
         console.log("Ответ от ИИ получен! Запускаем фильтрацию...");
         
-        // Очистка от маркдауна и нормализация тегов
         text = text.replace(/\*/g, '').replace(/```/g, '');
         text = text.replace(/\[Q\]:/gi, '[Q]').replace(/\[O\]:/gi, '[O]').replace(/\[A\]:/gi, '[A]').replace(/\[F\]:/gi, '[F]');
         text = text.replace(/\[q\]/gi, '[Q]').replace(/\[o\]/gi, '[O]').replace(/\[a\]/gi, '[A]').replace(/\[f\]/gi, '[F]');
@@ -93,10 +90,8 @@ export async function generateQuizBatch(theme: string) {
                 const answerText = block.substring(idxA + 3, idxF).trim();
                 const factText = block.substring(idxF + 3).replace(/---/g, '').trim();
                 
-                // Явно указываем тип (o: string), чтобы не было ошибки 7006 в TypeScript
                 const options = optionsText.split('|').map((o: string) => o.trim()).filter((o: string) => o.length > 0);
                 
-                // Защита от кривого количества вариантов ответа
                 while(options.length < 4) {
                     options.push(`Вариант ${options.length + 1}`);
                 }
