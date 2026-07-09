@@ -1,119 +1,83 @@
 // src/lib/ai.ts
 
-// --- ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Поиск JSON массивов в сыром тексте ---
-// Игнорирует скобки внутри текста и ищет только настоящие структуры массива
-function extractArraysFromString(str: string): string[] {
-    const results: string[] = [];
+// --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
+// Игнорирует сломанные массивы, обрезанные концы и лишний текст.
+// Вытаскивает только те {} блоки, которые успели полностью сгенерироваться.
+function extractValidQuestionsFromText(text: string): any[] {
+    const results: any[] = [];
+    let startIndex = -1;
     let depth = 0;
-    let start = -1;
     let inString = false;
     let escapeNext = false;
-    
-    for (let i = 0; i < str.length; i++) {
-        const char = str[i];
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        
         if (escapeNext) { escapeNext = false; continue; }
         if (char === '\\') { escapeNext = true; continue; }
         if (char === '"') { inString = !inString; continue; }
-        
+
         if (!inString) {
-            if (char === '[') {
-                if (depth === 0) start = i;
+            if (char === '{') {
+                if (depth === 0) startIndex = i;
                 depth++;
-            } else if (char === ']') {
+            } else if (char === '}') {
                 if (depth > 0) {
                     depth--;
-                    if (depth === 0 && start !== -1) {
-                        results.push(str.substring(start, i + 1));
-                        start = -1;
+                    // Мы нашли закрывающую скобку для главного объекта
+                    if (depth === 0 && startIndex !== -1) {
+                        const objStr = text.substring(startIndex, i + 1);
+                        try {
+                            // Очищаем переносы строк внутри значений, которые ломают JSON
+                            const cleanStr = objStr.replace(/\n/g, ' ').replace(/\r/g, '').replace(/,\s*}/g, '}');
+                            const parsed = JSON.parse(cleanStr);
+                            
+                            // Если объект распарсился и похож на вопрос - забираем его
+                            if (parsed && parsed.question && Array.isArray(parsed.options)) {
+                                results.push(parsed);
+                            }
+                        } catch (e) {
+                            // Если конкретно этот блок битый, просто игнорируем его и ищем дальше
+                        }
+                        startIndex = -1;
                     }
                 }
             }
         }
     }
+    
     return results;
-}
-
-// --- ГОД-МОД ЭКСТРАКТОР ---
-// Рекурсивно погружается в любые данные (объекты, массивы, строки), чтобы найти нужный пул вопросов
-function deepExtractQuestions(data: any): any[] | null {
-    if (!data) return null;
-    
-    // 1. Если это массив - проверяем, наш ли он?
-    if (Array.isArray(data) && data.length > 0) {
-        // Проверяем, есть ли хотя бы один элемент, похожий на вопрос
-        const isValid = (item: any) => item && typeof item === 'object' && item.question && item.options;
-        if (data.some(isValid)) {
-            return data.filter(isValid);
-        }
-    }
-    
-    // 2. Если это строка - возможно, внутри спрятан stringified JSON или markdown
-    if (typeof data === 'string') {
-        let text = data.trim();
-        if (text.includes('[') || text.includes('{')) {
-            // Сначала чистим маркдаун
-            let cleanText = text.replace(/```json/gi, '').replace(/```/g, '').trim();
-            
-            // Пробуем парсить целиком
-            try {
-                const parsed = JSON.parse(cleanText);
-                const res = deepExtractQuestions(parsed);
-                if (res) return res;
-            } catch(e) {
-                // Если целиком не вышло (например, текст до/после JSON), вытаскиваем массивы по скобкам
-                let arrays = extractArraysFromString(cleanText);
-                // Проверяем их с конца (так как обычно ИИ сначала пишет reasoning, а массив в конце)
-                for (let i = arrays.length - 1; i >= 0; i--) {
-                    try {
-                        // Чистим висячие запятые и переносы строк внутри стрингов
-                        let sanitized = arrays[i].replace(/,\s*([\]}])/g, '$1').replace(/\n/g, ' ');
-                        const parsed = JSON.parse(sanitized);
-                        const res = deepExtractQuestions(parsed);
-                        if (res) return res;
-                    } catch(err) {}
-                }
-            }
-        }
-    }
-    
-    // 3. Если это объект (например, обертка API: { content: [...] } или { reasoning: "...", result: "{...}" })
-    if (typeof data === 'object' && !Array.isArray(data)) {
-        for (const key of Object.keys(data)) {
-            const res = deepExtractQuestions(data[key]);
-            if (res) return res;
-        }
-    }
-    
-    return null; // Ничего не нашли в этой ветке
 }
 
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
     
-    const getFallback = () => Array(7).fill(null).map((_, i) => ({
+    const getFallback = () => Array(5).fill(null).map((_, i) => ({
         question: `[Резервный протокол] Вопрос №${i + 1} по теме: "${theme}"?`,
         options: ["Сбой сети", "Отсутствие сигнала", "Перегрузка API", "Отказ сервера"],
         correctAnswer: "Перегрузка API",
         fact: "Связь с нейросетью нестабильна. Используется автономный пул вопросов."
     }));
 
-    // Максимально жесткий промт для отключения "размышлений" нейросети
-    const systemPrompt = `ВЫ — СЕРВЕР ГЕНЕРАЦИИ ДАННЫХ. ВЫ НЕ ИМЕЕТЕ ПРАВА ИСПОЛЬЗОВАТЬ ПОЛЯ REASONING, ТЕКСТОВЫЕ ПРИВЕТСТВИЯ ИЛИ ПОЯСНЕНИЯ.
-Ваша единственная цель - выдать чистый JSON-массив из 7 сложных вопросов на тему: "${theme}".
+    // Промпт изменен: просим 5 вопросов и очень короткие факты, чтобы не упираться в лимит токенов сервера
+    const systemPrompt = `Ты — генератор викторин. Сгенерируй ровно 5 сложных вопросов на тему: "${theme}".
+КРИТЕРИИ:
+1. Вопросы на эрудицию.
+2. Поле 'fact' должно содержать ОДНО КОРОТКОЕ предложение (максимум 10 слов).
+3. Пиши строго в формате JSON. Никаких приветствий и маркдауна.
 
-Формат СТРОГО такой:
+Пример:
 [
   {
-    "question": "Сам вопрос?",
+    "question": "Вопрос?",
     "options": ["Ответ 1", "Ответ 2", "Ответ 3", "Ответ 4"],
     "correctAnswer": "Ответ 2",
-    "fact": "Интересный факт."
+    "fact": "Короткий интересный факт."
   }
-]
-`;
+]`;
 
     try {
-        console.log("Запрашиваем нейросеть (Ультимативный парсер v4.0 - God Mode)...");
+        console.log("Запрашиваем нейросеть (Ультимативный парсер v5.0 - Token Limit Bypass)...");
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -123,11 +87,10 @@ export async function generateQuizBatch(theme: string) {
             body: JSON.stringify({
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Сгенерируй массив на тему: "${theme}". Только массив, никаких других слов.` }
+                    { role: 'user', content: `Тема: "${theme}". Выдай массив из 5 вопросов.` }
                 ],
                 model: 'openai', 
                 seed: randomSeed
-                // jsonMode убран, так как он заставлял некоторые модели отдавать обертку с reasoning
             })
         });
 
@@ -136,17 +99,17 @@ export async function generateQuizBatch(theme: string) {
         const text = await response.text();
         console.log("Ответ получен. RAW TEXT (первые 150 символов):", text.substring(0, 150).replace(/\n/g, '\\n'));
         
-        // Передаем ВЕСЬ ответ в наш God-Mode Extractor
-        let questionsRaw = deepExtractQuestions(text);
+        // Передаем весь текст (даже если он оборван) в наш пуленепробиваемый экстрактор
+        let questionsRaw = extractValidQuestionsFromText(text);
 
-        if (!questionsRaw || questionsRaw.length === 0) {
-            console.error("Извлекатель не смог найти массив вопросов в ответе:", text);
-            throw new Error("Массив вопросов не найден в структуре ответа (God-Mode failed)");
+        if (questionsRaw.length === 0) {
+            console.error("Экстрактор не смог найти ни одного целого вопроса в ответе:", text);
+            throw new Error("Не удалось извлечь ни одного вопроса из ответа ИИ");
         }
 
-        console.log(`Успешно распознано вопросов: ${questionsRaw.length}. Производим нормализацию...`);
+        console.log(`Успешно спасено целых вопросов из ответа: ${questionsRaw.length}.`);
 
-        // Нормализация данных и защита от читов
+        // Нормализация данных
         const validQuestions = questionsRaw.map((q: any, index: number) => {
             let options = Array.isArray(q.options) ? [...q.options] : ["Вариант А", "Вариант Б", "Вариант В", "Вариант Г"];
             
@@ -171,15 +134,14 @@ export async function generateQuizBatch(theme: string) {
             }
 
             return {
-                question: q.question || `Вопрос №${index + 1} поврежден при передаче данных?`,
+                question: q.question || `Сбой расшифровки вопроса №${index + 1}`,
                 options: options,
                 correctAnswer: String(correct),
-                fact: q.fact || "Интересный факт утерян."
+                fact: q.fact || "Факт утерян."
             };
         });
 
-        // Гарантируем возврат максимум 7 вопросов
-        return validQuestions.slice(0, 7);
+        return validQuestions; // Возвращаем сколько спасли (даже если их 3 или 4, игра сама дозакажет новые)
 
     } catch (error) {
         console.error('Критическая ошибка ИИ:', error);
