@@ -45,7 +45,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const [questionData, setQuestionData] = useState<any>(null);
   const [feedback, setFeedback] = useState<{ message: string, fact: string, isCorrect: boolean } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isProcessingLocal, setIsProcessingLocal] = useState(false); // ЗАЩИТА ОТ ДВОЙНЫХ КЛИКОВ
 
   const [timeLeft, setTimeLeft] = useState<number>(QUESTION_TIME_LIMIT);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -76,6 +75,7 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   }, [room.id]);
 
   useEffect(() => {
+    // Включаем таймер только если мы в активной фазе вопроса и это ход текущего игрока
     if (questionData && !feedback && turnPlayerId === user.id && !isGenerating) {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
@@ -157,48 +157,32 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const handleCastleClick = async (castleId: number) => {
     if (turnPlayerId !== user.id) return; 
     if (!canAttack(castleId)) return;
-    if (attackingCastle || isProcessingLocal) return; // СЕКРЕТНЫЙ ФИКС: Запрет двойного клика
+    if (attackingCastle) return;
 
-    setIsProcessingLocal(true); // Включаем локальную блокировку кликов
+    let currentQuestions = [...questions];
 
-    try {
-        let currentQuestions = [...questions];
+    update(ref(db, `rooms/${room.id}/gameState`), {
+      attackingCastle: castleId,
+      isGenerating: currentQuestions.length === 0,
+      feedback: null,
+      questionData: null
+    });
 
-        update(ref(db, `rooms/${room.id}/gameState`), {
-          attackingCastle: castleId,
-          isGenerating: currentQuestions.length === 0,
-          feedback: null,
-          questionData: null
-        });
-
-        // Если вопросы кончились, генерируем новую партию прямо во время боя
-        if (currentQuestions.length === 0) {
-            const newBatch = await generateQuizBatch(theme);
-            // Жесткая проверка: даже если ИИ рухнул, берем хотя бы один технический вопрос
-            if (newBatch && newBatch.length > 0) {
-                currentQuestions = newBatch;
-            } else {
-                currentQuestions = [{
-                    question: "Аварийное восстановление системы завершено?",
-                    options: ["Да", "Так точно", "Определенно", "Подтверждаю"],
-                    correctAnswer: "Да",
-                    fact: "Иногда нейросети уходят на перекур."
-                }];
-            }
-        }
-
-        const nextQuestion = currentQuestions[0];
-        const remainingQuestions = currentQuestions.slice(1);
-
-        update(ref(db, `rooms/${room.id}/gameState`), {
-          questionData: nextQuestion,
-          questions: remainingQuestions, 
-          isGenerating: false,
-          timeLeft: QUESTION_TIME_LIMIT
-        });
-    } finally {
-        setIsProcessingLocal(false); // Снимаем блокировку после успешного обновления Firebase
+    // Если вопросы кончились, генерируем новую партию прямо во время боя
+    if (currentQuestions.length === 0) {
+        const newBatch = await generateQuizBatch(theme);
+        currentQuestions = newBatch;
     }
+
+    const nextQuestion = currentQuestions[0];
+    const remainingQuestions = currentQuestions.slice(1);
+
+    update(ref(db, `rooms/${room.id}/gameState`), {
+      questionData: nextQuestion,
+      questions: remainingQuestions, 
+      isGenerating: false,
+      timeLeft: QUESTION_TIME_LIMIT
+    });
   };
 
   const handleAnswerClick = (selectedOption: string) => {
