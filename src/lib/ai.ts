@@ -1,15 +1,23 @@
 // src/lib/ai.ts
 
+// Используем ключ из .env или вшитый (твой рабочий ключ OpenRouter)
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
     
-    // Явно указываем типы, чтобы TypeScript был доволен
+    // Резервный пул с явным указанием типов (чтобы TypeScript не ругался)
     const getFallback = () => Array(7).fill(null).map((_: any, i: number) => ({
-        question: `[Аварийный протокол] Вопрос №${i + 1} по теме: "${theme}"? (Сид: ${randomSeed})`,
+        question: `[Офлайн режим] Вопрос №${i + 1} по теме: "${theme}"? (Сид: ${randomSeed})`,
         options: ["Протокол Альфа", "Протокол Бета", "Протокол Гамма", "Протокол Дельта"],
         correctAnswer: "Протокол Альфа",
-        fact: "Связь с ИИ прервалась. Активированы резервные алгоритмы."
+        fact: "Активированы резервные алгоритмы."
     }));
+
+    if (!OPENROUTER_API_KEY) {
+        console.error("КРИТИЧЕСКАЯ ОШИБКА: API ключ отсутствует!");
+        return getFallback();
+    }
 
     const systemPrompt = `Ты — главный редактор телевизионной викторины. Твоя задача выдать 7 уникальных вопросов.
     
@@ -27,48 +35,45 @@ export async function generateQuizBatch(theme: string) {
     [F] Достоверный факт`;
 
     try {
-        console.log("Запрашиваем данные у GPT-4o (через безопасный POST-запрос)...");
+        console.log("Молниеносный запрос к OpenRouter (Gemini 2.0 Flash)...");
         
-        // Используем POST-запрос. Это позволяет отправлять длинные промпты 
-        // и использовать мощную модель GPT-4o абсолютно бесплатно и БЕЗ КЛЮЧЕЙ.
-        const response = await fetch('https://text.pollinations.ai/', {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
+                'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
                 'Content-Type': 'application/json',
+                // Эти заголовки просит OpenRouter
+                'HTTP-Referer': 'http://localhost:5173', 
+                'X-Title': 'NEKOplay',
             },
             body: JSON.stringify({
+                model: 'google/gemini-2.0-flash-exp:free', // Сверхбыстрая и бесплатная модель
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: `Тема: "${theme}". Сгенерируй 7 вопросов.` }
                 ],
-                model: 'openai', // Принудительно заставляем сервер использовать OpenAI GPT-4o
+                temperature: 0.7,
                 seed: randomSeed
             })
         });
 
         if (!response.ok) {
-            throw new Error(`Ошибка сети: ${response.status}`);
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(`Ошибка OpenRouter: ${response.status} - ${JSON.stringify(errData)}`);
         }
 
-        let text = await response.text();
+        const data = await response.json();
         
-        // Анти-HTML защита
-        if (text.toLowerCase().includes('<!doctype html>') || text.toLowerCase().includes('<html')) {
-            throw new Error("Нейросеть недоступна (вернула HTML)");
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+            throw new Error("Структура ответа API пуста");
         }
-
-        // Анти-JSON защита (на случай если ИИ обернет ответ)
-        try {
-            if (text.trim().startsWith('{')) {
-                const parsed = JSON.parse(text);
-                text = parsed.content || parsed.message || parsed.response || parsed.text || text;
-            }
-        } catch (e) {}
         
-        console.log("Ответ ИИ получен, начинаем фильтрацию...");
+        let text = data.choices[0].message.content;
         
-        text = text.replace(/\*/g, '');
-        text = text.replace(/```/g, '');
+        console.log("Ответ от ИИ получен! Запускаем фильтрацию...");
+        
+        // Очистка от маркдауна и нормализация тегов
+        text = text.replace(/\*/g, '').replace(/```/g, '');
         text = text.replace(/\[Q\]:/gi, '[Q]').replace(/\[O\]:/gi, '[O]').replace(/\[A\]:/gi, '[A]').replace(/\[F\]:/gi, '[F]');
         text = text.replace(/\[q\]/gi, '[Q]').replace(/\[o\]/gi, '[O]').replace(/\[a\]/gi, '[A]').replace(/\[f\]/gi, '[F]');
 
@@ -88,10 +93,12 @@ export async function generateQuizBatch(theme: string) {
                 const answerText = block.substring(idxA + 3, idxF).trim();
                 const factText = block.substring(idxF + 3).replace(/---/g, '').trim();
                 
+                // Явно указываем тип (o: string), чтобы не было ошибки 7006 в TypeScript
                 const options = optionsText.split('|').map((o: string) => o.trim()).filter((o: string) => o.length > 0);
                 
+                // Защита от кривого количества вариантов ответа
                 while(options.length < 4) {
-                    options.push(`Резервный вариант ${options.length + 1}`);
+                    options.push(`Вариант ${options.length + 1}`);
                 }
                 if (options.length > 4) {
                     options.length = 4;
