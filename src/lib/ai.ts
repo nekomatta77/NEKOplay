@@ -68,26 +68,18 @@ function extractValidQuestionsFromText(text: string): any[] {
 export async function generateQuizBatch(theme: string) {
     const randomSeed = Math.floor(Math.random() * 1000000);
 
-    const systemPrompt = `Ты - API-сервер. Выдаешь ТОЛЬКО JSON-массив из 5 вопросов на тему: "${theme}".
-ЗАПРЕЩЕНО использовать рассуждения, reasoning, thinking или писать любой текст кроме JSON.
-Поле fact должно содержать ровно 1 короткое предложение.
+    const systemPrompt = `Ты - генератор викторин. Выдай ТОЛЬКО JSON-массив из 5 вопросов на тему: "${theme}".
+Формат:
+[{"question":"?","options":["1","2","3","4"],"correctAnswer":"2","fact":"!"}]
+Без разметки, без текста.`;
 
-СТРОГИЙ ФОРМАТ:
-[
-  {
-    "question": "Вопрос?",
-    "options": ["Ответ 1", "Ответ 2", "Ответ 3", "Ответ 4"],
-    "correctAnswer": "Ответ 2",
-    "fact": "Факт."
-  }
-]`;
-
-    // ЖЕСТКИЙ ТАЙМ-АУТ: 7 секунд (Чтобы игра никогда не висла на live-сервере)
+    // ГЛАВНЫЙ ФИКС: Увеличиваем тайм-аут до 25 секунд.
+    // Раньше было 7 секунд, и скрипт просто убивал ИИ до того, как тот успевал дописать вопросы!
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000); 
+    const timeoutId = setTimeout(() => controller.abort(), 25000); 
 
     try {
-        console.log("⚡ Запрашиваем ИИ (God-Mode v11.1 - No Local Backup)...");
+        console.log(`⚡ Запрашиваем ИИ (God-Mode v12.0 - Extended Timeout)... Ожидание до 25 секунд.`);
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -95,7 +87,7 @@ export async function generateQuizBatch(theme: string) {
             body: JSON.stringify({
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Тема: "${theme}". Уникальный запрос: ${Date.now()}. Только JSON.` }
+                    { role: 'user', content: `Тема: "${theme}". ID: ${Date.now()}. Только JSON массив.` }
                 ],
                 model: 'openai', 
                 seed: randomSeed,
@@ -131,7 +123,10 @@ export async function generateQuizBatch(theme: string) {
             }
         }
 
-        if (!questionsRaw || questionsRaw.length === 0) throw new Error("Empty Array");
+        if (!questionsRaw || questionsRaw.length === 0) {
+            console.error("RAW TEXT (провал извлечения):", text.substring(0, 200));
+            throw new Error("Empty Array");
+        }
 
         const validQuestions = questionsRaw.map((q: any, index: number) => {
             let options = Array.isArray(q.options) ? [...q.options] : ["Вариант А", "Вариант Б", "В", "Г"];
@@ -158,11 +153,13 @@ export async function generateQuizBatch(theme: string) {
             };
         });
 
+        console.log(`✅ ИИ успешно сгенерировал вопросов: ${validQuestions.length}`);
         return validQuestions.slice(0, 5);
 
     } catch (error) {
         clearTimeout(timeoutId);
-        console.warn("🛡️ API недоступно или долго отвечает. Возвращаем пустой массив.");
-        return []; // Возвращаем пустой массив, а фронтенд сам разберется и подставит 1 системный вопрос
+        console.warn("🛡️ API недоступно или не успело ответить за 25 секунд. Возвращаем пустой массив.");
+        // Возвращаем строго пустой массив без резервных локальных вопросов (как ты и просил)
+        return []; 
     }
 }
