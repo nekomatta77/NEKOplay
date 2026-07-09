@@ -1,8 +1,6 @@
 // src/lib/ai.ts
 
 // --- АБСОЛЮТНАЯ ЗАЩИТА: Посимвольный извлекатель целых объектов ---
-// Игнорирует сломанные массивы, обрезанные концы и лишний текст.
-// Вытаскивает только те {} блоки, которые успели полностью сгенерироваться.
 function extractValidQuestionsFromText(text: string): any[] {
     const results: any[] = [];
     let startIndex = -1;
@@ -24,20 +22,17 @@ function extractValidQuestionsFromText(text: string): any[] {
             } else if (char === '}') {
                 if (depth > 0) {
                     depth--;
-                    // Мы нашли закрывающую скобку для главного объекта
                     if (depth === 0 && startIndex !== -1) {
                         const objStr = text.substring(startIndex, i + 1);
                         try {
-                            // Очищаем переносы строк внутри значений, которые ломают JSON
                             const cleanStr = objStr.replace(/\n/g, ' ').replace(/\r/g, '').replace(/,\s*}/g, '}');
                             const parsed = JSON.parse(cleanStr);
                             
-                            // Если объект распарсился и похож на вопрос - забираем его
                             if (parsed && parsed.question && Array.isArray(parsed.options)) {
                                 results.push(parsed);
                             }
                         } catch (e) {
-                            // Если конкретно этот блок битый, просто игнорируем его и ищем дальше
+                            // Игнорируем сломанный блок
                         }
                         startIndex = -1;
                     }
@@ -59,25 +54,24 @@ export async function generateQuizBatch(theme: string) {
         fact: "Связь с нейросетью нестабильна. Используется автономный пул вопросов."
     }));
 
-    // Промпт изменен: просим 5 вопросов и очень короткие факты, чтобы не упираться в лимит токенов сервера
-    const systemPrompt = `Ты — генератор викторин. Сгенерируй ровно 5 сложных вопросов на тему: "${theme}".
-КРИТЕРИИ:
-1. Вопросы на эрудицию.
-2. Поле 'fact' должно содержать ОДНО КОРОТКОЕ предложение (максимум 10 слов).
-3. Пиши строго в формате JSON. Никаких приветствий и маркдауна.
+    // Очень жесткий промпт, запрещающий рассуждения
+    const systemPrompt = `Ты - API-сервер. Твоя единственная функция - выдавать JSON-массив из 5 вопросов на тему: "${theme}".
+ЗАПРЕЩЕНО использовать рассуждения (reasoning). ЗАПРЕЩЕНО писать текст.
+Выведи ТОЛЬКО валидный JSON-массив.
+Поле fact должно содержать ровно 1 короткое предложение.
 
-Пример:
+Формат:
 [
   {
     "question": "Вопрос?",
     "options": ["Ответ 1", "Ответ 2", "Ответ 3", "Ответ 4"],
     "correctAnswer": "Ответ 2",
-    "fact": "Короткий интересный факт."
+    "fact": "Факт."
   }
 ]`;
 
     try {
-        console.log("Запрашиваем нейросеть (Ультимативный парсер v5.0 - Token Limit Bypass)...");
+        console.log("Запрашиваем нейросеть (Ультимативный парсер v6.0 - Fast Model)...");
         
         const response = await fetch('https://text.pollinations.ai/', {
             method: 'POST',
@@ -87,33 +81,47 @@ export async function generateQuizBatch(theme: string) {
             body: JSON.stringify({
                 messages: [
                     { role: 'system', content: systemPrompt },
-                    { role: 'user', content: `Тема: "${theme}". Выдай массив из 5 вопросов.` }
+                    { role: 'user', content: `Тема: "${theme}". Сгенерируй массив без лишних слов.` }
                 ],
-                model: 'openai', 
-                seed: randomSeed
+                model: 'gpt-4o-mini', // <-- ГЛАВНЫЙ ФИКС: Используем быструю модель без внутренних рассуждений
+                seed: randomSeed,
+                jsonMode: true
             })
         });
 
         if (!response.ok) throw new Error(`Ошибка API: ${response.status}`);
 
-        const text = await response.text();
+        let text = await response.text();
         console.log("Ответ получен. RAW TEXT (первые 150 символов):", text.substring(0, 150).replace(/\n/g, '\\n'));
         
-        // Передаем весь текст (даже если он оборван) в наш пуленепробиваемый экстрактор
+        // УРОВЕНЬ 1: Снятие обертки API (Если сервер вернул JSON объект с полем content)
+        try {
+            const apiResponse = JSON.parse(text);
+            if (apiResponse && typeof apiResponse === 'object') {
+                if (typeof apiResponse.content === 'string') {
+                    text = apiResponse.content;
+                } else if (apiResponse.choices?.[0]?.message?.content) {
+                    text = apiResponse.choices[0].message.content;
+                }
+            }
+        } catch (e) {
+            // Оставляем текст как есть, если это не JSON обертка
+        }
+
+        // УРОВЕНЬ 2: Вытаскиваем объекты (спасет, даже если массив оборвался)
         let questionsRaw = extractValidQuestionsFromText(text);
 
         if (questionsRaw.length === 0) {
-            console.error("Экстрактор не смог найти ни одного целого вопроса в ответе:", text);
+            console.error("Экстрактор не смог найти ни одного вопроса в ответе:", text);
             throw new Error("Не удалось извлечь ни одного вопроса из ответа ИИ");
         }
 
-        console.log(`Успешно спасено целых вопросов из ответа: ${questionsRaw.length}.`);
+        console.log(`Успешно спасено целых вопросов: ${questionsRaw.length}.`);
 
         // Нормализация данных
         const validQuestions = questionsRaw.map((q: any, index: number) => {
             let options = Array.isArray(q.options) ? [...q.options] : ["Вариант А", "Вариант Б", "Вариант В", "Вариант Г"];
             
-            // Защита от пустых ответов
             options = options.filter(opt => opt && String(opt).trim() !== "");
             
             while(options.length < 4) options.push(`Доп. вариант ${options.length + 1}`);
@@ -127,7 +135,7 @@ export async function generateQuizBatch(theme: string) {
 
             options = options.map(opt => String(opt));
 
-            // Алгоритм Фишера-Йетса для честной рандомизации
+            // Алгоритм Фишера-Йетса
             for (let i = options.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [options[i], options[j]] = [options[j], options[i]];
@@ -141,7 +149,7 @@ export async function generateQuizBatch(theme: string) {
             };
         });
 
-        return validQuestions; // Возвращаем сколько спасли (даже если их 3 или 4, игра сама дозакажет новые)
+        return validQuestions;
 
     } catch (error) {
         console.error('Критическая ошибка ИИ:', error);
