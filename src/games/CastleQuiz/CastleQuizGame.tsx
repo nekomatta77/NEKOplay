@@ -15,22 +15,102 @@ interface Props {
   onLeave?: () => void;
 }
 
-const CONNECTIONS = [[1, 2], [1, 3], [2, 4], [3, 4], [4, 5], [4, 6], [5, 7], [6, 7]];
 const QUESTION_TIME_LIMIT = 20;
 
+// Цвета для 6 игроков
+const PLAYER_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#a855f7', '#06b6d4'];
+const GLOW_COLORS = ['#60a5fa', '#f87171', '#4ade80', '#facc15', '#c084fc', '#22d3ee'];
+
+// Генератор карт для 2, 3, 4, 5, 6 игроков в координатах 1000x600
+const generateMapLayout = (players: User[]) => {
+  const pCount = Math.min(players.length, 6);
+  let castles: any[] = [];
+  let connections: number[][] = [];
+
+  if (pCount <= 2) {
+    castles = [
+      { id: 1, cx: 150, cy: 300, ownerId: players[0].id, isBase: true },
+      { id: 2, cx: 350, cy: 150, ownerId: null, isBase: false },
+      { id: 3, cx: 350, cy: 450, ownerId: null, isBase: false },
+      { id: 4, cx: 500, cy: 300, ownerId: null, isBase: false },
+      { id: 5, cx: 650, cy: 150, ownerId: null, isBase: false },
+      { id: 6, cx: 650, cy: 450, ownerId: null, isBase: false },
+      { id: 7, cx: 850, cy: 300, ownerId: players[1]?.id || players[0].id, isBase: true }
+    ];
+    connections = [[1,2], [1,3], [2,4], [3,4], [4,5], [4,6], [5,7], [6,7]];
+  } else if (pCount === 3) {
+    castles = [
+      { id: 1, cx: 500, cy: 100, ownerId: players[0].id, isBase: true },
+      { id: 2, cx: 200, cy: 500, ownerId: players[1].id, isBase: true },
+      { id: 3, cx: 800, cy: 500, ownerId: players[2].id, isBase: true },
+      { id: 4, cx: 500, cy: 300, ownerId: null, isBase: false },
+      { id: 5, cx: 350, cy: 400, ownerId: null, isBase: false },
+      { id: 6, cx: 650, cy: 400, ownerId: null, isBase: false }
+    ];
+    connections = [[1,4], [2,5], [3,6], [4,5], [5,6], [6,4]];
+  } else if (pCount === 4) {
+    castles = [
+      { id: 1, cx: 200, cy: 150, ownerId: players[0].id, isBase: true },
+      { id: 2, cx: 800, cy: 150, ownerId: players[1].id, isBase: true },
+      { id: 3, cx: 800, cy: 450, ownerId: players[2].id, isBase: true },
+      { id: 4, cx: 200, cy: 450, ownerId: players[3].id, isBase: true },
+      { id: 5, cx: 500, cy: 150, ownerId: null, isBase: false },
+      { id: 6, cx: 800, cy: 300, ownerId: null, isBase: false },
+      { id: 7, cx: 500, cy: 450, ownerId: null, isBase: false },
+      { id: 8, cx: 200, cy: 300, ownerId: null, isBase: false },
+      { id: 9, cx: 500, cy: 300, ownerId: null, isBase: false }
+    ];
+    connections = [[1,5], [1,8], [2,5], [2,6], [3,6], [3,7], [4,7], [4,8], [5,9], [6,9], [7,9], [8,9]];
+  } else if (pCount === 5) {
+    castles = [
+      { id: 1, cx: 500, cy: 80, ownerId: players[0].id, isBase: true },
+      { id: 2, cx: 850, cy: 250, ownerId: players[1].id, isBase: true },
+      { id: 3, cx: 750, cy: 520, ownerId: players[2].id, isBase: true },
+      { id: 4, cx: 250, cy: 520, ownerId: players[3].id, isBase: true },
+      { id: 5, cx: 150, cy: 250, ownerId: players[4].id, isBase: true },
+      { id: 6, cx: 500, cy: 230, ownerId: null, isBase: false },
+      { id: 7, cx: 650, cy: 330, ownerId: null, isBase: false },
+      { id: 8, cx: 550, cy: 430, ownerId: null, isBase: false },
+      { id: 9, cx: 450, cy: 430, ownerId: null, isBase: false },
+      { id: 10, cx: 350, cy: 330, ownerId: null, isBase: false },
+      { id: 11, cx: 500, cy: 330, ownerId: null, isBase: false }
+    ];
+    connections = [[1,6], [2,7], [3,8], [4,9], [5,10], [6,7], [7,8], [8,9], [9,10], [10,6], [6,11], [7,11], [8,11], [9,11], [10,11]];
+  } else {
+    castles = [
+      { id: 1, cx: 500, cy: 80, ownerId: players[0].id, isBase: true },
+      { id: 2, cx: 800, cy: 220, ownerId: players[1].id, isBase: true },
+      { id: 3, cx: 800, cy: 420, ownerId: players[2].id, isBase: true },
+      { id: 4, cx: 500, cy: 520, ownerId: players[3].id, isBase: true },
+      { id: 5, cx: 200, cy: 420, ownerId: players[4].id, isBase: true },
+      { id: 6, cx: 200, cy: 220, ownerId: players[5].id, isBase: true },
+      { id: 7, cx: 500, cy: 220, ownerId: null, isBase: false },
+      { id: 8, cx: 650, cy: 300, ownerId: null, isBase: false },
+      { id: 9, cx: 650, cy: 400, ownerId: null, isBase: false },
+      { id: 10, cx: 500, cy: 420, ownerId: null, isBase: false },
+      { id: 11, cx: 350, cy: 400, ownerId: null, isBase: false },
+      { id: 12, cx: 350, cy: 300, ownerId: null, isBase: false },
+      { id: 13, cx: 500, cy: 320, ownerId: null, isBase: false }
+    ];
+    connections = [[1,7], [2,8], [3,9], [4,10], [5,11], [6,12], [7,8], [8,9], [9,10], [10,11], [11,12], [12,7], [7,13], [8,13], [9,13], [10,13], [11,13], [12,13]];
+  }
+
+  return { castles, connections };
+};
+
 export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
-  const player1 = room.players[0];
-  const player2 = room.players[1] || room.players[0]; 
-  const isHost = user.id === player1.id;
+  const isHost = user.id === room.players[0].id;
+  const gamePlayers = room.players || [];
 
   const [localGameState, setLocalGameState] = useState<'setup' | 'generating' | 'playing' | 'gameOver'>('setup');
-  const [theme, setTheme] = useState<string>('Древний Египет');
-  const [turnPlayerId, setTurnPlayerId] = useState<string>(player1.id);
+  const [theme, setTheme] = useState<string>('Киберпанк');
+  const [turnPlayerId, setTurnPlayerId] = useState<string>(gamePlayers[0].id);
   const [winner, setWinner] = useState<string | null>(null);
   
   const [castles, setCastles] = useState<any[]>([]);
+  const [connections, setConnections] = useState<number[][]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
-  const [history, setHistory] = useState<string[]>([]); // История вопросов
+  const [history, setHistory] = useState<string[]>([]);
   
   const [attackingCastle, setAttackingCastle] = useState<number | null>(null);
   const [questionData, setQuestionData] = useState<any>(null);
@@ -50,8 +130,9 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         if (data.theme) setTheme(data.theme);
         if (data.turnPlayerId) setTurnPlayerId(data.turnPlayerId);
         if (data.castles) setCastles(data.castles);
+        if (data.connections) setConnections(data.connections);
         setQuestions(data.questions || []); 
-        setHistory(data.history || []); // Загружаем историю
+        setHistory(data.history || []);
         if (data.winner) setWinner(data.winner);
         setAttackingCastle(data.attackingCastle || null);
         setQuestionData(data.questionData || null);
@@ -95,21 +176,12 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
             batch = [{ question: "Сеть ИИ недоступна. Начать резервный бой?", options: ["Да", "В бой"], correctAnswer: "Да", fact: "ИИ оффлайн." }];
         }
         
-        // Записываем полученные вопросы в историю
         const initialHistory = batch.map((q: any) => q.question);
-
-        const initialCastles = [
-          { id: 1, cx: 15, cy: 50, ownerId: player1.id, isBase: true },
-          { id: 2, cx: 35, cy: 25, ownerId: null, isBase: false },
-          { id: 3, cx: 35, cy: 75, ownerId: null, isBase: false },
-          { id: 4, cx: 50, cy: 50, ownerId: null, isBase: false },     
-          { id: 5, cx: 65, cy: 25, ownerId: null, isBase: false },
-          { id: 6, cx: 65, cy: 75, ownerId: null, isBase: false },
-          { id: 7, cx: 85, cy: 50, ownerId: player2.id, isBase: true }, 
-        ];
+        const generatedMap = generateMapLayout(gamePlayers);
 
         await update(ref(db, `rooms/${room.id}/gameState`), {
-          phase: 'playing', theme, turnPlayerId: player1.id, castles: initialCastles,
+          phase: 'playing', theme, turnPlayerId: gamePlayers[0].id, 
+          castles: generatedMap.castles, connections: generatedMap.connections,
           questions: batch, history: initialHistory, attackingCastle: null, questionData: null,
           feedback: null, isGenerating: false, winner: null, timeLeft: QUESTION_TIME_LIMIT
         });
@@ -118,16 +190,17 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   };
 
   const getPlayerColor = (ownerId: string | null, isGlow = false) => {
-    if (ownerId === player1.id) return isGlow ? '#60a5fa' : '#2563eb'; 
-    if (ownerId === player2.id) return isGlow ? '#f87171' : '#dc2626'; 
-    return isGlow ? '#6b7280' : '#374151'; 
+    if (!ownerId) return isGlow ? '#4b5563' : '#1f2937'; 
+    const pIndex = gamePlayers.findIndex(p => p.id === ownerId);
+    if (pIndex === -1) return isGlow ? '#4b5563' : '#1f2937';
+    return isGlow ? GLOW_COLORS[pIndex % 6] : PLAYER_COLORS[pIndex % 6];
   };
 
   const canAttack = (targetCastleId: number) => {
     const target = castles.find(c => c.id === targetCastleId);
     if (!target || target.ownerId === turnPlayerId) return false;
     const myCastles = castles.filter(c => c.ownerId === turnPlayerId).map(c => c.id);
-    return CONNECTIONS.some(conn => {
+    return connections.some(conn => {
       const [a, b] = conn;
       return (myCastles.includes(a) && targetCastleId === b) || (myCastles.includes(b) && targetCastleId === a);
     });
@@ -146,11 +219,9 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         });
 
         if (currentQuestions.length === 0) {
-            // Передаем историю при дозарядке
             const newBatch = await generateQuizBatch(theme, currentHistory);
             if (newBatch && newBatch.length > 0) {
                 currentQuestions = newBatch;
-                // Обновляем историю и обрезаем до 60 элементов, чтобы не забивать БД
                 currentHistory = [...currentHistory, ...newBatch.map((q: any) => q.question)].slice(-60);
                 await update(ref(db, `rooms/${room.id}/gameState`), { history: currentHistory });
             } else {
@@ -177,26 +248,29 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
 
   const processAnswer = async (isCorrect: boolean) => {
     let newPhase = 'playing', gameWinner = null;
-    let finalMessage = isCorrect ? 'УЗЕЛ ВЗЛОМАН!' : 'ОТКАЗ ДОСТУПА!';
+    let finalMessage = isCorrect ? 'УЗЕЛ ВЗЛОМАН' : 'ОТКАЗ ДОСТУПА';
 
     const targetCastle = castles.find(c => c.id === attackingCastle);
     const newCastles = castles.map(c => c.id === attackingCastle && isCorrect ? { ...c, ownerId: turnPlayerId } : c);
 
     if (isCorrect && targetCastle?.isBase) {
-      newPhase = 'gameOver'; gameWinner = turnPlayerId; finalMessage = 'СИСТЕМА ПРОТИВНИКА УНИЧТОЖЕНА!';
+      newPhase = 'gameOver'; gameWinner = turnPlayerId; finalMessage = 'ГЛАВНАЯ БАЗА УНИЧТОЖЕНА';
     }
 
     try {
         await update(ref(db, `rooms/${room.id}/gameState`), {
-          feedback: { message: finalMessage, fact: questionData?.fact || 'Таймаут', isCorrect },
+          feedback: { message: finalMessage, fact: questionData?.fact || 'Таймаут соединения', isCorrect },
           castles: newCastles, phase: newPhase, winner: gameWinner
         });
 
         if (newPhase === 'playing') {
           setTimeout(() => {
+            const currentPlayerIndex = gamePlayers.findIndex(p => p.id === turnPlayerId);
+            const nextPlayerId = gamePlayers[(currentPlayerIndex + 1) % gamePlayers.length].id;
+            
             update(ref(db, `rooms/${room.id}/gameState`), {
               attackingCastle: null, questionData: null, feedback: null,
-              turnPlayerId: turnPlayerId === player1.id ? player2.id : player1.id
+              turnPlayerId: nextPlayerId
             });
           }, 4500);
         }
@@ -215,46 +289,50 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   return (
     <div className="relative flex flex-col items-center min-h-screen bg-[#020204] text-white p-2 md:p-6 font-sans overflow-hidden">
       
-      {/* Адаптивный HUD */}
-      <div className="w-full max-w-6xl grid grid-cols-3 gap-2 md:gap-4 bg-gray-900/80 p-3 md:p-4 rounded-3xl border border-gray-800 shadow-2xl mb-4 md:mb-8 backdrop-blur-xl z-10 items-center">
+      {/* HUD-панель для любого числа игроков */}
+      <div className="w-full max-w-6xl mb-4 md:mb-6 flex flex-col items-center z-10">
         
-        {/* Игрок 1 */}
-        <div className={`flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4 p-2 md:px-6 md:py-3 rounded-2xl transition-all ${turnPlayerId === player1.id ? 'bg-blue-900/40 border border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'opacity-40 grayscale'}`}>
-          <img src={player1.avatar} alt="P1" className="w-10 h-10 md:w-14 md:h-14 rounded-full border-2 border-blue-400 object-cover shadow-[0_0_15px_rgba(59,130,246,0.5)]"/>
-          <div className="text-center md:text-left">
-            <div className="text-blue-400 text-[9px] md:text-xs font-bold uppercase tracking-widest hidden md:block">Синий Альянс</div>
-            <div className="font-bold text-xs md:text-lg truncate max-w-[80px] md:max-w-none">{player1.name}</div>
-          </div>
-        </div>
-        
-        {/* Центр HUD */}
-        <div className="text-center flex flex-col items-center justify-center">
-          <div className="text-[9px] md:text-xs text-purple-400 font-bold tracking-[0.2em] uppercase mb-1 bg-purple-500/10 px-2 md:px-4 py-1 rounded-full border border-purple-500/30 truncate max-w-full">
+        {/* Центральный блок информации */}
+        <div className="bg-gray-900/80 border border-gray-800 backdrop-blur-md px-6 py-2 rounded-2xl shadow-xl flex items-center space-x-6 mb-4">
+          <div className="text-[10px] md:text-xs text-cyan-500 font-bold tracking-[0.2em] uppercase border border-cyan-500/30 px-3 py-1 rounded-full">
             {theme}
           </div>
-          <div className="text-sm md:text-2xl font-black mt-1 md:mt-2">
-            <span className="text-gray-600 mr-1 md:mr-2 text-xs md:text-xl">ХОД:</span>
-            <span className={turnPlayerId === player1.id ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]'}>
-              {room.players.find(p => p.id === turnPlayerId)?.name}
-            </span>
+          <div className="text-gray-400 text-xs tracking-widest uppercase">
+            Остаток пакетов: <span className="text-white font-bold">{questions.length}</span>
           </div>
-          <div className="text-[9px] md:text-xs text-gray-500 mt-1 uppercase tracking-widest hidden md:block">Пулы в резерве: {questions.length}</div>
         </div>
 
-        {/* Игрок 2 */}
-        <div className={`flex flex-col md:flex-row-reverse items-center space-y-2 md:space-y-0 md:space-x-reverse md:space-x-4 p-2 md:px-6 md:py-3 rounded-2xl transition-all ${turnPlayerId === player2.id ? 'bg-red-900/40 border border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'opacity-40 grayscale'}`}>
-          <img src={player2.avatar} alt="P2" className="w-10 h-10 md:w-14 md:h-14 rounded-full border-2 border-red-400 object-cover shadow-[0_0_15px_rgba(239,68,68,0.5)]"/>
-          <div className="text-center md:text-right">
-            <div className="text-red-400 text-[9px] md:text-xs font-bold uppercase tracking-widest hidden md:block">Красная Орда</div>
-            <div className="font-bold text-xs md:text-lg truncate max-w-[80px] md:max-w-none">{player2.name}</div>
-          </div>
+        {/* Сетка игроков */}
+        <div className="flex flex-wrap justify-center gap-2 md:gap-4 w-full">
+          {gamePlayers.map((p, idx) => {
+            const isActive = turnPlayerId === p.id;
+            const color = PLAYER_COLORS[idx % 6];
+            return (
+              <div 
+                key={p.id}
+                className={`flex items-center space-x-3 px-4 py-2 rounded-xl transition-all duration-300 border bg-[#111115]
+                  ${isActive 
+                    ? 'scale-110 shadow-lg z-10' 
+                    : 'opacity-60 scale-95 border-gray-800'}`}
+                style={{ borderColor: isActive ? color : '', boxShadow: isActive ? `0 0 20px ${color}40` : '' }}
+              >
+                <img src={p.avatar} alt="P" className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover border-2" style={{ borderColor: color }}/>
+                <div className="text-left hidden md:block max-w-[100px]">
+                  <div className="text-[9px] font-bold uppercase tracking-widest" style={{ color }}>
+                    {isActive ? 'АКТИВЕН' : `Игрок ${idx + 1}`}
+                  </div>
+                  <div className="font-bold text-sm truncate text-gray-200">{p.name}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Интерактивная Карта */}
       <div className="w-full max-w-6xl flex-grow flex items-center justify-center">
         <CastleMap 
-          castles={castles} connections={CONNECTIONS} turnPlayerId={turnPlayerId} userId={user.id}
+          castles={castles} connections={connections} turnPlayerId={turnPlayerId} userId={user.id}
           attackingCastle={attackingCastle} isProcessingLocal={isProcessingLocal}
           canAttack={canAttack} getPlayerColor={getPlayerColor} handleCastleClick={handleCastleClick}
         />
@@ -262,20 +340,20 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
 
       {/* Окно Победы */}
       {localGameState === 'gameOver' && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in">
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in">
           <div className="text-center p-4">
-            <h1 className="text-5xl md:text-8xl font-black mb-6 uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-orange-600 drop-shadow-[0_0_30px_rgba(253,224,71,0.4)]">
-              КОНЕЦ ИГРЫ
+            <h1 className="text-5xl md:text-8xl font-black mb-6 uppercase tracking-[0.2em] text-cyan-400 drop-shadow-[0_0_30px_rgba(6,182,212,0.4)]">
+              СИСТЕМА ВЗЛОМАНА
             </h1>
-            <p className="text-xl md:text-3xl text-gray-300 mb-10">
-              Доминант: <span className="font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">{room.players.find(p => p.id === winner)?.name}</span>
+            <p className="text-xl md:text-3xl text-gray-400 mb-12 tracking-widest uppercase">
+              Администратор: <span className="font-bold text-white ml-2">{room.players.find(p => p.id === winner)?.name}</span>
             </p>
             {isHost && (
                <button 
                 onClick={() => update(ref(db, `rooms/${room.id}/gameState`), { phase: 'setup' })}
-                className="w-full md:w-auto px-10 py-5 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-purple-600 hover:to-blue-600 text-white rounded-2xl font-bold uppercase tracking-widest transition-all shadow-xl"
+                className="px-12 py-5 bg-[#111115] border-2 border-gray-700 hover:border-cyan-500 hover:bg-cyan-900/20 hover:text-cyan-400 text-white rounded-xl font-bold uppercase tracking-[0.2em] transition-all shadow-xl"
                >
-                 Вернуться в лобби
+                 Завершить сессию
                </button>
             )}
           </div>

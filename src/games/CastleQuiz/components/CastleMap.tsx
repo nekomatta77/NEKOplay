@@ -15,22 +15,35 @@ interface CastleMapProps {
 export const CastleMap: React.FC<CastleMapProps> = ({ 
   castles, connections, turnPlayerId, userId, attackingCastle, isProcessingLocal, canAttack, getPlayerColor, handleCastleClick 
 }) => {
+
+  // Функция для отрисовки идеального гексагона (шестиугольника)
+  const getHexagonPath = (cx: number, cy: number, r: number) => {
+    return `M ${cx},${cy - r} 
+            L ${cx + r * 0.866},${cy - r * 0.5} 
+            L ${cx + r * 0.866},${cy + r * 0.5} 
+            L ${cx},${cy + r} 
+            L ${cx - r * 0.866},${cy + r * 0.5} 
+            L ${cx - r * 0.866},${cy - r * 0.5} Z`;
+  };
+
   return (
-    <div className="relative w-full aspect-[4/3] md:aspect-[21/9] bg-gray-950/80 rounded-[2rem] border border-gray-800 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden backdrop-blur-sm">
-      {/* Сетка на фоне */}
-      <div className="absolute inset-0 opacity-20" 
-           style={{ backgroundImage: 'linear-gradient(#4b5563 1px, transparent 1px), linear-gradient(90deg, #4b5563 1px, transparent 1px)', backgroundSize: '30px 30px' }}>
+    <div className="relative w-full max-w-6xl aspect-[16/9] lg:aspect-[21/9] bg-[#050508] rounded-3xl border border-gray-800 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden">
+      
+      {/* Сетка в стиле радара */}
+      <div className="absolute inset-0 opacity-[0.03]" 
+           style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
       </div>
 
-      <svg className="absolute inset-0 w-full h-full drop-shadow-2xl" preserveAspectRatio="none" viewBox="0 0 100 100">
+      {/* Жесткий viewBox (1000x600) гарантирует, что на ЛЮБОМ устройстве карта не растянется и сохранит идеальные пропорции */}
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet">
         <defs>
-          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+          <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="8" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
 
-        {/* Линии связей */}
+        {/* Линии связи (Потоки данных) */}
         {connections.map((conn, i) => {
           const from = castles.find(c => c.id === conn[0]);
           const to = castles.find(c => c.id === conn[1]);
@@ -40,64 +53,74 @@ export const CastleMap: React.FC<CastleMapProps> = ({
           const strokeColor = isOwnedConn ? getPlayerColor(from.ownerId, true) : "#1f2937";
           
           return (
-            <line 
-              key={i}
-              x1={`${from.cx}`} y1={`${from.cy}`} 
-              x2={`${to.cx}`} y2={`${to.cy}`} 
-              stroke={strokeColor} 
-              strokeWidth={isOwnedConn ? "1.5" : "1"} 
-              strokeLinecap="round"
-              className="transition-colors duration-500"
-              filter={isOwnedConn ? "url(#glow)" : ""}
-            />
+            <g key={`conn-${i}`}>
+              {/* Фоновая толстая тусклая линия */}
+              <line 
+                x1={from.cx} y1={from.cy} x2={to.cx} y2={to.cy} 
+                stroke={strokeColor} opacity="0.2" strokeWidth="6" 
+              />
+              {/* Яркая пунктирная линия с анимацией потока */}
+              <line 
+                x1={from.cx} y1={from.cy} x2={to.cx} y2={to.cy} 
+                stroke={strokeColor} strokeWidth={isOwnedConn ? "3" : "2"} 
+                strokeDasharray="10 10" className="animate-[dash_2s_linear_infinite]"
+                filter={isOwnedConn ? "url(#glow)" : ""}
+              />
+            </g>
           );
         })}
 
-        {/* Узлы (замки) */}
+        {/* Узлы (Шестиугольники) */}
         {castles.map(castle => {
           const isClickable = canAttack(castle.id) && turnPlayerId === userId && !attackingCastle && !isProcessingLocal;
           const color = getPlayerColor(castle.ownerId);
           const glowColor = getPlayerColor(castle.ownerId, true);
+          const size = castle.isBase ? 40 : 25;
           
           return (
             <g 
               key={castle.id} 
-              className={`transition-all duration-300 ${isClickable ? 'cursor-pointer hover:scale-[1.15]' : ''}`}
-              style={{ transformOrigin: `${castle.cx}px ${castle.cy}px` }}
+              className={`transition-all duration-300 ${isClickable ? 'cursor-pointer' : ''}`}
+              style={{ transformOrigin: `${castle.cx}px ${castle.cy}px`, transform: isClickable ? 'scale(1.15)' : 'scale(1)' }}
               onClick={() => handleCastleClick(castle.id)}
             >
-              {/* Пульсирующая аура */}
-              <circle cx={`${castle.cx}`} cy={`${castle.cy}`} r={castle.isBase ? "10" : "8"} fill={glowColor} opacity="0.15" className="animate-pulse" />
+              {/* Фоновое свечение базы */}
+              {castle.ownerId && (
+                <circle cx={castle.cx} cy={castle.cy} r={size * 1.5} fill={glowColor} opacity="0.1" className="animate-pulse" />
+              )}
               
-              {/* Полигон замка (Ромб/Гексагон) */}
-              <polygon 
-                points={
-                  castle.isBase 
-                  ? `${castle.cx},${castle.cy-6} ${castle.cx+5},${castle.cy-3} ${castle.cx+5},${castle.cy+3} ${castle.cx},${castle.cy+6} ${castle.cx-5},${castle.cy+3} ${castle.cx-5},${castle.cy-3}`
-                  : `${castle.cx},${castle.cy-4} ${castle.cx+3.5},${castle.cy-2} ${castle.cx+3.5},${castle.cy+2} ${castle.cx},${castle.cy+4} ${castle.cx-3.5},${castle.cy+2} ${castle.cx-3.5},${castle.cy-2}`
-                }
-                fill={color}
+              {/* Вращающееся внешнее кольцо-радар */}
+              <circle 
+                cx={castle.cx} cy={castle.cy} r={size + 10} 
+                fill="none" stroke={glowColor} strokeWidth="2" opacity="0.3" 
+                strokeDasharray="15 15" 
+                className="animate-[spin_6s_linear_infinite]" 
+              />
+
+              {/* Тело гексагона */}
+              <path 
+                d={getHexagonPath(castle.cx, castle.cy, size)}
+                fill={castle.ownerId ? color : '#111115'}
                 stroke={isClickable ? "#ffffff" : glowColor}
-                strokeWidth={isClickable ? "0.8" : "0.4"}
+                strokeWidth={isClickable ? "4" : "2"}
                 filter={castle.ownerId ? "url(#glow)" : ""}
                 className="transition-colors duration-500"
               />
 
-              {/* Иконка внутри */}
+              {/* Иконка внутри гексагона */}
               {castle.isBase ? (
-                <text x={`${castle.cx}`} y={`${castle.cy}`} fontSize="4" fill="#fff" textAnchor="middle" dominantBaseline="central" className="font-bold">★</text>
+                <text x={castle.cx} y={castle.cy} fontSize="20" fill="#fff" textAnchor="middle" dominantBaseline="central" className="font-bold">★</text>
               ) : (
-                <circle cx={`${castle.cx}`} cy={`${castle.cy}`} r="1" fill="#fff" opacity="0.8" />
-              )}
-
-              {/* Индикатор возможной атаки */}
-              {isClickable && (
-                <circle cx={`${castle.cx}`} cy={`${castle.cy}`} r={castle.isBase ? "8" : "6"} fill="none" stroke="#fff" strokeWidth="0.4" strokeDasharray="1 1" className="animate-[spin_4s_linear_infinite]" />
+                <circle cx={castle.cx} cy={castle.cy} r="4" fill={castle.ownerId ? "#000" : "#fff"} opacity="0.8" />
               )}
             </g>
           );
         })}
       </svg>
+
+      <style>{`
+        @keyframes dash { to { stroke-dashoffset: -20; } }
+      `}</style>
     </div>
   );
 };

@@ -16,61 +16,60 @@ export const BattleModal: React.FC<BattleModalProps> = ({
   isGenerating, questionData, feedback, timeLeft, timeLimit, turnPlayerId, userId, isProcessingLocal, handleAnswerClick
 }) => {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-4xl bg-gray-900/95 border border-purple-500/40 p-6 md:p-12 rounded-[2rem] shadow-[0_0_80px_rgba(168,85,247,0.25)] relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/90 backdrop-blur-lg animate-in fade-in duration-200">
+      <div className="w-full max-w-4xl bg-[#0a0a0f] border border-gray-800 p-6 md:p-12 rounded-3xl shadow-[0_0_80px_rgba(0,0,0,0.8)] relative overflow-hidden">
         
-        {/* Сканирующая линия для атмосферы */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-purple-500/50 animate-[scan_2s_ease-in-out_infinite]"></div>
+        {/* Анимация сканера */}
+        <div className="absolute top-0 left-0 w-full h-0.5 bg-cyan-500/50 animate-[scan_3s_ease-in-out_infinite] shadow-[0_0_10px_rgba(6,182,212,0.8)]"></div>
 
         {isGenerating ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-24 h-24 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-8 shadow-[0_0_30px_rgba(168,85,247,0.5)]"></div>
-            <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 tracking-[0.2em] uppercase text-center">
-              Дозарядка ИИ-ядра
+            <div className="w-20 h-20 border-y-2 border-cyan-500 rounded-full animate-spin mb-8 shadow-[0_0_30px_rgba(6,182,212,0.2)]"></div>
+            <h3 className="text-2xl font-black text-gray-100 tracking-[0.3em] uppercase text-center">
+              СИНТЕЗ ДАННЫХ
             </h3>
-            <p className="text-gray-500 mt-4 font-mono text-sm tracking-widest uppercase">Генерация уникальных пакетов...</p>
+            <p className="text-gray-600 mt-4 font-mono text-xs tracking-widest uppercase">Нейросеть генерирует пакеты...</p>
           </div>
         ) : questionData && !feedback ? (
           <div className="animate-in slide-in-from-bottom-8 duration-500">
-            {/* Таймер */}
-            <div className="w-full h-2 bg-gray-800 rounded-full mb-8 overflow-hidden border border-gray-700">
+            <div className="w-full h-1.5 bg-gray-900 mb-8 overflow-hidden">
               <div 
-                className="h-full transition-all duration-1000 ease-linear rounded-full"
+                className="h-full transition-all duration-1000 ease-linear"
                 style={{ 
                   width: `${(timeLeft / timeLimit) * 100}%`,
-                  backgroundColor: timeLeft > 5 ? '#a855f7' : '#ef4444',
-                  boxShadow: `0 0 10px ${timeLeft > 5 ? '#a855f7' : '#ef4444'}`
+                  backgroundColor: timeLeft > 5 ? '#06b6d4' : '#ef4444',
+                  boxShadow: `0 0 10px ${timeLeft > 5 ? '#06b6d4' : '#ef4444'}`
                 }}
               ></div>
             </div>
 
             <div className="flex justify-between items-center mb-8">
-              <span className="bg-purple-500/10 border border-purple-500/30 text-purple-400 px-4 py-1.5 rounded-full text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase">
-                Перехват данных
+              <span className="text-gray-500 text-[10px] md:text-xs font-bold tracking-[0.3em] uppercase">
+                [ ПРОТОКОЛ ВЗЛОМА ]
               </span>
-              <span className={`text-3xl md:text-4xl font-black font-mono ${timeLeft > 5 ? 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]' : 'text-red-500 animate-pulse drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]'}`}>
+              <span className={`text-3xl md:text-4xl font-black font-mono ${timeLeft > 5 ? 'text-white' : 'text-red-500 animate-pulse'}`}>
                 00:{timeLeft.toString().padStart(2, '0')}
               </span>
             </div>
 
-            <h2 className="text-2xl md:text-4xl font-bold text-white leading-tight mb-10 text-center md:text-left">
+            <h2 className="text-xl md:text-3xl font-bold text-gray-100 leading-relaxed mb-10 text-center md:text-left">
               {questionData.question}
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {questionData.options.map((opt: string, idx: number) => (
                 <button 
                   key={idx}
                   onClick={() => handleAnswerClick(opt)}
                   disabled={turnPlayerId !== userId || isProcessingLocal}
-                  className={`relative p-5 md:p-6 bg-gray-800/60 border border-gray-700 rounded-2xl transition-all text-base md:text-lg font-medium text-left overflow-hidden group backdrop-blur-sm
+                  className={`relative p-5 md:p-6 bg-[#111116] border border-gray-800 rounded-xl transition-all text-sm md:text-base font-medium text-left overflow-hidden group
                     ${(turnPlayerId === userId && !isProcessingLocal)
-                      ? 'hover:bg-purple-900/40 hover:border-purple-400 cursor-pointer shadow-lg hover:shadow-purple-500/20 hover:-translate-y-1' 
+                      ? 'hover:bg-gray-800 hover:border-gray-600 cursor-pointer hover:-translate-y-1' 
                       : 'opacity-50 cursor-not-allowed grayscale'}`}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
-                  <div className="flex items-center relative z-10">
-                    <span className="shrink-0 flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-gray-900 border border-gray-700 text-gray-400 font-bold rounded-xl mr-4 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-400 transition-colors shadow-inner">
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 -translate-x-full group-hover:animate-[shimmer_1s_infinite]"></div>
+                  <div className="flex items-center relative z-10 text-gray-300 group-hover:text-white">
+                    <span className="shrink-0 flex items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-black border border-gray-700 text-gray-500 font-bold rounded-lg mr-4 group-hover:border-white group-hover:text-white transition-colors">
                       {['A', 'B', 'C', 'D'][idx]}
                     </span>
                     <span className="leading-snug">{opt}</span>
@@ -80,18 +79,21 @@ export const BattleModal: React.FC<BattleModalProps> = ({
             </div>
           </div>
         ) : feedback ? (
-          <div className={`text-center py-12 animate-in zoom-in-95 duration-300 ${feedback.isCorrect ? 'text-green-400' : 'text-red-500'}`}>
-            <div className="text-7xl md:text-9xl mb-8 drop-shadow-[0_0_30px_currentColor]">
-              {feedback.isCorrect ? (feedback.message.includes('БАЗА') ? '👑' : '⚡') : '💀'}
-            </div>
-            <h2 className="text-3xl md:text-5xl font-black mb-8 uppercase tracking-widest drop-shadow-md">
-              {feedback.message}
-            </h2>
-            <div className="bg-black/50 p-6 md:p-8 rounded-3xl border border-current/30 text-gray-300 relative max-w-2xl mx-auto shadow-inner">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-900 px-6 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-bold text-gray-400 border border-gray-700">
-                Дешифровка
+          <div className="py-8 animate-in zoom-in-95 duration-300">
+            <div className={`border-l-4 pl-6 md:pl-8 ${feedback.isCorrect ? 'border-green-500' : 'border-red-500'}`}>
+              <h2 className={`text-3xl md:text-5xl font-black mb-2 uppercase tracking-[0.1em] ${feedback.isCorrect ? 'text-green-400' : 'text-red-500'}`}>
+                {feedback.isCorrect ? '[ ДОСТУП РАЗРЕШЕН ]' : '[ ОШИБКА ДЕШИФРОВКИ ]'}
+              </h2>
+              <h3 className="text-xl text-gray-400 font-bold uppercase tracking-widest mb-8">{feedback.message}</h3>
+              
+              <div className="bg-[#111116] p-6 rounded-lg border border-gray-800/50">
+                <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-600 mb-3">
+                  АНАЛИЗ ИСТОРИЧЕСКИХ ДАННЫХ
+                </div>
+                <p className="text-base md:text-lg text-gray-300 leading-relaxed font-mono">
+                  {feedback.fact}
+                </p>
               </div>
-              <p className="text-base md:text-lg italic leading-relaxed mt-2">"{feedback.fact}"</p>
             </div>
           </div>
         ) : null}
