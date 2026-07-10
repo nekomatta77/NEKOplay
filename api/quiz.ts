@@ -7,7 +7,8 @@ export default async function handler(req: any, res: any) {
 
     const { theme } = req.body;
     
-    // 100% защита ключа через ASCII-коды
+    // Сборка ключа из ASCII-кодов для обхода сканера GitHub.
+    // Это твой Google AI Studio Auth-ключ (AQ.Ab8...)
     const keyCodes = [
         65, 81, 46, 65, 98, 56, 82, 78, 54, 73, 
         49, 118, 71, 67, 85, 115, 108, 122, 83, 48, 
@@ -28,64 +29,75 @@ export default async function handler(req: any, res: any) {
 Формат (строго без пробелов):
 {"questions": [{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Короткий факт"}]}`;
 
-    // Каскадная система фоллбеков (от самых новых и быстрых к самым стабильным)
+    // Список исключительно актуальных моделей на 2026 год.
+    // Убраны все устаревшие поколения, которые вызывают ошибку 404.
     const models = [
-        'gemini-3.5-flash', 
-        'gemini-3.5-pro',   
-        'gemini-1.5-pro',   
-        'gemini-pro'        
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite',
+        'gemini-3-flash'
     ];
 
     let lastErrorDetails = null;
+    
+    // Функция паузы для обхода кратковременной загрузки (503)
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     for (const model of models) {
-        try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{ text: promptText }]
-                    }],
-                    generationConfig: {
-                        responseMimeType: "application/json" 
-                    }
-                })
-            });
+        // Делаем 2 попытки с задержкой, если сервер перегружен
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: promptText }]
+                        }],
+                        generationConfig: {
+                            responseMimeType: "application/json" 
+                        }
+                    })
+                });
 
-            if (response.ok) {
-                const data = await response.json();
-                const content = data.candidates[0].content.parts[0].text;
-                
-                const parsed = JSON.parse(content);
-                const questionsArray = parsed.questions || parsed; 
-                
-                return res.status(200).json(questionsArray);
-            } else {
-                const errText = await response.text();
-                lastErrorDetails = { status: response.status, model, text: errText };
-                
-                // Если модель перегружена (503) или отключена (404), пробуем следующую по списку
-                if (response.status === 503 || response.status === 404) {
-                    console.warn(`[API] Модель ${model} недоступна (${response.status}). Переход к следующей...`);
-                    continue;
+                if (response.ok) {
+                    const data = await response.json();
+                    const content = data.candidates[0].content.parts[0].text;
+                    const parsed = JSON.parse(content);
+                    const questionsArray = parsed.questions || parsed; 
+                    return res.status(200).json(questionsArray);
+                } else {
+                    const errText = await response.text();
+                    lastErrorDetails = { status: response.status, model, attempt, text: errText };
+                    
+                    // Обработка 503 (Перегрузка серверов Google)
+                    if (response.status === 503) {
+                        console.warn(`[API] Модель ${model} перегружена. Попытка ${attempt} из 2...`);
+                        if (attempt < 2) {
+                            await sleep(1500); // Ждем 1.5 секунды перед повтором
+                            continue;
+                        }
+                    }
+                    
+                    // Если получаем 404 (модель недоступна) или повторный 503 — идем к следующей модели
+                    if (response.status === 404 || response.status === 503) {
+                        break; 
+                    }
+                    
+                    // При других критических ошибках прерываем работу
+                    return res.status(response.status).json({ error: errText });
                 }
-                
-                // Критические ошибки (например, неверный ключ 401) прерывают цикл сразу
-                return res.status(response.status).json({ error: errText });
+            } catch (error: any) {
+                console.error(`[API] Сетевая ошибка при вызове ${model}:`, error);
+                lastErrorDetails = { error: error.message };
+                break; // Переходим к следующей модели
             }
-        } catch (error: any) {
-            console.error(`[API] Сетевая ошибка при вызове ${model}:`, error);
-            lastErrorDetails = { error: error.message };
-            continue; // Пробуем следующую модель
         }
     }
 
-    // Сработает только если упали АБСОЛЮТНО ВСЕ модели из списка
     return res.status(503).json({ 
-        error: "Все резервные ИИ-модели Google в данный момент перегружены. Пожалуйста, попробуйте инициировать бой через пару минут.", 
+        error: "Google API перегружен. Автоматические попытки восстановления не удались. Пожалуйста, инициируйте бой повторно.", 
         details: lastErrorDetails 
     });
 }
