@@ -1,9 +1,12 @@
-// src/games/CastleQuiz/CastleQuizGame.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Room, User } from '../../types';
 import { generateQuizBatch } from '../../lib/ai';
 import { ref, update, onValue } from 'firebase/database';
 import { db } from '../../lib/firebase';
+
+import { SetupScreen } from './components/SetupScreen';
+import { CastleMap } from './components/CastleMap';
+import { BattleModal } from './components/BattleModal';
 
 interface Props {
   room: Room;
@@ -12,22 +15,8 @@ interface Props {
   onLeave?: () => void;
 }
 
-interface Castle {
-  id: number;
-  cx: number;
-  cy: number;
-  ownerId: string | null;
-  isBase: boolean;
-}
-
-const CONNECTIONS = [
-  [1, 2], [1, 3],
-  [2, 4], [3, 4],
-  [4, 5], [4, 6],
-  [5, 7], [6, 7] 
-];
-
-const QUESTION_TIME_LIMIT = 20; 
+const CONNECTIONS = [[1, 2], [1, 3], [2, 4], [3, 4], [4, 5], [4, 6], [5, 7], [6, 7]];
+const QUESTION_TIME_LIMIT = 20;
 
 export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const player1 = room.players[0];
@@ -39,8 +28,10 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
   const [turnPlayerId, setTurnPlayerId] = useState<string>(player1.id);
   const [winner, setWinner] = useState<string | null>(null);
   
-  const [castles, setCastles] = useState<Castle[]>([]);
+  const [castles, setCastles] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
+  const [history, setHistory] = useState<string[]>([]); // История вопросов
+  
   const [attackingCastle, setAttackingCastle] = useState<number | null>(null);
   const [questionData, setQuestionData] = useState<any>(null);
   const [feedback, setFeedback] = useState<{ message: string, fact: string, isCorrect: boolean } | null>(null);
@@ -59,11 +50,9 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         if (data.theme) setTheme(data.theme);
         if (data.turnPlayerId) setTurnPlayerId(data.turnPlayerId);
         if (data.castles) setCastles(data.castles);
-        
         setQuestions(data.questions || []); 
-        
+        setHistory(data.history || []); // Загружаем историю
         if (data.winner) setWinner(data.winner);
-        
         setAttackingCastle(data.attackingCastle || null);
         setQuestionData(data.questionData || null);
         setFeedback(data.feedback || null);
@@ -72,7 +61,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         setIsProcessingLocal(false); 
       }
     });
-
     return () => unsubscribe();
   }, [room.id]);
 
@@ -82,7 +70,6 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         setTimeLeft((prev) => {
           const newTime = prev - 1;
           update(ref(db, `rooms/${room.id}/gameState`), { timeLeft: newTime });
-          
           if (newTime <= 0) {
             clearInterval(timerRef.current!);
             handleTimeUp();
@@ -91,40 +78,27 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         });
       }, 1000);
     }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionData, feedback, turnPlayerId, isGenerating, isProcessingLocal, room.id, user.id]);
 
-  const handleTimeUp = () => {
-    processAnswer(false);
-  };
+  const handleTimeUp = () => processAnswer(false);
 
   const handleStartGame = async () => {
     if (!isHost || isProcessingLocal) return;
     setIsProcessingLocal(true);
-    
     try {
-        await update(ref(db, `rooms/${room.id}/gameState`), {
-          phase: 'generating',
-          theme
-        });
+        await update(ref(db, `rooms/${room.id}/gameState`), { phase: 'generating', theme });
 
-        let batch = await generateQuizBatch(theme);
-        
-        // ЗАЩИТА 1: Если API вернуло пустоту при старте игры
+        let batch = await generateQuizBatch(theme, []);
         if (!batch || batch.length === 0) {
-            batch = [{
-                question: "Сеть ИИ недоступна. Начать резервный бой?",
-                options: ["Да", "Согласен", "Подтверждаю", "В бой"],
-                correctAnswer: "Да",
-                fact: "ИИ не смог сгенерировать вопросы, система работает в автономном режиме."
-            }];
+            batch = [{ question: "Сеть ИИ недоступна. Начать резервный бой?", options: ["Да", "В бой"], correctAnswer: "Да", fact: "ИИ оффлайн." }];
         }
         
-        const initialCastles: Castle[] = [
+        // Записываем полученные вопросы в историю
+        const initialHistory = batch.map((q: any) => q.question);
+
+        const initialCastles = [
           { id: 1, cx: 15, cy: 50, ownerId: player1.id, isBase: true },
           { id: 2, cx: 35, cy: 25, ownerId: null, isBase: false },
           { id: 3, cx: 35, cy: 75, ownerId: null, isBase: false },
@@ -135,342 +109,171 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         ];
 
         await update(ref(db, `rooms/${room.id}/gameState`), {
-          phase: 'playing',
-          theme,
-          turnPlayerId: player1.id,
-          castles: initialCastles,
-          questions: batch,
-          attackingCastle: null,
-          questionData: null,
-          feedback: null,
-          isGenerating: false,
-          winner: null,
-          timeLeft: QUESTION_TIME_LIMIT
+          phase: 'playing', theme, turnPlayerId: player1.id, castles: initialCastles,
+          questions: batch, history: initialHistory, attackingCastle: null, questionData: null,
+          feedback: null, isGenerating: false, winner: null, timeLeft: QUESTION_TIME_LIMIT
         });
-    } catch (error) {
-        console.error("Ошибка старта игры:", error);
-    } finally {
-        setIsProcessingLocal(false);
-    }
+    } catch (error) { console.error("Start Error:", error); } 
+    finally { setIsProcessingLocal(false); }
   };
 
   const getPlayerColor = (ownerId: string | null, isGlow = false) => {
-    if (ownerId === player1.id) return isGlow ? '#60a5fa' : '#3b82f6'; 
-    if (ownerId === player2.id) return isGlow ? '#f87171' : '#ef4444'; 
+    if (ownerId === player1.id) return isGlow ? '#60a5fa' : '#2563eb'; 
+    if (ownerId === player2.id) return isGlow ? '#f87171' : '#dc2626'; 
     return isGlow ? '#6b7280' : '#374151'; 
   };
 
   const canAttack = (targetCastleId: number) => {
     const target = castles.find(c => c.id === targetCastleId);
     if (!target || target.ownerId === turnPlayerId) return false;
-
     const myCastles = castles.filter(c => c.ownerId === turnPlayerId).map(c => c.id);
     return CONNECTIONS.some(conn => {
       const [a, b] = conn;
-      return (myCastles.includes(a) && targetCastleId === b) || 
-             (myCastles.includes(b) && targetCastleId === a);
+      return (myCastles.includes(a) && targetCastleId === b) || (myCastles.includes(b) && targetCastleId === a);
     });
   };
 
   const handleCastleClick = async (castleId: number) => {
-    if (turnPlayerId !== user.id || isProcessingLocal) return; 
-    if (!canAttack(castleId)) return;
-    if (attackingCastle) return;
-
+    if (turnPlayerId !== user.id || isProcessingLocal || !canAttack(castleId) || attackingCastle) return;
     setIsProcessingLocal(true);
     
     try {
         let currentQuestions = [...questions];
+        let currentHistory = [...history];
 
         await update(ref(db, `rooms/${room.id}/gameState`), {
-          attackingCastle: castleId,
-          isGenerating: currentQuestions.length === 0,
-          feedback: null,
-          questionData: null
+          attackingCastle: castleId, isGenerating: currentQuestions.length === 0, feedback: null, questionData: null
         });
 
-        // Если вопросы кончились, генерируем новую партию
         if (currentQuestions.length === 0) {
-            const newBatch = await generateQuizBatch(theme);
+            // Передаем историю при дозарядке
+            const newBatch = await generateQuizBatch(theme, currentHistory);
             if (newBatch && newBatch.length > 0) {
                 currentQuestions = newBatch;
+                // Обновляем историю и обрезаем до 60 элементов, чтобы не забивать БД
+                currentHistory = [...currentHistory, ...newBatch.map((q: any) => q.question)].slice(-60);
+                await update(ref(db, `rooms/${room.id}/gameState`), { history: currentHistory });
             } else {
-                // ЗАЩИТА 2: Если API вернуло пустоту во время дозарядки
-                currentQuestions = [{
-                    question: "Аварийное восстановление системы завершено?",
-                    options: ["Да", "Так точно", "Определенно", "Подтверждаю"],
-                    correctAnswer: "Да",
-                    fact: "Очередная партия вопросов не была доставлена вовремя."
-                }];
+                currentQuestions = [{ question: "Сбой ИИ", options: ["Ок", "Да"], correctAnswer: "Ок", fact: "Ошибка" }];
             }
         }
 
-        // АБСОЛЮТНАЯ ЗАЩИТА ОТ UNDEFINED ДЛЯ FIREBASE
-        const nextQuestion = currentQuestions[0] || {
-            question: "Технический сбой синхронизации. Продолжить?",
-            options: ["Да", "Ок", "Принять", "Далее"],
-            correctAnswer: "Да",
-            fact: "Защитный протокол предотвратил падение базы данных."
-        };
-        const remainingQuestions = currentQuestions.slice(1) || [];
+        const nextQuestion = currentQuestions[0];
+        const remainingQuestions = currentQuestions.slice(1);
 
         await update(ref(db, `rooms/${room.id}/gameState`), {
-          questionData: nextQuestion, 
-          questions: remainingQuestions, 
-          isGenerating: false,
-          timeLeft: QUESTION_TIME_LIMIT
+          questionData: nextQuestion, questions: remainingQuestions, isGenerating: false, timeLeft: QUESTION_TIME_LIMIT
         });
-    } catch (error) {
-        console.error("Ошибка при атаке замка:", error);
-    } finally {
-        setIsProcessingLocal(false);
-    }
+    } catch (error) { console.error("Attack Error:", error); } 
+    finally { setIsProcessingLocal(false); }
   };
 
   const handleAnswerClick = (selectedOption: string) => {
     if (turnPlayerId !== user.id || isProcessingLocal) return; 
     setIsProcessingLocal(true);
     if (timerRef.current) clearInterval(timerRef.current);
-    
-    const isCorrect = selectedOption === questionData.correctAnswer;
-    processAnswer(isCorrect);
+    processAnswer(selectedOption === questionData.correctAnswer);
   };
 
   const processAnswer = async (isCorrect: boolean) => {
-    let newPhase = 'playing';
-    let gameWinner = null;
-    let finalMessage = isCorrect ? 'Территория захвачена!' : 'Атака отбита!';
+    let newPhase = 'playing', gameWinner = null;
+    let finalMessage = isCorrect ? 'УЗЕЛ ВЗЛОМАН!' : 'ОТКАЗ ДОСТУПА!';
 
     const targetCastle = castles.find(c => c.id === attackingCastle);
-    const newCastles = castles.map(c => 
-      c.id === attackingCastle && isCorrect ? { ...c, ownerId: turnPlayerId } : c
-    );
+    const newCastles = castles.map(c => c.id === attackingCastle && isCorrect ? { ...c, ownerId: turnPlayerId } : c);
 
     if (isCorrect && targetCastle?.isBase) {
-      newPhase = 'gameOver';
-      gameWinner = turnPlayerId;
-      finalMessage = 'ГЛАВНАЯ БАЗА УНИЧТОЖЕНА! ПОБЕДА!';
+      newPhase = 'gameOver'; gameWinner = turnPlayerId; finalMessage = 'СИСТЕМА ПРОТИВНИКА УНИЧТОЖЕНА!';
     }
-
-    const newFeedback = {
-      message: finalMessage,
-      fact: questionData?.fact || 'Время вышло или произошла ошибка',
-      isCorrect
-    };
 
     try {
         await update(ref(db, `rooms/${room.id}/gameState`), {
-          feedback: newFeedback,
-          castles: newCastles,
-          phase: newPhase,
-          winner: gameWinner
+          feedback: { message: finalMessage, fact: questionData?.fact || 'Таймаут', isCorrect },
+          castles: newCastles, phase: newPhase, winner: gameWinner
         });
 
         if (newPhase === 'playing') {
           setTimeout(() => {
-            const nextPlayerId = turnPlayerId === player1.id ? player2.id : player1.id;
             update(ref(db, `rooms/${room.id}/gameState`), {
-              attackingCastle: null,
-              questionData: null,
-              feedback: null,
-              turnPlayerId: nextPlayerId
+              attackingCastle: null, questionData: null, feedback: null,
+              turnPlayerId: turnPlayerId === player1.id ? player2.id : player1.id
             });
-          }, 4000);
+          }, 4500);
         }
-    } catch (error) {
-        console.error("Ошибка при ответе:", error);
-        setIsProcessingLocal(false);
-    }
+    } catch (error) { console.error("Answer Error:", error); setIsProcessingLocal(false); }
   };
 
-  if (localGameState === 'setup') {
+  if (localGameState === 'setup' || localGameState === 'generating') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white p-4">
-        <div className="bg-gray-800/80 backdrop-blur-md p-8 rounded-2xl shadow-2xl border border-purple-500/30 max-w-md w-full text-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-red-500"></div>
-          
-          <h1 className="text-4xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500 uppercase tracking-widest">
-            Битва Умов
-          </h1>
-          <p className="text-gray-400 mb-8 text-sm uppercase tracking-widest">Нейро-тактическая викторина</p>
-          
-          {isHost ? (
-            <>
-              <div className="mb-6">
-                <label className="block text-left text-xs uppercase tracking-wider font-bold text-gray-400 mb-2">Глобальная тема генерации:</label>
-                <input 
-                  type="text" 
-                  value={theme}
-                  onChange={(e) => setTheme(e.target.value)}
-                  placeholder="Например: Киберпанк, Космос, Мемы..."
-                  className="w-full px-4 py-3 bg-gray-900/50 border border-gray-600 rounded-xl focus:border-purple-500 focus:outline-none text-white transition-colors"
-                />
-              </div>
-
-              <button 
-                onClick={handleStartGame}
-                disabled={isProcessingLocal}
-                className={`w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-bold text-lg shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all uppercase tracking-wider ${isProcessingLocal ? 'opacity-50 cursor-not-allowed' : 'hover:from-purple-500 hover:to-indigo-500 transform hover:scale-[1.02]'}`}
-              >
-                {isProcessingLocal ? 'Подготовка...' : 'Инициировать бой'}
-              </button>
-            </>
-          ) : (
-            <div className="py-12">
-              <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-              <h2 className="text-xl font-bold text-white mb-2 tracking-wide">СИНХРОНИЗАЦИЯ...</h2>
-              <p className="text-gray-400 text-sm uppercase">Ожидание настройки протокола от хоста</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (localGameState === 'generating') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0f] text-white p-4">
-        <div className="bg-gray-800/80 backdrop-blur-md p-10 rounded-3xl shadow-2xl border border-purple-500/30 max-w-md w-full text-center flex flex-col items-center">
-          <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
-          <h2 className="text-2xl font-black text-purple-400 tracking-widest uppercase mb-3">Синтез боевого арсенала...</h2>
-          <p className="text-gray-400 text-sm mb-2">Нейросеть Gemini формирует пул вопросов по теме <span className="font-bold text-white">«{theme}»</span>.</p>
-          <p className="text-green-400 text-xs font-mono uppercase tracking-widest bg-green-900/20 px-3 py-1 rounded border border-green-500/30 mt-2">API ключи скрыты и защищены</p>
-        </div>
-      </div>
+      <SetupScreen 
+        isHost={isHost} theme={theme} setTheme={setTheme} 
+        handleStartGame={handleStartGame} isProcessing={localGameState === 'generating' || isProcessingLocal} 
+      />
     );
   }
 
   return (
-    <div className="relative flex flex-col items-center min-h-screen bg-[#050508] text-white overflow-hidden p-4 font-sans">
+    <div className="relative flex flex-col items-center min-h-screen bg-[#020204] text-white p-2 md:p-6 font-sans overflow-hidden">
       
-      {/* HUD */}
-      <div className="w-full max-w-5xl flex justify-between items-center bg-gray-900/80 p-4 rounded-2xl border border-gray-800 shadow-lg mb-6 backdrop-blur-md z-10">
-        <div className={`flex items-center space-x-4 px-6 py-3 rounded-xl transition-all ${turnPlayerId === player1.id ? 'bg-blue-500/10 border border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'opacity-50 grayscale'}`}>
-          <div className="w-12 h-12 rounded-full bg-blue-600 border-2 border-blue-400 overflow-hidden">
-             <img src={player1.avatar} alt="P1" className="w-full h-full object-cover"/>
-          </div>
-          <div>
-            <div className="text-blue-400 text-xs font-bold uppercase tracking-wider">Синий Альянс</div>
-            <div className="font-bold text-lg">{player1.name}</div>
+      {/* Адаптивный HUD */}
+      <div className="w-full max-w-6xl grid grid-cols-3 gap-2 md:gap-4 bg-gray-900/80 p-3 md:p-4 rounded-3xl border border-gray-800 shadow-2xl mb-4 md:mb-8 backdrop-blur-xl z-10 items-center">
+        
+        {/* Игрок 1 */}
+        <div className={`flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4 p-2 md:px-6 md:py-3 rounded-2xl transition-all ${turnPlayerId === player1.id ? 'bg-blue-900/40 border border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.3)]' : 'opacity-40 grayscale'}`}>
+          <img src={player1.avatar} alt="P1" className="w-10 h-10 md:w-14 md:h-14 rounded-full border-2 border-blue-400 object-cover shadow-[0_0_15px_rgba(59,130,246,0.5)]"/>
+          <div className="text-center md:text-left">
+            <div className="text-blue-400 text-[9px] md:text-xs font-bold uppercase tracking-widest hidden md:block">Синий Альянс</div>
+            <div className="font-bold text-xs md:text-lg truncate max-w-[80px] md:max-w-none">{player1.name}</div>
           </div>
         </div>
         
-        <div className="text-center flex flex-col items-center">
-          <div className="text-xs text-purple-400 font-bold tracking-[0.2em] uppercase mb-1 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
-            Категория: {theme}
+        {/* Центр HUD */}
+        <div className="text-center flex flex-col items-center justify-center">
+          <div className="text-[9px] md:text-xs text-purple-400 font-bold tracking-[0.2em] uppercase mb-1 bg-purple-500/10 px-2 md:px-4 py-1 rounded-full border border-purple-500/30 truncate max-w-full">
+            {theme}
           </div>
-          <div className="text-xl font-black mt-2">
-            <span className="text-gray-500 mr-2">ХОД:</span>
-            <span className={turnPlayerId === player1.id ? 'text-blue-400' : 'text-red-400'}>
+          <div className="text-sm md:text-2xl font-black mt-1 md:mt-2">
+            <span className="text-gray-600 mr-1 md:mr-2 text-xs md:text-xl">ХОД:</span>
+            <span className={turnPlayerId === player1.id ? 'text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]'}>
               {room.players.find(p => p.id === turnPlayerId)?.name}
             </span>
           </div>
-          <div className="text-xs text-gray-500 mt-1">Остаток пула: {questions.length} (Авто-пополнение)</div>
+          <div className="text-[9px] md:text-xs text-gray-500 mt-1 uppercase tracking-widest hidden md:block">Пулы в резерве: {questions.length}</div>
         </div>
 
-        <div className={`flex items-center space-x-4 px-6 py-3 rounded-xl transition-all flex-row-reverse space-x-reverse ${turnPlayerId === player2.id ? 'bg-red-500/10 border border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'opacity-50 grayscale'}`}>
-          <div className="w-12 h-12 rounded-full bg-red-600 border-2 border-red-400 overflow-hidden">
-             <img src={player2.avatar} alt="P2" className="w-full h-full object-cover"/>
-          </div>
-          <div className="text-right">
-            <div className="text-red-400 text-xs font-bold uppercase tracking-wider">Красная Орда</div>
-            <div className="font-bold text-lg">{player2.name}</div>
+        {/* Игрок 2 */}
+        <div className={`flex flex-col md:flex-row-reverse items-center space-y-2 md:space-y-0 md:space-x-reverse md:space-x-4 p-2 md:px-6 md:py-3 rounded-2xl transition-all ${turnPlayerId === player2.id ? 'bg-red-900/40 border border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 'opacity-40 grayscale'}`}>
+          <img src={player2.avatar} alt="P2" className="w-10 h-10 md:w-14 md:h-14 rounded-full border-2 border-red-400 object-cover shadow-[0_0_15px_rgba(239,68,68,0.5)]"/>
+          <div className="text-center md:text-right">
+            <div className="text-red-400 text-[9px] md:text-xs font-bold uppercase tracking-widest hidden md:block">Красная Орда</div>
+            <div className="font-bold text-xs md:text-lg truncate max-w-[80px] md:max-w-none">{player2.name}</div>
           </div>
         </div>
       </div>
 
-      {/* ТАКТИЧЕСКАЯ КАРТА */}
-      <div className="relative w-full max-w-5xl aspect-[21/9] bg-gray-950 rounded-3xl border border-gray-800 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden">
-        <div className="absolute inset-0 opacity-10" 
-             style={{ backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
-        </div>
-
-        <svg className="absolute inset-0 w-full h-full drop-shadow-2xl" preserveAspectRatio="none">
-          <defs>
-            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
-
-          {CONNECTIONS.map((conn, i) => {
-            const from = castles.find(c => c.id === conn[0]);
-            const to = castles.find(c => c.id === conn[1]);
-            if (!from || !to) return null;
-            
-            const isOwnedConn = from.ownerId && from.ownerId === to.ownerId;
-            const strokeColor = isOwnedConn ? getPlayerColor(from.ownerId, true) : "#1f2937";
-            
-            return (
-              <line 
-                key={i}
-                x1={`${from.cx}%`} y1={`${from.cy}%`} 
-                x2={`${to.cx}%`} y2={`${to.cy}%`} 
-                stroke={strokeColor} 
-                strokeWidth={isOwnedConn ? "6" : "4"} 
-                strokeLinecap="round"
-                className="transition-colors duration-500"
-                filter={isOwnedConn ? "url(#glow)" : ""}
-              />
-            );
-          })}
-
-          {castles.map(castle => {
-            const isClickable = canAttack(castle.id) && turnPlayerId === user.id && !attackingCastle && !isProcessingLocal;
-            const color = getPlayerColor(castle.ownerId);
-            const glowColor = getPlayerColor(castle.ownerId, true);
-            
-            return (
-              <g 
-                key={castle.id} 
-                className={`transition-transform duration-300 ${isClickable ? 'cursor-pointer hover:scale-110' : ''}`}
-                style={{ transformOrigin: `${castle.cx}% ${castle.cy}%` }}
-                onClick={() => handleCastleClick(castle.id)}
-              >
-                <circle cx={`${castle.cx}%`} cy={`${castle.cy}%`} r={castle.isBase ? "45" : "35"} fill={glowColor} opacity="0.1" className="animate-pulse" />
-                
-                <polygon 
-                  points={
-                    castle.isBase 
-                    ? `${castle.cx},${castle.cy-25} ${castle.cx+22},${castle.cy-12} ${castle.cx+22},${castle.cy+12} ${castle.cx},${castle.cy+25} ${castle.cx-22},${castle.cy+12} ${castle.cx-22},${castle.cy-12}`
-                    : `${castle.cx},${castle.cy-18} ${castle.cx+15},${castle.cy-9} ${castle.cx+15},${castle.cy+9} ${castle.cx},${castle.cy+18} ${castle.cx-15},${castle.cy+9} ${castle.cx-15},${castle.cy-9}`
-                  }
-                  fill={color}
-                  stroke={isClickable ? "#fff" : glowColor}
-                  strokeWidth={isClickable ? "4" : "2"}
-                  filter={castle.ownerId ? "url(#glow)" : ""}
-                  className="transition-colors duration-500"
-                />
-
-                {castle.isBase ? (
-                  <text x={`${castle.cx}%`} y={`${castle.cy}%`} fontSize="16" fill="#fff" textAnchor="middle" dominantBaseline="central" className="font-bold">★</text>
-                ) : (
-                  <circle cx={`${castle.cx}%`} cy={`${castle.cy}%`} r="4" fill="#fff" opacity="0.5" />
-                )}
-
-                {isClickable && (
-                  <circle cx={`${castle.cx}%`} cy={`${castle.cy}%`} r={castle.isBase ? "35" : "28"} fill="none" stroke="#fff" strokeWidth="2" strokeDasharray="6 6" className="animate-spin-slow" />
-                )}
-              </g>
-            );
-          })}
-        </svg>
+      {/* Интерактивная Карта */}
+      <div className="w-full max-w-6xl flex-grow flex items-center justify-center">
+        <CastleMap 
+          castles={castles} connections={CONNECTIONS} turnPlayerId={turnPlayerId} userId={user.id}
+          attackingCastle={attackingCastle} isProcessingLocal={isProcessingLocal}
+          canAttack={canAttack} getPlayerColor={getPlayerColor} handleCastleClick={handleCastleClick}
+        />
       </div>
 
-      {/* ЭКРАН ПОБЕДЫ */}
+      {/* Окно Победы */}
       {localGameState === 'gameOver' && (
         <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in">
-          <div className="text-center">
-            <h1 className="text-7xl font-black mb-6 uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-600">
-              Игра Окончена
+          <div className="text-center p-4">
+            <h1 className="text-5xl md:text-8xl font-black mb-6 uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-orange-600 drop-shadow-[0_0_30px_rgba(253,224,71,0.4)]">
+              КОНЕЦ ИГРЫ
             </h1>
-            <p className="text-2xl text-white mb-8">
-              Победитель: <span className="font-bold text-yellow-400">{room.players.find(p => p.id === winner)?.name}</span>
+            <p className="text-xl md:text-3xl text-gray-300 mb-10">
+              Доминант: <span className="font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">{room.players.find(p => p.id === winner)?.name}</span>
             </p>
             {isHost && (
                <button 
                 onClick={() => update(ref(db, `rooms/${room.id}/gameState`), { phase: 'setup' })}
-                className="px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold uppercase tracking-wider transition-colors"
+                className="w-full md:w-auto px-10 py-5 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-purple-600 hover:to-blue-600 text-white rounded-2xl font-bold uppercase tracking-widest transition-all shadow-xl"
                >
                  Вернуться в лобби
                </button>
@@ -479,94 +282,14 @@ export const CastleQuizGame: React.FC<Props> = ({ room, user }) => {
         </div>
       )}
 
-      {/* ЭКРАН БОЯ (Вопрос или Ожидание) */}
+      {/* Модальное окно сражения */}
       {attackingCastle && localGameState !== 'gameOver' && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-3xl bg-gray-900/90 border border-purple-500/30 p-8 md:p-12 rounded-3xl shadow-[0_0_60px_rgba(168,85,247,0.2)] relative overflow-hidden">
-            
-            <div className="absolute top-0 left-0 w-full h-1 bg-purple-500/50 animate-[scan_2s_ease-in-out_infinite]"></div>
-
-            {isGenerating ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
-                <h3 className="text-2xl font-black text-purple-400 tracking-widest uppercase">Дозарядка пула...</h3>
-                <p className="text-gray-500 mt-4 font-mono text-sm">Открытое AI соединение установлено</p>
-              </div>
-            ) : questionData && !feedback ? (
-              <div className="animate-in slide-in-from-bottom-4">
-                
-                <div className="w-full h-2 bg-gray-800 rounded-full mb-8 overflow-hidden">
-                  <div 
-                    className="h-full transition-all duration-1000 ease-linear"
-                    style={{ 
-                      width: `${(timeLeft / QUESTION_TIME_LIMIT) * 100}%`,
-                      backgroundColor: timeLeft > 5 ? '#a855f7' : '#ef4444' 
-                    }}
-                  ></div>
-                </div>
-
-                <div className="flex justify-between items-center mb-6">
-                  <span className="bg-purple-600/20 border border-purple-500/30 text-purple-400 px-4 py-1.5 rounded-full text-xs font-bold tracking-[0.2em] uppercase">
-                    Анализ данных
-                  </span>
-                  <span className={`text-2xl font-black font-mono ${timeLeft > 5 ? 'text-white' : 'text-red-500 animate-pulse'}`}>
-                    00:{timeLeft.toString().padStart(2, '0')}
-                  </span>
-                </div>
-
-                <h2 className="text-2xl md:text-3xl font-bold text-white leading-relaxed mb-8">{questionData.question}</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {questionData.options.map((opt: string, idx: number) => (
-                    <button 
-                      key={idx}
-                      onClick={() => handleAnswerClick(opt)}
-                      disabled={turnPlayerId !== user.id || isProcessingLocal}
-                      className={`relative p-5 bg-gray-800/80 border border-gray-700 rounded-2xl transition-all text-lg font-medium text-left overflow-hidden group
-                        ${(turnPlayerId === user.id && !isProcessingLocal)
-                          ? 'hover:bg-purple-900/40 hover:border-purple-400 cursor-pointer shadow-lg hover:shadow-purple-500/20 hover:-translate-y-1' 
-                          : 'opacity-50 cursor-not-allowed'}`}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
-                      <div className="flex items-center relative z-10">
-                        <span className="inline-flex items-center justify-center w-10 h-10 bg-gray-900 border border-gray-700 text-gray-400 font-bold rounded-xl mr-4 group-hover:bg-purple-600 group-hover:text-white group-hover:border-purple-400 transition-colors">
-                          {['A', 'B', 'C', 'D'][idx]}
-                        </span>
-                        <span>{opt}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : feedback ? (
-              <div className={`text-center py-10 animate-in zoom-in-95 ${feedback.isCorrect ? 'text-green-400' : 'text-red-400'}`}>
-                <div className="text-7xl mb-6 drop-shadow-2xl">
-                  {feedback.isCorrect ? (feedback.message.includes('БАЗА') ? '👑' : '⚡') : '💀'}
-                </div>
-                <h2 className="text-4xl font-black mb-6 uppercase tracking-widest">{feedback.message}</h2>
-                <div className="bg-gray-900/80 p-8 rounded-2xl border border-gray-800 text-gray-300 relative">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gray-900 px-4 text-xs uppercase tracking-[0.2em] font-bold text-gray-500">
-                    Историческая справка
-                  </div>
-                  <p className="text-lg italic leading-relaxed">"{feedback.fact}"</p>
-                </div>
-              </div>
-            ) : null}
-
-          </div>
-        </div>
+        <BattleModal 
+          isGenerating={isGenerating} questionData={questionData} feedback={feedback}
+          timeLeft={timeLeft} timeLimit={QUESTION_TIME_LIMIT} turnPlayerId={turnPlayerId} 
+          userId={user.id} isProcessingLocal={isProcessingLocal} handleAnswerClick={handleAnswerClick}
+        />
       )}
-
-      <style>{`
-        @keyframes scan {
-          0% { transform: translateY(0); }
-          50% { transform: translateY(100%); }
-          100% { transform: translateY(0); }
-        }
-        @keyframes shimmer {
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
     </div>
   );
 };

@@ -6,7 +6,7 @@ import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
 import FlappyNekoGame from '../games/FlappyNeko/FlappyNekoGame';
 import PixelRopeGame from '../games/PixelRope/PixelRopeGame';
 // ВАЖНО: Импорт в фигурных скобках {}
-import { CastleQuizGame } from '../games/CastleQuiz/CastleQuizGame';
+import { CastleQuizGame } from '../games/CastleQuiz/components/CastleQuizGame';
 
 interface GameViewProps {
   room: Room;

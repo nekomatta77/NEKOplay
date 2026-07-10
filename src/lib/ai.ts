@@ -1,17 +1,13 @@
 // src/lib/ai.ts
 
-/**
- * Отправляет запрос на наш внутренний API (api/quiz) для генерации вопросов.
- * Ключи и запросы к нейросети происходят на сервере, клиент получает только готовый JSON.
- */
-export const generateQuizBatch = async (theme: string) => {
+export const generateQuizBatch = async (theme: string, history: string[] = []) => {
     try {
         const response = await fetch('/api/quiz', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ theme })
+            body: JSON.stringify({ theme, history })
         });
 
         if (!response.ok) {
