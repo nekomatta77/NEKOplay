@@ -1,13 +1,13 @@
 // src/lib/ai.ts
 
-export const generateQuizBatch = async (theme: string, history: string[] = []) => {
+export const generateQuizBatch = async (payload: { theme?: string, themes?: string[], history?: string[] }) => {
     try {
         const response = await fetch('/api/quiz', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ theme, history })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {

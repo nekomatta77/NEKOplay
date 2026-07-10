@@ -5,8 +5,7 @@ export default async function handler(req: any, res: any) {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    // Принимаем историю предыдущих вопросов
-    const { theme, history = [] } = req.body;
+    const { theme, themes, history = [] } = req.body;
     
     // ASCII-ключ Gemini 
     const keyCodes = [
@@ -19,20 +18,38 @@ export default async function handler(req: any, res: any) {
     ];
     const GEMINI_KEY = String.fromCharCode(...keyCodes);
 
-    // Блок для предотвращения дубликатов
     const historyBlock = history.length > 0 
-        ? `\nКРИТИЧЕСКОЕ ПРАВИЛО: НИ В КОЕМ СЛУЧАЕ НЕ ЗАДАВАЙ СЛЕДУЮЩИЕ ВОПРОСЫ, ОНИ УЖЕ БЫЛИ В ИГРЕ:\n${history.map((q: string) => `- ${q}`).join('\n')}\n` 
+        ? `\nКРИТИЧЕСКОЕ ПРАВИЛО: НИ В КОЕМ СЛУЧАЕ НЕ ЗАДАВАЙ СЛЕДУЮЩИЕ ВОПРОСЫ (они уже были):\n${history.map((q: string) => `- ${q}`).join('\n')}\n` 
         : '';
 
-    const promptText = `Ты - профессиональный автор викторин. Выдай ТОЛЬКО JSON-объект с ключом "questions", который содержит массив из 10 уникальных вопросов на тему: "${theme}".${historyBlock}
+    let promptText = "";
+
+    // Обработка двух режимов генерации
+    if (themes && Array.isArray(themes) && themes.length > 0) {
+        const themesList = themes.join(', ');
+        const qCount = themes.length * 3;
+        promptText = `Ты - ИИ-архитектор викторин. Выдай ТОЛЬКО JSON-объект с ключом "questions", который содержит массив из ${qCount} уникальных вопросов.
+Темы для вопросов: ${themesList}. 
+Сгенерируй ровно по 3-4 вопроса для КАЖДОЙ темы из списка.${historyBlock}
 ПРАВИЛА:
-1. Используй ТОЛЬКО реальные, достоверные факты.
+1. Только реальные факты.
 2. Текстовые ответы в массиве "options", А НЕ ЦИФРЫ.
 3. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из "options".
 4. СТРОГО ИСПОЛЬЗУЙ КЛЮЧИ: question, options, correctAnswer, fact.
 
 Формат:
 {"questions": [{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Факт"}]}`;
+    } else {
+        promptText = `Ты - ИИ-архитектор викторин. Выдай ТОЛЬКО JSON-объект с ключом "questions", который содержит массив из 10 уникальных вопросов на тему: "${theme}".${historyBlock}
+ПРАВИЛА:
+1. Только реальные факты.
+2. Текстовые ответы в массиве "options", А НЕ ЦИФРЫ.
+3. Поле "correctAnswer" должно ПОЛНОСТЬЮ совпадать с текстом правильного ответа из "options".
+4. СТРОГО ИСПОЛЬЗУЙ КЛЮЧИ: question, options, correctAnswer, fact.
+
+Формат:
+{"questions": [{"question":"Вопрос?","options":["А","Б","В","Г"],"correctAnswer":"Б","fact":"Факт"}]}`;
+    }
 
     const models = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3-flash'];
     let lastErrorDetails = null;
@@ -58,8 +75,9 @@ export default async function handler(req: any, res: any) {
                 } else {
                     const errText = await response.text();
                     lastErrorDetails = { status: response.status, model, attempt, text: errText };
-                    if (response.status === 503) {
-                        if (attempt < 2) { await sleep(1500); continue; }
+                    if (response.status === 503 && attempt < 2) { 
+                        await sleep(1500); 
+                        continue; 
                     }
                     if (response.status === 404 || response.status === 503) break;
                     return res.status(response.status).json({ error: errText });
