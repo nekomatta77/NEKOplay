@@ -1,11 +1,11 @@
 // src/games/DeadOfWinter/store/gameActions.ts
-import { GameState, ActionDice } from './gameState';
+import { GameState, Player, ActionDice } from './gameState';
 
 // Завершение хода и передача следующему игроку
 export const endPlayerTurn = (state: GameState): GameState => {
   if (!state.activePlayerId) return state;
 
-  const currentPlayerIndex = state.players.findIndex(p => p.id === state.activePlayerId);
+  const currentPlayerIndex = state.players.findIndex((p: Player) => p.id === state.activePlayerId);
   const nextPlayerIndex = currentPlayerIndex + 1;
 
   // Если сходили все игроки, переходим в фазу колонии
@@ -28,12 +28,12 @@ export const endPlayerTurn = (state: GameState): GameState => {
 export const spendDice = (state: GameState, playerId: string, diceId: string): GameState => {
   return {
     ...state,
-    players: state.players.map(player => {
+    players: state.players.map((player: Player) => {
       if (player.id !== playerId) return player;
       
       return {
         ...player,
-        actionDice: player.actionDice.map(dice => 
+        actionDice: player.actionDice.map((dice: ActionDice) => 
           dice.id === diceId ? { ...dice, status: 'spent' } : dice
         )
       };
@@ -65,7 +65,7 @@ export const requestDiceRoll = (state: GameState, playerId: string, diceCount: n
 export const applyRolledDice = (state: GameState, playerId: string, results: number[]): GameState => {
   return {
     ...state,
-    players: state.players.map(player => {
+    players: state.players.map((player: Player) => {
       if (player.id !== playerId) return player;
       
       const newDice: ActionDice[] = results.map((val, idx) => ({

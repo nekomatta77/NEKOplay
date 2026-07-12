@@ -1,6 +1,7 @@
 // src/games/DeadOfWinter/store/gameState.ts
 
 export type DiceStatus = 'available' | 'spent' | 'rolled';
+export type GamePhase = 'lobby' | 'drafting' | 'player_turns' | 'colony_phase';
 
 export interface ActionDice {
   id: string;
@@ -12,23 +13,29 @@ export interface Player {
   id: string;
   name: string;
   isFirstPlayer: boolean;
-  survivors: string[]; // ID выживших под контролем игрока
+  survivors: string[]; 
   actionDice: ActionDice[];
+}
+
+export interface GameSettings {
+  duration: 'short' | 'medium' | 'long';
+  difficulty: 'normal' | 'hardcore';
+  hasTraitor: boolean;
 }
 
 export interface GameState {
   players: Player[];
   activePlayerId: string | null;
   round: number;
-  phase: 'player_turns' | 'colony_phase';
-  // Базовые ресурсы колонии
+  phase: GamePhase;
+  settings: GameSettings;
+  draftPool: string[]; // ID скрытых карт на столе
   colony: {
     morale: number;
     food: number;
     starvationTokens: number;
     waste: number;
   };
-  // Данные для синхронизации 3D-броска
   lastDiceRequest?: {
     playerId: string;
     notation: string;
@@ -36,17 +43,3 @@ export interface GameState {
     timestamp: number;
   };
 }
-
-// Инициализация стартового состояния
-export const initialGameState: GameState = {
-  players: [],
-  activePlayerId: null,
-  round: 1,
-  phase: 'player_turns',
-  colony: {
-    morale: 5,
-    food: 0,
-    starvationTokens: 0,
-    waste: 0,
-  },
-};
