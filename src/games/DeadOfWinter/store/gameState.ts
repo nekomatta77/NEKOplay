@@ -28,6 +28,13 @@ export interface GameState {
     starvationTokens: number;
     waste: number;
   };
+  // Данные для синхронизации 3D-броска
+  lastDiceRequest?: {
+    playerId: string;
+    notation: string;
+    results: number[];
+    timestamp: number;
+  };
 }
 
 // Инициализация стартового состояния

@@ -30,11 +30,54 @@ export const spendDice = (state: GameState, playerId: string, diceId: string): G
     ...state,
     players: state.players.map(player => {
       if (player.id !== playerId) return player;
+      
       return {
         ...player,
         actionDice: player.actionDice.map(dice => 
           dice.id === diceId ? { ...dice, status: 'spent' } : dice
         )
+      };
+    })
+  };
+};
+
+// Запрос на бросок 3D-кубиков
+export const requestDiceRoll = (state: GameState, playerId: string, diceCount: number): GameState => {
+  // Генерируем результаты кубиков (от 1 до 6)
+  const results = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
+  
+  // Сортируем по убыванию (от большего к меньшему), чтобы сильные кубики были первыми
+  results.sort((a, b) => b - a);
+
+  // Возвращаем обновленный стейт с запросом на анимацию
+  return {
+    ...state,
+    lastDiceRequest: {
+      playerId,
+      notation: `${diceCount}d6`,
+      results,
+      timestamp: Date.now()
+    }
+  };
+};
+
+// Добавление брошенных кубиков в инвентарь игрока после завершения 3D анимации
+export const applyRolledDice = (state: GameState, playerId: string, results: number[]): GameState => {
+  return {
+    ...state,
+    players: state.players.map(player => {
+      if (player.id !== playerId) return player;
+      
+      const newDice: ActionDice[] = results.map((val, idx) => ({
+        id: `dice_${Date.now()}_${idx}`,
+        value: val,
+        status: 'available'
+      }));
+
+      return {
+        ...player,
+        // Заменяем старые (или пустые) кубики на новые выпавшие
+        actionDice: [...player.actionDice, ...newDice]
       };
     })
   };
