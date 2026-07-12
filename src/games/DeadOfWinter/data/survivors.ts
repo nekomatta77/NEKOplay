@@ -65,3 +65,12 @@ export const SURVIVORS: Record<string, SurvivorData> = {
     image: `${BASE_IMG_URL}/ThomasHeart.png`, abilityTitle: 'Тактика', abilityDesc: 'Может перебросить один свой кубик действия один раз за ход.'
   }
 };
+
+// === ВОЗВРАЩЕННЫЕ ЭКСПОРТЫ ДЛЯ СБОРЩИКА ===
+export const getSurvivorData = (id: string): SurvivorData | undefined => {
+  return SURVIVORS[id];
+};
+
+export const getAllSurvivors = (): SurvivorData[] => {
+  return Object.values(SURVIVORS);
+};
