@@ -1,22 +1,17 @@
 // src/games/DeadOfWinter/store/gameActions.ts
 import { GameState, Player, ActionDice } from './gameState';
 
-// Старт игры после выбора персонажей
-export const startGame = (state: GameState, playerId: string, selectedSurvivors: string[]): GameState => {
+// Старт игры после общего выбора персонажей
+export const startGame = (state: GameState, selections: Record<string, string[]>): GameState => {
   return {
     ...state,
-    phase: 'player_turns', // Исправление ошибки 2820 (добавлена 's')
-    activePlayerId: playerId,
-    players: state.players.map((p: Player) => {
-      if (p.id === playerId) {
-        return {
-          ...p,
-          survivors: selectedSurvivors,
-          actionDice: [] 
-        };
-      }
-      return p;
-    })
+    phase: 'player_turns',
+    activePlayerId: state.players[0].id, // Ходит первый игрок
+    players: state.players.map((p: Player) => ({
+        ...p,
+        survivors: selections[p.id] || [], // Раздаем выбранных героев
+        actionDice: [] 
+    }))
   };
 };
 

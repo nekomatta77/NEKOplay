@@ -7,27 +7,20 @@ import { ActionMenu } from './ActionMenu';
 import CharacterSelection from './CharacterSelection';
 import DiceRoller from './DiceRoller';
 import DiceTray from './DiceTray';
+import SurvivorModal from './SurvivorModal';
 import { SURVIVORS } from '../data/survivors';
 
-// Начальный пустой стейт игры
+// Добавим двух игроков для теста лобби
 const initialEmptyState: GameState = {
   phase: 'lobby',
   round: 1,
   activePlayerId: null,
-  settings: {
-    duration: 'medium', // Исправлено: изменено с 'normal' на 'medium'
-    difficulty: 'normal',
-    hasTraitor: false
-  },
+  settings: { duration: 'medium', difficulty: 'normal', hasTraitor: false },
   draftPool: [],
-  colony: { 
-    morale: 5, 
-    food: 0, 
-    starvationTokens: 0, 
-    waste: 0 
-  }, 
+  colony: { morale: 5, food: 0, starvationTokens: 0, waste: 0 }, 
   players: [
-    { id: 'player_1', name: 'Игрок 1', isFirstPlayer: true, survivors: [], actionDice: [] }
+    { id: 'player_1', name: 'Игрок 1', isFirstPlayer: true, survivors: [], actionDice: [] },
+    { id: 'player_2', name: 'Игрок 2', isFirstPlayer: false, survivors: [], actionDice: [] }
   ]
 };
 
@@ -36,19 +29,21 @@ export default function BoardScreen() {
   
   const [selectedDiceId, setSelectedDiceId] = useState<string | null>(null);
   const [activeSurvivorId, setActiveSurvivorId] = useState<string | null>(null);
+  const [inspectedSurvivorId, setInspectedSurvivorId] = useState<string | null>(null); // Модалка
   
   const [isTrayVisible, setIsTrayVisible] = useState(false);
   const [rollingPlayerName, setRollingPlayerName] = useState('');
   const lastTimestamp = useRef(gameState.lastDiceRequest?.timestamp || 0);
 
+  // В реальной игре это будет ID текущего клиента. Пока хардкодим для теста, что мы Игрок 1.
   const currentPlayerId = 'player_1'; 
   const activePlayer = gameState.players.find((p: Player) => p.id === gameState.activePlayerId);
   const isMyTurn = gameState.activePlayerId === currentPlayerId;
   const myPlayerInfo = gameState.players.find((p: Player) => p.id === currentPlayerId);
 
   // === ОБРАБОТЧИК ЛОББИ ===
-  const handleGameStart = (selectedSurvivorIds: string[]) => {
-    setGameState(prev => startGame(prev, currentPlayerId, selectedSurvivorIds));
+  const handleGameStart = (selections: Record<string, string[]>) => {
+    setGameState(prev => startGame(prev, selections));
   };
 
   // === СЛУШАТЕЛЬ БРОСКОВ ===
@@ -70,12 +65,17 @@ export default function BoardScreen() {
     }
   }, [gameState.lastDiceRequest, gameState.players]);
 
+  // ИСПРАВЛЕНИЕ БАГА: Надежное обновление через prev стейт
   const handleRollComplete = () => {
     setTimeout(() => {
       setIsTrayVisible(false);
-      if (gameState.lastDiceRequest?.playerId === currentPlayerId) {
-         setGameState(prev => applyRolledDice(prev, currentPlayerId, prev.lastDiceRequest!.results));
-      }
+      setGameState(prev => {
+        // Проверяем свежий prev стейт, а не старый gameState
+        if (prev.lastDiceRequest && prev.lastDiceRequest.playerId === currentPlayerId) {
+           return applyRolledDice(prev, currentPlayerId, prev.lastDiceRequest.results);
+        }
+        return prev;
+      });
     }, 1500);
   };
 
@@ -98,8 +98,13 @@ export default function BoardScreen() {
   };
 
   const handleSurvivorClick = (survivorId: string) => {
-    if (!selectedDiceId) return;
-    setActiveSurvivorId(survivorId);
+    if (selectedDiceId) {
+      // Если кубик выбран - применяем действие
+      setActiveSurvivorId(survivorId);
+    } else {
+      // Если кубик не выбран - открываем карточку для просмотра
+      setInspectedSurvivorId(survivorId);
+    }
   };
 
   const handleActionExecution = (actionType: string) => {
@@ -112,7 +117,7 @@ export default function BoardScreen() {
 
   // Рендеринг ЛОББИ
   if (gameState.phase === 'lobby') {
-    return <CharacterSelection onGameStart={handleGameStart} />;
+    return <CharacterSelection players={gameState.players} onGameStart={handleGameStart} />;
   }
 
   // Рендеринг ИГРОВОГО ПОЛЯ
@@ -137,7 +142,7 @@ export default function BoardScreen() {
         <section className="flex-1 rounded-2xl border border-white/5 bg-white/[0.02] p-8 shadow-[inset_0_0_50px_rgba(0,0,0,0.5)]">
           <h2 className="text-xl font-bold tracking-widest text-zinc-500 mb-6 flex items-center gap-3">
             <span className="w-4 h-4 rounded-full bg-cyan-600 animate-pulse"></span>
-            КОЛОНИЯ
+            КОЛОНИЯ (Ваши выжившие)
           </h2>
           <div className="flex gap-6">
             {myPlayerInfo?.survivors.map((survId: string) => {
@@ -151,8 +156,8 @@ export default function BoardScreen() {
                   key={surv.id}
                   onClick={() => handleSurvivorClick(surv.id)}
                   className={`
-                    relative w-52 rounded-xl border transition-all duration-300 overflow-hidden
-                    ${selectedDiceId ? 'cursor-pointer hover:border-cyan-500/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] hover:-translate-y-1' : 'cursor-default border-white/10'}
+                    relative w-52 rounded-xl border transition-all duration-300 overflow-hidden cursor-pointer
+                    ${selectedDiceId ? 'hover:border-cyan-500/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] hover:-translate-y-1' : 'border-white/10 hover:border-zinc-500'}
                     ${isTargeted ? 'border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.2)] scale-105' : 'bg-black/40'}
                   `}
                 >
@@ -186,7 +191,7 @@ export default function BoardScreen() {
             Бросить кубики действий
           </button>
         ) : (
-          <div className="flex gap-4 p-4 rounded-xl bg-white/5 border border-white/5 shadow-inner">
+          <div className="flex gap-4 p-4 rounded-xl bg-white/5 border border-white/5 shadow-inner relative">
             <span className="absolute -top-3 left-6 text-[10px] font-bold tracking-widest uppercase text-zinc-500 bg-black px-2">Ваши кубики</span>
             {myPlayerInfo?.actionDice.map((dice: ActionDice) => (
               <div
@@ -218,6 +223,13 @@ export default function BoardScreen() {
         />
       )}
 
+      {/* Модальное окно просмотра персонажа */}
+      {inspectedSurvivorId && (
+        <SurvivorModal 
+          survivor={SURVIVORS[inspectedSurvivorId]} 
+          onClose={() => setInspectedSurvivorId(null)} 
+        />
+      )}
     </div>
   );
 }
