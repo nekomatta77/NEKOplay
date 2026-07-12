@@ -1,20 +1,42 @@
 // src/games/DeadOfWinter/components/BoardScreen.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, Player, ActionDice } from '../store/gameState';
-import { endPlayerTurn, spendDice, requestDiceRoll, applyRolledDice } from '../store/gameActions';
+import { endPlayerTurn, spendDice, requestDiceRoll, applyRolledDice, startGame } from '../store/gameActions';
 import { TurnIndicator } from './TurnIndicator';
 import { ActionMenu } from './ActionMenu';
+import CharacterSelection from './CharacterSelection';
 import DiceRoller from './DiceRoller';
 import DiceTray from './DiceTray';
-import { mockInitialState, mockSurvivors } from '../data/mockData';
+import { SURVIVORS } from '../data/survivors';
+
+// Начальный пустой стейт игры
+const initialEmptyState: GameState = {
+  phase: 'lobby',
+  round: 1,
+  activePlayerId: null,
+  settings: {
+    duration: 'medium', // Исправлено: изменено с 'normal' на 'medium'
+    difficulty: 'normal',
+    hasTraitor: false
+  },
+  draftPool: [],
+  colony: { 
+    morale: 5, 
+    food: 0, 
+    starvationTokens: 0, 
+    waste: 0 
+  }, 
+  players: [
+    { id: 'player_1', name: 'Игрок 1', isFirstPlayer: true, survivors: [], actionDice: [] }
+  ]
+};
 
 export default function BoardScreen() {
-  const [gameState, setGameState] = useState<GameState>(mockInitialState);
+  const [gameState, setGameState] = useState<GameState>(initialEmptyState);
   
   const [selectedDiceId, setSelectedDiceId] = useState<string | null>(null);
   const [activeSurvivorId, setActiveSurvivorId] = useState<string | null>(null);
   
-  // === Состояние 3D кубиков ===
   const [isTrayVisible, setIsTrayVisible] = useState(false);
   const [rollingPlayerName, setRollingPlayerName] = useState('');
   const lastTimestamp = useRef(gameState.lastDiceRequest?.timestamp || 0);
@@ -23,6 +45,11 @@ export default function BoardScreen() {
   const activePlayer = gameState.players.find((p: Player) => p.id === gameState.activePlayerId);
   const isMyTurn = gameState.activePlayerId === currentPlayerId;
   const myPlayerInfo = gameState.players.find((p: Player) => p.id === currentPlayerId);
+
+  // === ОБРАБОТЧИК ЛОББИ ===
+  const handleGameStart = (selectedSurvivorIds: string[]) => {
+    setGameState(prev => startGame(prev, currentPlayerId, selectedSurvivorIds));
+  };
 
   // === СЛУШАТЕЛЬ БРОСКОВ ===
   useEffect(() => {
@@ -43,22 +70,18 @@ export default function BoardScreen() {
     }
   }, [gameState.lastDiceRequest, gameState.players]);
 
-  // Завершение анимации броска
   const handleRollComplete = () => {
     setTimeout(() => {
       setIsTrayVisible(false);
-      
-      // Если бросал я, забираю кубики себе в руку (в глобальный стейт)
       if (gameState.lastDiceRequest?.playerId === currentPlayerId) {
          setGameState(prev => applyRolledDice(prev, currentPlayerId, prev.lastDiceRequest!.results));
       }
     }, 1500);
   };
 
-  // Кнопка броска (когда у игрока нет кубиков)
   const handleStartRoll = () => {
     if (!isMyTurn) return;
-    const diceCount = (myPlayerInfo?.survivors.length || 1) + 1; // 1 кубик + по 1 за каждого выжившего
+    const diceCount = (myPlayerInfo?.survivors.length || 1) + 1; 
     setGameState(prev => requestDiceRoll(prev, currentPlayerId, diceCount));
   };
 
@@ -87,12 +110,17 @@ export default function BoardScreen() {
     setActiveSurvivorId(null);
   };
 
+  // Рендеринг ЛОББИ
+  if (gameState.phase === 'lobby') {
+    return <CharacterSelection onGameStart={handleGameStart} />;
+  }
+
+  // Рендеринг ИГРОВОГО ПОЛЯ
   const selectedDiceValue = myPlayerInfo?.actionDice.find((d: ActionDice) => d.id === selectedDiceId)?.value || 0;
 
   return (
     <div className="relative min-h-screen bg-zinc-950 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-900 to-zinc-950 overflow-hidden font-sans text-zinc-100">
       
-      {/* 3D Движок кубиков */}
       <DiceTray isVisible={isTrayVisible} playerName={rollingPlayerName} />
       <DiceRoller onRollComplete={handleRollComplete} />
 
@@ -113,7 +141,9 @@ export default function BoardScreen() {
           </h2>
           <div className="flex gap-6">
             {myPlayerInfo?.survivors.map((survId: string) => {
-              const surv = mockSurvivors[survId as keyof typeof mockSurvivors];
+              const surv = SURVIVORS[survId];
+              if (!surv) return null;
+
               const isTargeted = activeSurvivorId === survId;
               
               return (
@@ -121,17 +151,24 @@ export default function BoardScreen() {
                   key={surv.id}
                   onClick={() => handleSurvivorClick(surv.id)}
                   className={`
-                    relative p-4 w-52 rounded-xl border transition-all duration-300
+                    relative w-52 rounded-xl border transition-all duration-300 overflow-hidden
                     ${selectedDiceId ? 'cursor-pointer hover:border-cyan-500/50 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] hover:-translate-y-1' : 'cursor-default border-white/10'}
-                    ${isTargeted ? 'border-cyan-400 bg-cyan-950/40 shadow-[0_0_30px_rgba(34,211,238,0.2)] scale-105' : 'bg-black/40'}
+                    ${isTargeted ? 'border-cyan-400 shadow-[0_0_30px_rgba(34,211,238,0.2)] scale-105' : 'bg-black/40'}
                   `}
                 >
-                  <div className="absolute top-2 right-2 flex gap-1">
-                     <span className="bg-rose-900/50 text-rose-200 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-700/50">⚔ {surv.attack}+</span>
-                     <span className="bg-cyan-900/50 text-cyan-200 text-[10px] font-bold px-1.5 py-0.5 rounded border border-cyan-700/50">👁 {surv.search}+</span>
+                  <div className="h-32 w-full bg-zinc-800 relative">
+                     <img src={surv.image} alt={surv.name} className="w-full h-full object-cover opacity-70" />
+                     <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent" />
                   </div>
-                  <h3 className="font-bold text-lg mb-1 pr-16">{surv.name}</h3>
-                  <p className="text-xs text-zinc-500">Влияние: {surv.influence}</p>
+                  <div className="absolute top-2 right-2 flex gap-1 z-10">
+                     <span className="bg-rose-900/80 text-rose-200 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-700/50 backdrop-blur-sm">⚔ {surv.attack}+</span>
+                     <span className="bg-cyan-900/80 text-cyan-200 text-[10px] font-bold px-1.5 py-0.5 rounded border border-cyan-700/50 backdrop-blur-sm">👁 {surv.search}+</span>
+                  </div>
+                  <div className="p-4 relative z-10 -mt-8">
+                    <h3 className="font-black text-lg mb-0.5 drop-shadow-md">{surv.name}</h3>
+                    <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-2">{surv.profession}</p>
+                    <p className="text-xs text-zinc-500">Влияние: <span className="text-white font-bold">{surv.influence}</span></p>
+                  </div>
                 </div>
               );
             })}
@@ -174,7 +211,7 @@ export default function BoardScreen() {
 
       {activeSurvivorId && selectedDiceId && (
         <ActionMenu 
-          survivorStats={mockSurvivors[activeSurvivorId as keyof typeof mockSurvivors]}
+          survivorStats={SURVIVORS[activeSurvivorId]}
           selectedDiceValue={selectedDiceValue}
           onAction={handleActionExecution}
           onClose={() => setActiveSurvivorId(null)}
