@@ -4,7 +4,7 @@ import { ref, onValue, push, set, serverTimestamp, remove } from 'firebase/datab
 import { db } from '../lib/firebase';
 import { GAMES } from '../lib/games';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, Plus, Users, Gamepad2, X, PlayCircle, LogOut as LeaveIcon, Radio, Layers } from 'lucide-react';
+import { LogOut, Plus, Users, Gamepad2, X, PlayCircle, LogOut as LeaveIcon, Radio } from 'lucide-react';
 
 interface DashboardProps {
   user: User;
@@ -196,13 +196,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
         <div className={`transition-all duration-700 ${(activeRoom && !isJoining) ? 'opacity-20 blur-md pointer-events-none scale-[0.99]' : 'opacity-100 scale-100'}`}>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 gap-6">
             <div>
-              <div className="flex items-center gap-2 text-indigo-400 font-bold uppercase tracking-widest text-xs mb-2">
-                <Layers className="w-4 h-4" /> Операционная панель
-              </div>
               <h2 className="text-3xl font-black text-white tracking-tight">Доступные лобби</h2>
-              <p className="text-sm text-zinc-400 font-medium mt-1">Выберите активный узел связи или откройте собственный</p>
             </div>
-            {/* ИСПРАВЛЕНО 1: Переименовано "Развернуть сервер" -> "Хост" */}
             <button 
               onClick={() => setShowModal(true)}
               className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-black hover:bg-zinc-200 px-7 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all duration-300 shadow-[0_4px_30px_rgba(255,255,255,0.15)] hover:scale-105 active:scale-95"
@@ -222,8 +217,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                   <div className="p-5 bg-white/[0.02] rounded-3xl mb-4 border border-white/5">
                     <Gamepad2 className="w-12 h-12 text-zinc-600 animate-pulse" />
                   </div>
-                  <p className="text-lg font-bold text-zinc-400 tracking-wide">Радиоэфир пуст</p>
-                  <p className="text-sm text-zinc-500 mt-1 max-w-xs">Создайте первое лобби, нажав кнопку «Хост» выше</p>
+                  <p className="text-lg font-bold text-zinc-400 tracking-wide">Список доступных лобби</p>
                 </motion.div>
               ) : (
                 rooms.map((room, idx) => {
@@ -289,7 +283,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                   <input type="text" value={roomName} onChange={(e) => setRoomName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-indigo-500/60 focus:bg-black/60 transition-all font-medium text-sm" required maxLength={20} />
                 </div>
                 <div>
-                  {/* ИСПРАВЛЕНО 2: Изменено "Режим симуляции" -> "Выбор игры" */}
                   <label className="block text-[10px] font-black text-zinc-400 mb-2.5 uppercase tracking-widest">Выбор игры</label>
                   <div className="relative">
                     <select value={selectedGameId} onChange={handleGameChange} className="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-indigo-500/60 focus:bg-black/60 transition-all appearance-none cursor-pointer font-medium text-sm">
@@ -305,7 +298,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onJoinRoom }) => {
                   </div>
                   <input type="range" min={selectedGameObj.minPlayers} max={selectedGameObj.maxPlayers} value={maxPlayers} onChange={(e) => setMaxPlayers(parseInt(e.target.value))} className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-400" />
                 </div>
-                {/* ИСПРАВЛЕНО 3: Изменено "Инициализировать" -> "Создать" */}
                 <button type="submit" className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 bg-[length:200%_100%] animate-gradient text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs transition-all duration-300 shadow-[0_0_25px_rgba(99,102,241,0.3)] hover:shadow-[0_0_35px_rgba(99,102,241,0.5)] hover:scale-[1.02]">
                   Создать
                 </button>
