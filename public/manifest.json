@@ -4,6 +4,7 @@
   "description": "Игровая платформа NEKOplay",
   "start_url": "/",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "background_color": "#020617",
   "theme_color": "#020617",
   "orientation": "any",

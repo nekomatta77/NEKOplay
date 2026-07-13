@@ -12,16 +12,49 @@ interface GameViewProps {
   onLeave: () => void;
 }
 
+// Кроссбраузерная функция для входа в полноэкранный режим
+const enterFullscreen = () => {
+  const elem = document.documentElement as any;
+  if (elem.requestFullscreen) {
+    elem.requestFullscreen().catch(() => {});
+  } else if (elem.mozRequestFullScreen) { // Firefox
+    elem.mozRequestFullScreen();
+  } else if (elem.webkitRequestFullscreen) { // Chrome, Safari, Opera
+    elem.webkitRequestFullscreen();
+  } else if (elem.msRequestFullscreen) { // IE/Edge
+    elem.msRequestFullscreen();
+  }
+};
+
+// Кроссбраузерная функция для выхода из полноэкранного режима
+const exitFullscreen = async () => {
+  const doc = document as any;
+  if (doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement) {
+    if (doc.exitFullscreen) {
+      await doc.exitFullscreen().catch(() => {});
+    } else if (doc.webkitExitFullscreen) {
+      doc.webkitExitFullscreen();
+    } else if (doc.mozCancelFullScreen) {
+      doc.mozCancelFullScreen();
+    } else if (doc.msExitFullscreen) {
+      doc.msExitFullscreen();
+    }
+  }
+};
+
 export default function GameView({ room, user, onLeave }: GameViewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isIframeLoaded, setIsIframeLoaded] = useState(false);
   const pendingState = useRef<any>(null);
   const [reactGameState, setReactGameState] = useState<any>(null);
 
+  // Пытаемся развернуть игру на весь экран при входе
+  useEffect(() => {
+    enterFullscreen();
+  }, []);
+
   const handleLeaveGame = async () => {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen().catch(console.error);
-    }
+    await exitFullscreen();
     const updatedPlayers = room.players?.filter(p => p.id !== user.id) || [];
     const isHost = room.players?.find(p => p.id === user.id)?.isHost;
     
@@ -44,12 +77,11 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id]);
 
   useEffect(() => {
-    // Исключаем встроенные игры из логики обработки событий iframe
     if (room.gameType === 'pixelrope' || room.gameType === 'castlequiz') return; 
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'request_fullscreen') {
-        if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); }
+        enterFullscreen();
       }
       if (event.data?.type === 'start_game') {
         const gamePlayers = room.players || [];
@@ -86,7 +118,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
       pendingState.current = state; 
       setReactGameState(state);
       
-      // Исключаем отправку постов синхронизации в iframe для встроенных игр
       if (
         isIframeLoaded && 
         iframeRef.current?.contentWindow && 
@@ -100,7 +131,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id, room.players, isIframeLoaded, room.gameType]);
 
   useEffect(() => {
-    // Исключаем прослушивание экшенов для встроенных игр
     if (room.gameType === 'pixelrope' || room.gameType === 'castlequiz') return;
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
@@ -112,12 +142,25 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
     return () => unsubscribe();
   }, [room.id, user.id, isIframeLoaded, room.gameType]);
 
+  // Обертка для обработки первого тапа (если браузер заблокировал автоматический фуллскрин)
+  const handleWrapperClick = () => {
+    enterFullscreen();
+  };
+
   // Секция рендеринга встроенных React-компонентов игр
   if (room.gameType === 'pixelrope') {
-    return <PixelRopeGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
+    return (
+      <div className="fixed inset-0 bg-black z-50 overflow-hidden" onClick={handleWrapperClick}>
+        <PixelRopeGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />
+      </div>
+    );
   }
   if (room.gameType === 'castlequiz') {
-    return <CastleQuizGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
+    return (
+      <div className="fixed inset-0 bg-black z-50 overflow-hidden" onClick={handleWrapperClick}>
+        <CastleQuizGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />
+      </div>
+    );
   }
 
   // Логика формирования URL для внешних HTML5 игр внутри iframe
@@ -137,7 +180,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-50">
+    <div className="fixed inset-0 bg-black z-50 overflow-hidden" onClick={handleWrapperClick}>
       <iframe ref={iframeRef} onLoad={handleIframeLoad} src={getGameUrl()} className="w-full h-full border-0 block" title="Game Window" allow="autoplay; fullscreen; microphone" />
     </div>
   );
