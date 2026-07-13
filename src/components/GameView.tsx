@@ -2,8 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Room, User } from '../types';
 import { ref, update, onValue, set, remove } from 'firebase/database';
 import { db } from '../lib/firebase';
-import DeadOfWinterGame from '../games/DeadOfWinter/DeadOfWinterGame';
-import FlappyNekoGame from '../games/FlappyNeko/FlappyNekoGame';
 import PixelRopeGame from '../games/PixelRope/PixelRopeGame';
 // ВАЖНО: Импорт в фигурных скобках {}
 import { CastleQuizGame } from '../games/CastleQuiz/CastleQuizGame';
@@ -47,7 +45,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   useEffect(() => {
     // Исключаем встроенные игры из логики обработки событий iframe
-    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'pixelrope' || room.gameType === 'castlequiz') return; 
+    if (room.gameType === 'pixelrope' || room.gameType === 'castlequiz') return; 
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'request_fullscreen') {
@@ -92,8 +90,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
       if (
         isIframeLoaded && 
         iframeRef.current?.contentWindow && 
-        room.gameType !== 'deadofwinter' && 
-        room.gameType !== 'flappyneko' &&
         room.gameType !== 'pixelrope' &&
         room.gameType !== 'castlequiz'
       ) {
@@ -105,7 +101,7 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
 
   useEffect(() => {
     // Исключаем прослушивание экшенов для встроенных игр
-    if (room.gameType === 'deadofwinter' || room.gameType === 'flappyneko' || room.gameType === 'pixelrope' || room.gameType === 'castlequiz') return;
+    if (room.gameType === 'pixelrope' || room.gameType === 'castlequiz') return;
     const actionRef = ref(db, `rooms/${room.id}/lastAction`);
     const unsubscribe = onValue(actionRef, (snapshot) => {
       const actionData = snapshot.val();
@@ -117,12 +113,6 @@ export default function GameView({ room, user, onLeave }: GameViewProps) {
   }, [room.id, user.id, isIframeLoaded, room.gameType]);
 
   // Секция рендеринга встроенных React-компонентов игр
-  if (room.gameType === 'deadofwinter') {
-    return <DeadOfWinterGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
-  }
-  if (room.gameType === 'flappyneko') {
-    return <FlappyNekoGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
-  }
   if (room.gameType === 'pixelrope') {
     return <PixelRopeGame room={room} user={user} gameState={reactGameState} onLeave={handleLeaveGame} />;
   }
