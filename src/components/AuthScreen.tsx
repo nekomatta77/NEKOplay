@@ -37,12 +37,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         lastSeen: serverTimestamp()
       });
 
-      // Сохраняем в память браузера
       localStorage.setItem('nekoplay_user', JSON.stringify(newUser));
-
       onLogin(newUser);
     } catch (error) {
-      console.error("Ошибка при сохранении пользователя в Firebase:", error);
+      console.error("Ошибка при сохранении пользователя:", error);
       alert("Не удалось подключиться к серверу. Попробуйте еще раз.");
     } finally {
       setIsLoading(false);
@@ -50,67 +48,71 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden pb-safe">
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-600/20 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-[100dvh] bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden pb-safe font-sans selection:bg-indigo-500/30">
+      {/* Анимированный фон с неоновыми сферами */}
+      <motion.div 
+        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }} 
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" 
+      />
+      <motion.div 
+        animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }} 
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-violet-600/20 rounded-full blur-[150px] pointer-events-none" 
+      />
 
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative bg-zinc-900/60 backdrop-blur-xl border border-zinc-800/80 p-8 sm:p-10 rounded-3xl shadow-2xl w-full max-w-md z-10 my-8"
+        initial={{ opacity: 0, y: 30, filter: 'blur(10px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="relative bg-zinc-900/40 backdrop-blur-2xl border border-white/10 p-8 sm:p-10 rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.5)] w-full max-w-md z-10"
       >
-        {/* ИСПРАВЛЕНО: Блок динамического превью выбранной аватарки. Теперь закрывает ВСЮ область. Увеличен в 1.4х раза. */}
-        <div className="flex justify-center mb-6">
-          <div className="relative">
-            {/* Мягкий внешний эффект свечения */}
-            <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-35 rounded-full" />
-            
-            {/* Основной контейнер превью: w-20 h-20 (увеличенный в 1.4ххх). Убраны padding и границы. */}
-            <div className="relative w-20 h-20 rounded-3xl overflow-hidden shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all duration-300 bg-zinc-950/30 backdrop-blur-sm">
+        <div className="flex justify-center mb-8">
+          <div className="relative group cursor-pointer">
+            <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-40 group-hover:opacity-60 transition-opacity duration-500 rounded-full" />
+            <div className="relative w-[80px] h-[80px] rounded-2xl overflow-hidden shadow-[0_0_0_2px_rgba(255,255,255,0.1)] bg-zinc-950/50 backdrop-blur-sm z-10">
               <img 
                 src={selectedAvatar} 
-                alt="Selected Profile Preview" 
-                // w-full h-full object-cover заставляет аватарку полностью закрывать область от края до края
-                className="w-full h-full object-cover rounded-2xl transition-transform duration-300 scale-105"
+                alt="Selected Preview" 
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
               />
             </div>
           </div>
         </div>
         
-        <h1 className="text-3xl sm:text-4xl font-black text-center mb-2 tracking-tight">
-          <span className="text-white">NEKO</span><span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-500">play</span>
+        <h1 className="text-4xl font-black text-center mb-2 tracking-tighter">
+          <span className="text-white">NEKO</span>
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">play</span>
         </h1>
-        <p className="text-zinc-400 text-center mb-8 font-medium text-sm sm:text-base">Выберите свой профиль для начала игры</p>
+        <p className="text-zinc-400 text-center mb-8 font-medium text-sm">Создай свой профиль для погружения</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="flex items-center gap-2 text-xs sm:text-sm font-bold text-zinc-300 mb-3 uppercase tracking-wider">
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-xs font-bold text-zinc-400 uppercase tracking-widest">
               <Sparkles className="w-4 h-4 text-indigo-400" />
-              Выберите аватар
+              Внешний вид
             </label>
-            <div className="grid grid-cols-5 gap-2 sm:gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="grid grid-cols-5 gap-3 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar p-1">
               {AVATARS.map((avatar, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => setSelectedAvatar(avatar)}
-                  className={`relative rounded-xl sm:rounded-2xl overflow-hidden aspect-square transition-all duration-300 ${
+                  className={`relative rounded-xl overflow-hidden aspect-square transition-all duration-300 ${
                     selectedAvatar === avatar
-                      ? 'scale-110 shadow-[0_0_15px_rgba(99,102,241,0.6)] z-10 ring-2 ring-indigo-500 ring-offset-2 ring-offset-zinc-950 opacity-100'
-                      : 'opacity-40 hover:opacity-100 hover:scale-105'
+                      ? 'scale-110 shadow-[0_0_20px_rgba(99,102,241,0.5)] z-10 ring-2 ring-indigo-400 ring-offset-2 ring-offset-zinc-900 opacity-100'
+                      : 'opacity-50 hover:opacity-100 hover:scale-105 hover:ring-1 hover:ring-white/20'
                   }`}
                 >
-                  <div className={`absolute inset-0 border-2 rounded-xl sm:rounded-2xl transition-colors ${selectedAvatar === avatar ? 'border-indigo-500' : 'border-transparent'}`} />
-                  <img src={avatar} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover bg-zinc-800/50" />
+                  <img src={avatar} alt={`Avatar ${idx + 1}`} className="w-full h-full object-cover bg-zinc-900" />
                 </button>
               ))}
             </div>
           </div>
 
-          <div>
-            <label htmlFor="name" className="block text-xs sm:text-sm font-bold text-zinc-300 mb-2 uppercase tracking-wider">
-              Никнейм
+          <div className="space-y-3">
+            <label htmlFor="name" className="block text-xs font-bold text-zinc-400 uppercase tracking-widest">
+              Позывной
             </label>
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -121,8 +123,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="block w-full pl-12 pr-4 py-3 sm:py-4 border border-zinc-700/50 rounded-2xl leading-5 bg-zinc-950/50 text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 text-sm transition-all shadow-inner"
-                placeholder="Введите ваш никнейм"
+                className="block w-full pl-12 pr-4 py-4 bg-zinc-950/50 border border-white/5 rounded-2xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 focus:bg-zinc-900/50 transition-all text-sm font-medium"
+                placeholder="Введи никнейм..."
                 maxLength={15}
                 required
                 disabled={isLoading}
@@ -133,11 +135,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
           <button
             type="submit"
             disabled={!name.trim() || isLoading}
-            className="relative w-full group overflow-hidden rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="relative w-full group overflow-hidden rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed mt-4"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-violet-600 transition-transform group-hover:scale-105" />
-            <div className="relative flex justify-center py-3 sm:py-4 px-4 text-sm font-bold text-white tracking-wide uppercase">
-              {isLoading ? 'Подключение...' : 'Войти в платформу'}
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500 bg-[length:200%_100%] animate-gradient transition-transform group-hover:scale-[1.02]" />
+            <div className="relative flex justify-center py-4 px-4 text-sm font-black text-white tracking-widest uppercase">
+              {isLoading ? 'Инициализация...' : 'Войти в систему'}
             </div>
           </button>
         </form>

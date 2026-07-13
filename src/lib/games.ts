@@ -11,14 +11,6 @@ export const GAMES: Game[] = [
     maxPlayers: 8,
   },
   {
-    id: 'flappyneko',
-    name: 'Флэппи Птичка',
-    description: 'Кроссплатформенный мультиплеерный заезд! Летите одновременно с 20 игроками, уворачивайтесь от труб. После падения вы становитесь призраком и продолжаете полет!',
-    image: 'https://picsum.photos/seed/flappyneko/400/300?blur=1',
-    minPlayers: 1, 
-    maxPlayers: 20,
-  },
-  {
     id: 'drawphone',
     name: 'Испорченный телефон',
     description: 'Рисуй и угадывай! Безумная цепочка слов и рисунков.',
@@ -43,19 +35,10 @@ export const GAMES: Game[] = [
     maxPlayers: 8,
   },
   {
-    id: 'deadofwinter', 
-    name: 'Мертвые сезоны',
-    description: 'Сложная кооперативная игра на выживание с предателем. Собирайте ресурсы, убивайте зомби и не дайте колонии пасть!',
-    image: 'https://picsum.photos/seed/deadofwinter/400/300?blur=2',
-    minPlayers: 2, 
-    maxPlayers: 5,
-  },
-  // НАША НОВАЯ ИГРА:
-  {
     id: 'castlequiz', 
     name: 'Битва Умов',
     description: 'Стратегическая викторина с захватом замков. Выберите любую тему, и нейросеть сгенерирует уникальные вопросы для вашей битвы!',
-    image: 'https://picsum.photos/seed/castlequiz/400/300?blur=2', // Заглушка, потом заменишь на красивую картинку
+    image: 'https://picsum.photos/seed/castlequiz/400/300?blur=2', 
     minPlayers: 2, 
     maxPlayers: 4,
   }
